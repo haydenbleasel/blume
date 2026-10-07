@@ -259,6 +259,46 @@ test.describe("dropdowns", () => {
     await expect(open).toHaveCount(0);
   });
 
+  for (const dir of ["ltr", "rtl"]) {
+    test(`a page actions menu with longer labels shows in full (${dir})`, async ({
+      page,
+    }) => {
+      await page.goto("/docs/quickstart");
+      await page.evaluate((value) => {
+        document.documentElement.setAttribute("dir", value);
+      }, dir);
+      const dropdown = page
+        .locator("[data-blume-toc] [data-blume-page-actions] details")
+        .filter({ has: page.locator("[data-mcp-copy-url]") });
+      const menu = dropdown.locator("[data-blume-menu]");
+      const label = menu.locator("[data-mcp-url-label]");
+      // Longer than the rail has room for, with a word too long for one line.
+      await label.evaluate((element) => {
+        element.textContent =
+          "Kopiera io.github.modelcontextprotocol.servers-URL";
+      });
+      await dropdown.locator("summary").click();
+      // Where the rail clips the menu, the probe hits what's behind it instead.
+      await expect
+        .poll(() =>
+          menu.evaluate((element) => {
+            const box = element.getBoundingClientRect();
+            const y = box.top + box.height / 2;
+            return [box.left + 2, box.right - 2].every((x) =>
+              element.contains(document.elementFromPoint(x, y))
+            );
+          })
+        )
+        .toBe(true);
+      // The label wraps inside it rather than running past its edge.
+      expect(
+        await label.evaluate(
+          (element) => element.scrollWidth <= element.clientWidth
+        )
+      ).toBe(true);
+    });
+  }
+
   test("page actions move into the On this page dropdown below 1,280px", async ({
     page,
   }) => {

@@ -118,8 +118,10 @@ const rowClass =
 // background).
 const menuRowClass =
   "flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-start text-muted-foreground text-sm transition-colors hover:bg-muted hover:text-foreground";
+// At most out to the rail's edge, past its 1rem padding: the rail scrolls, so
+// it clips anything wider. Longer labels wrap instead.
 const panelClass =
-  "absolute top-full right-2 z-50 mt-1 w-max min-w-[14rem] max-w-[22rem] rounded-blume border border-border bg-background p-1 shadow-xl";
+  "absolute top-full end-0 z-50 mt-1 w-max min-w-[14rem] max-w-[calc(100%+1rem)] wrap-anywhere rounded-blume border border-border bg-background p-1 shadow-xl";
 ---
 
 <div
