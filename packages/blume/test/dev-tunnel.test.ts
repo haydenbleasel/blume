@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import { mkdtemp, mkdir, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 
 import cloudflareAdapter from "@astrojs/cloudflare";
@@ -72,13 +72,8 @@ describe("blume dev tunnel flags", () => {
   });
 
   it("forwards auto-start tunnel settings through Astro's Cloudflare adapter", async () => {
-    const root = await mkdtemp(join(tmpdir(), "blume-adapter-tunnel-"));
+    const root = await mkdtemp(join(PKG_ROOT, ".blume-adapter-tunnel-"));
     tempDirs.push(root);
-    await symlink(
-      join(PKG_ROOT, "node_modules"),
-      join(root, "node_modules"),
-      "junction"
-    );
     await mkdir(join(root, "src", "pages"), { recursive: true });
     await writeFile(
       join(root, "src", "pages", "index.astro"),
