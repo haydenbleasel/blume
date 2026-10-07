@@ -109,8 +109,10 @@ describe("blume dev tunnel flags", () => {
     };
     const viteConfig = await getViteConfig(
       {
+        optimizeDeps: { include: [], noDiscovery: true },
         plugins: [beforeTunnel, afterTunnel],
         root,
+        ssr: { optimizeDeps: { include: [], noDiscovery: true } },
       },
       {
         adapter: cloudflareAdapter(adapterOptions),
