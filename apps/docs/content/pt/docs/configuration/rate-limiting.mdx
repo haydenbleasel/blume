@@ -1,7 +1,7 @@
 ---
 title: Limite de requisições
 description: >-
-  Limite com que frequência um mesmo leitor pode chamar o assistente, o proxy do playground da API e a busca no servidor. Vem ativado por padrão, com a contagem mantida em memória, no Upstash ou no Cloudflare.
+  Limite com que frequência um mesmo leitor pode chamar o assistente, o proxy do playground da API e a busca no servidor. Vem ativado por padrão, com a contagem mantida em memória, no Upstash, no Cloudflare ou no Unkey.
 ---
 
 Cada chamada às rotas de servidor que um leitor pode acessar tem um custo para você: o [assistente](/docs/configuration/assistant) gasta tokens do modelo, o proxy do [playground da API](/docs/references/openapi#cors-and-the-proxy) repassa requisições para a sua API e a [busca do Mixedbread](/docs/configuration/search#mixedbread) faz uma consulta paga. O Blume limita com que frequência um mesmo leitor, identificado pelo endereço IP, pode chamar cada uma dessas rotas. Quem passa do limite recebe `429 Too Many Requests` com um cabeçalho `Retry-After`, e o assistente avisa para tentar de novo em alguns minutos.
@@ -26,6 +26,7 @@ Cada rota tem sua própria contagem, então uma sessão intensa no playground n�
 | `memory()` | Na memória do servidor (o padrão) | Com exatidão em um único servidor; por instância em hosts serverless |
 | `upstash()` | [Upstash Redis](https://upstash.com) | Com exatidão, em qualquer host |
 | `cloudflare()` | No rate limiting do Cloudflare Workers | Por localização do Cloudflare |
+| `unkey()` | [Unkey](https://unkey.com) | Em qualquer host; as regiões se sincronizam em instantes |
 
 ### Memória [#memory]
 
@@ -68,6 +69,24 @@ export default defineConfig({
 ```
 
 O namespace do binding é definido a partir do nome do Worker, então dois sites na mesma conta não compartilham a contagem. Se quiser escolher o namespace você mesmo, defina `namespaceId`.
+
+### Unkey
+
+`unkey()` guarda a contagem no [rate limiting do Unkey](https://www.unkey.com/docs/api-management/ratelimiting/overview), compartilhado por todas as instâncias. Crie uma root key com a permissão `ratelimit.*.limit` e também a `ratelimit.*.create_namespace`, para que o Unkey possa criar o namespace na primeira requisição. Depois, defina essa chave como `UNKEY_ROOT_KEY`. O Blume se comunica com a API REST do Unkey, então você não precisa instalar nada. Enquanto a chave não estiver definida, as rotas contam em memória e o `blume build` mostra um aviso.
+
+```ts blume.config.ts lineNumbers
+import { unkey } from "blume/ratelimit";
+
+rateLimit: unkey(),
+```
+
+O namespace é `docs`, a menos que você indique outro com `namespace`. Indique o nome da variável que guarda a chave com `rootKeyEnv`:
+
+```ts blume.config.ts lineNumbers
+rateLimit: unkey({ namespace: "acme-docs", rootKeyEnv: "DOCS_UNKEY_ROOT_KEY" }),
+```
+
+O Unkey conta em cada região e compartilha as contagens entre as regiões em instantes. Por isso, uma rajada curta distribuída entre regiões pode deixar passar algumas requisições além do limite. Com uma chave que o Unkey recusa, como uma sem essas permissões, todas as contagens falham, e uma requisição que o armazenamento compartilhado não consegue contar sempre passa. Então, se o servidor registrar `Rate limiting failed` no log, verifique a chave.
 
 ## Atrás de um proxy reverso [#behind-a-reverse-proxy]
 

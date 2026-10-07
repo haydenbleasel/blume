@@ -1,7 +1,7 @@
 ---
 title: MCP サーバー
 description: >-
-  Model Context Protocol サーバーをホストして、コーディングエージェントがドキュメントを直接検索・読み取りできるようにします — ツール、リソース、ディスカバリードキュメント、コンテンツタイプおよびファセットフィルター、そしてそれに必要なサーバー出力について。
+  Model Context Protocol サーバーをホストして、コーディングエージェントがドキュメントを直接検索・読み取りできるようにします — ツール、リソース、ディスカバリードキュメント、コンテンツタイプおよびファセットフィルター、Connect to MCP メニュー、そしてそれに必要なサーバー出力について。
 ---
 
 [Model Context Protocol](https://modelcontextprotocol.io) サーバーをホストすると、コーディングエージェント（Claude Code、Cursor、VS Code、claude.ai コネクター）がスクレイピングなしでドキュメントを直接検索・読み取りできるようになります。これはオプトイン方式です。
@@ -21,6 +21,7 @@ agents: {
 | `route` | `/mcp` | Streamable-HTTP エンドポイントをマウントするパスです。 |
 | `name` | title | クライアントに表示されるサーバー名（デフォルトは title）です。 |
 | `instructions` | — | 接続するエージェントに渡される任意のシステムヒントです。 |
+| `clients` | `true` | **Connect to MCP** メニューがインストール先として表示するクライアントです。 |
 
 コンテンツページまたはカスタムページがすでにそのルートを使用している場合、サーバーは生成されません。ビルド時に警告が表示され、`llms.txt` やその他の [ディスカバリードキュメント](/docs/discoverability/agent-discovery) にもサーバーは含まれません。
 
@@ -28,7 +29,7 @@ agents: {
 
 ## ツールとリソース [#tools-and-resources]
 
-サーバーは読み取り専用のツール（`search_docs`、`get_page`、`list_pages`、`get_navigation`）と、すべてのページを MCP リソースとして公開します（`resources/list` は、`list_pages` と同様に未翻訳ページの i18n フォールバックコピーを除いて、各ページを配信 URL 上で `text/markdown` タイプとして列挙し、`resources/read` はそのページの [エージェント向け Markdown](/docs/discoverability/markdown)（`get_page` と同じ出力）を返します）。そのため、URI でコンテキストを添付するクライアントは、ツールを呼び出さずにドキュメントを閲覧できます。また、ディスカバリードキュメントを `/.well-known/mcp.json` と `/.well-known/mcp/server-card.json` で公開します。サーバーカードは [SEP-2127](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2127) Server Card 拡張スキーマ（逆 DNS 形式の `name`、`remotes` トランスポートエンドポイント）に準拠しており、提案の以前のリビジョンに対して構築されたスキャナー向けに initialize 形式の互換フィールド（`serverInfo`、`capabilities`、`transports`）も備えています。各ページの **Connect to MCP** メニューでは、Claude Code、Cursor、VS Code、Codex 向けのコピー＆実行式インストールを提供しています（[`deployment.site`](/docs/deployment) が設定されている場合に表示されます）。
+サーバーは読み取り専用のツール（`search_docs`、`get_page`、`list_pages`、`get_navigation`）と、すべてのページを MCP リソースとして公開します（`resources/list` は、`list_pages` と同様に未翻訳ページの i18n フォールバックコピーを除いて、各ページを配信 URL 上で `text/markdown` タイプとして列挙し、`resources/read` はそのページの [エージェント向け Markdown](/docs/discoverability/markdown)（`get_page` と同じ出力）を返します）。そのため、URI でコンテキストを添付するクライアントは、ツールを呼び出さずにドキュメントを閲覧できます。また、ディスカバリードキュメントを `/.well-known/mcp.json` と `/.well-known/mcp/server-card.json` で公開します。サーバーカードは [SEP-2127](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2127) Server Card 拡張スキーマ（逆 DNS 形式の `name`、`remotes` トランスポートエンドポイント）に準拠しており、提案の以前のリビジョンに対して構築されたスキャナー向けに initialize 形式の互換フィールド（`serverInfo`、`capabilities`、`transports`）も備えています。各ページの **Connect to MCP** メニューでは、Claude Code、Cursor、VS Code、Codex 向けのコピー＆実行式インストールを提供しています（[`deployment.site`](/docs/deployment) が設定されている場合に表示されます）。また、メニューに表示されるクライアントは [選択することもできます](#connect-to-mcp-menu)。
 
 `search_docs` は独自の全文検索インデックスを実行するため、[search](/docs/configuration/search) プロバイダーに関係なく動作します — `search: false` の場合でも同様です。MCP サーバーはページ内検索とは別の機能です。
 
@@ -55,6 +56,37 @@ MCP に対応していないフレームワーク向けに、同じツールが 
 `filters` のすべてのエントリが一致する必要があります（結果にはそのファセット値が含まれ、`list_pages` は各ページの値を表示します）。そのため、ナレッジベースは独自のサーバーを一切用意せずに、段階的開示型のエージェントワークフロー（適用済みの標準を列挙し、その中だけを検索する）を実現できます。
 
 値は `list_pages` に表示されるとおりに、大文字と小文字の区別も含めて完全一致で照合されます。たとえば `"enforced"` は、`status` が `Enforced` のページには一致しません。ファセット値は文字列であるため、`filters` 内の数値や真偽値はその文字列表現と照合されます（`{"priority": 1}` は `priority: 1` のページに一致します）。また、リストなどそれ以外の形式の値は、フィルターとして使われずに無視されます。
+
+## Connect to MCP メニュー [#connect-to-mcp-menu]
+
+**Connect to MCP** ページアクションは、サーバーの URL をコピーする項目に続けて、サーバーのインストール先となるクライアントを一覧表示します。Claude Code と Codex にはコピー用のコマンド、Cursor と VS Code にはインストールリンクが表示されます。表示するクライアントは `clients` で選択します。`true`（デフォルト）はすべての組み込みクライアントを表示し、`false` はいずれも表示しないため、メニューには **Copy server URL** のみが残ります。リストを指定すると、指定したクライアントがその順序で表示され、コマンドとリンクの間には区切り線が入ります。
+
+Blume に組み込まれていないクライアントは、`label` とコピーする `command` を持つオブジェクトとして指定します。コマンド内の `{name}` は、ID 形式にしたサーバー名に置き換えられます。これは `name`（未指定の場合はサイトのタイトル）を小文字に変換し、`a`–`z` と `0`–`9` 以外の文字が連続する部分をそれぞれハイフンに置き換えて、先頭と末尾を取り除いたものです（何も残らない場合は `docs`）。`{url}` はサーバーの URL に置き換えられます。[多言語](/docs/content/i18n#per-locale-navigation) サイトでは、`label` にロケールコードからテキストへのマップを指定できます。`icon` には [組み込みアイコン](/docs/content/components#icon) の名前、画像のパスまたは URL、インライン SVG のいずれかを指定でき、デフォルトは `terminal` です。
+
+```ts blume.config.ts lineNumbers
+agents: {
+  mcp: {
+    enabled: true,
+    clients: [
+      "claude-code",
+      "codex",
+      {
+        label: "Copy Copilot CLI command",
+        command: "copilot mcp add --transport http {name} {url}",
+      },
+      "cursor",
+      "vscode",
+    ],
+  },
+}
+```
+
+| キー          | メニューの項目                                             |
+| ------------- | ---------------------------------------------------------- |
+| `claude-code` | Claude Code 用の `claude mcp add` コマンドをコピーします。 |
+| `codex`       | Codex 用の `codex mcp add` コマンドをコピーします。        |
+| `cursor`      | Cursor の MCP インストールリンクを開きます。               |
+| `vscode`      | VS Code の MCP インストールリンクを開きます。              |
 
 ## サーバー出力が必要です [#server-output-required]
 

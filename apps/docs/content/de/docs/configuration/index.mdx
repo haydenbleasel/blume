@@ -102,7 +102,7 @@ export default defineConfig({
 | `description` | — | Standard-Meta-Beschreibung, wird für SEO und OG verwendet. |
 | `logo` | — | Bildmarke und/oder Wortmarke, die im Header angezeigt wird. |
 | `banner` | — | Websiteweite Ankündigungsleiste über dem Header. |
-| `footer` | — | Eine Zeile mit Links und Social-Profil-Icons unterhalb des Inhalts. |
+| `footer` | — | Eine Copyright-Zeile, eine Reihe von Links und Social-Profil-Icons unterhalb des Inhalts. |
 
 ### Logo
 
@@ -205,10 +205,11 @@ Bei einem übersetzten Banner basiert der Schlüssel für das Ausblenden auf dem
 
 ### Footer
 
-Jede Seite endet mit einem Footer: einer Zeile, so hoch wie der Header, mit deinen Links auf der einen Seite und Social-Profil-Icons auf der anderen. Der Footer ist der einzige Ort, an dem Blume deine Social-Profile und dein Repository verlinkt, deshalb steht das [`github`](#github)-Repository unter den Icons an erster Stelle, sofern es gesetzt ist. `footer` ergänzt den Rest:
+Jede Seite endet mit einem Footer: einer Zeile, so hoch wie der Header, mit deinen Links auf der einen Seite, Social-Profil-Icons auf der anderen und einer Copyright-Zeile mittig dazwischen. Der Footer ist der einzige Ort, an dem Blume deine Social-Profile und dein Repository verlinkt, deshalb steht das [`github`](#github)-Repository unter den Icons an erster Stelle, sofern es gesetzt ist. `footer` ergänzt den Rest:
 
 ```ts blume.config.ts lineNumbers
 footer: {
+  copyright: "© 2026 Acme, Inc.",
   links: [
     { label: "Pricing", href: "https://acme.dev/pricing" },
     { label: "Changelog", href: "/changelog" },
@@ -221,9 +222,9 @@ footer: {
 },
 ```
 
-`links` erscheinen in der Reihenfolge, in der du sie angibst. Schreibe interne Links so, als wäre die Website im Stammverzeichnis eingehängt; ein externer Link öffnet sich in einem neuen Tab. Auf einer [mehrsprachigen](/docs/content/i18n#per-locale-navigation) Website kann ein `label` eine Zuordnung von Sprachcode zu Text sein, und ein interner Link wandert in die Sprache der Leserin bzw. des Lesers, sofern diese Sprache die Seite bereitstellt. `socials` ordnet einer Plattform ihre Profil-URL zu, und die Icons erscheinen in der Reihenfolge, in der du sie angibst. Die verfügbaren Plattformen sind `bluesky`, `discord`, `facebook`, `github`, `hacker-news`, `instagram`, `linkedin`, `medium`, `podcast`, `reddit`, `slack`, `telegram`, `threads`, `website`, `x` und `youtube`. Ein `github`-Eintrag unter `socials` ersetzt den Repository-Link; blende diesen Link mit [`navigation.repo`](/docs/content/navigation#repository-link) aus.
+`copyright` ist reiner Text, schreibe also `©` direkt statt `&copy;`. Für eine Jahreszahl, die sich selbst aktuell hält, verwende ein Template-Literal: `` `© ${new Date().getFullYear()} Acme, Inc.` ``. `links` erscheinen in der Reihenfolge, in der du sie angibst. Schreibe interne Links so, als wäre die Website im Stammverzeichnis eingehängt; ein externer Link öffnet sich in einem neuen Tab. Auf einer [mehrsprachigen](/docs/content/i18n#per-locale-navigation) Website können `copyright` und ein `label` jeweils eine Zuordnung von Sprachcode zu Text sein, und ein interner Link wandert in die Sprache der Leserin bzw. des Lesers, sofern diese Sprache die Seite bereitstellt. `socials` ordnet einer Plattform ihre Profil-URL zu, und die Icons erscheinen in der Reihenfolge, in der du sie angibst. Die verfügbaren Plattformen sind `bluesky`, `discord`, `facebook`, `github`, `hacker-news`, `instagram`, `linkedin`, `medium`, `podcast`, `reddit`, `slack`, `telegram`, `threads`, `website`, `x` und `youtube`. Ein `github`-Eintrag unter `socials` ersetzt den Repository-Link; blende diesen Link mit [`navigation.repo`](/docs/content/navigation#repository-link) aus.
 
-Eine Website ohne Links, Profile oder Repository hat keinen Footer. Benutzerdefinierte Seiten, die auf `PageLayout` aufbauen, zeigen ihn ebenfalls an, sofern sie nicht den eigenen `footer`-Slot des Layouts befüllen. Um ihn vollständig zu ersetzen, überschreibe den [`Footer`-Layout-Slot](/docs/configuration/customization#layout-slots).
+Eine Website ohne Copyright, Links, Profile oder Repository hat keinen Footer. Benutzerdefinierte Seiten, die auf `PageLayout` aufbauen, zeigen ihn ebenfalls an, sofern sie nicht den eigenen `footer`-Slot des Layouts befüllen. Um ihn vollständig zu ersetzen, überschreibe den [`Footer`-Layout-Slot](/docs/configuration/customization#layout-slots).
 
 ## Inhalte [#content]
 

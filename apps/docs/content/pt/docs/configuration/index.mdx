@@ -102,7 +102,7 @@ export default defineConfig({
 | `description` | — | Meta descrição padrão, usada para SEO e OG. |
 | `logo` | — | Marca gráfica e/ou logotipo textual exibido no cabeçalho. |
 | `banner` | — | Barra de anúncios para todo o site, acima do cabeçalho. |
-| `footer` | — | Uma linha de links e ícones de perfis sociais abaixo do conteúdo. |
+| `footer` | — | Um aviso de copyright, uma linha de links e ícones de perfis sociais abaixo do conteúdo. |
 
 ### Logotipo [#logo]
 
@@ -205,10 +205,11 @@ Uma faixa traduzida usa o texto do locale padrão como chave de dispensa, então
 
 ### Rodapé [#footer]
 
-Toda página termina com um rodapé: uma única linha, da mesma altura do cabeçalho, com seus links de um lado e ícones de perfis sociais do outro. O rodapé é o único lugar onde o Blume coloca links para seus perfis sociais e seu repositório, então o repositório do [`github`](#github) vem primeiro entre os ícones sempre que estiver definido. O `footer` adiciona o resto:
+Toda página termina com um rodapé: uma única linha, da mesma altura do cabeçalho, com seus links de um lado, ícones de perfis sociais do outro e um aviso de copyright centralizado entre eles. O rodapé é o único lugar onde o Blume coloca links para seus perfis sociais e seu repositório, então o repositório do [`github`](#github) vem primeiro entre os ícones sempre que estiver definido. O `footer` adiciona o resto:
 
 ```ts blume.config.ts lineNumbers
 footer: {
+  copyright: "© 2026 Acme, Inc.",
   links: [
     { label: "Pricing", href: "https://acme.dev/pricing" },
     { label: "Changelog", href: "/changelog" },
@@ -221,9 +222,9 @@ footer: {
 },
 ```
 
-Os `links` aparecem na ordem em que você os escreve. Escreva os links internos como se o site estivesse montado na raiz; um link externo abre em uma nova aba. Em um site [multilíngue](/docs/content/i18n#per-locale-navigation), um `label` pode ser um mapa de código de locale para texto, e um link interno passa para o locale do leitor sempre que esse locale serve a página. `socials` associa cada plataforma à URL do seu perfil, e os ícones aparecem na ordem em que você os escreve. As plataformas são `bluesky`, `discord`, `facebook`, `github`, `hacker-news`, `instagram`, `linkedin`, `medium`, `podcast`, `reddit`, `slack`, `telegram`, `threads`, `website`, `x` e `youtube`. Uma entrada `github` em `socials` substitui o link para o repositório; oculte esse link com [`navigation.repo`](/docs/content/navigation#repository-link).
+`copyright` é texto simples, então escreva o próprio `©` em vez de `&copy;`. Para que o ano se mantenha sempre atualizado, use um template literal: `` `© ${new Date().getFullYear()} Acme, Inc.` ``. Os `links` aparecem na ordem em que você os escreve. Escreva os links internos como se o site estivesse montado na raiz; um link externo abre em uma nova aba. Em um site [multilíngue](/docs/content/i18n#per-locale-navigation), tanto o `copyright` quanto um `label` podem ser um mapa de código de locale para texto, e um link interno passa para o locale do leitor sempre que esse locale serve a página. `socials` associa cada plataforma à URL do seu perfil, e os ícones aparecem na ordem em que você os escreve. As plataformas são `bluesky`, `discord`, `facebook`, `github`, `hacker-news`, `instagram`, `linkedin`, `medium`, `podcast`, `reddit`, `slack`, `telegram`, `threads`, `website`, `x` e `youtube`. Uma entrada `github` em `socials` substitui o link para o repositório; oculte esse link com [`navigation.repo`](/docs/content/navigation#repository-link).
 
-Um site sem links, perfis ou repositório não tem rodapé. As páginas personalizadas construídas sobre o `PageLayout` também o exibem, a menos que preencham o próprio slot `footer` do layout. Para substituí-lo por completo, sobrescreva o [slot de layout `Footer`](/docs/configuration/customization#layout-slots).
+Um site sem copyright, links, perfis ou repositório não tem rodapé. As páginas personalizadas construídas sobre o `PageLayout` também o exibem, a menos que preencham o próprio slot `footer` do layout. Para substituí-lo por completo, sobrescreva o [slot de layout `Footer`](/docs/configuration/customization#layout-slots).
 
 ## Conteúdo [#content]
 

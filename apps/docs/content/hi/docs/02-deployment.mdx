@@ -268,6 +268,7 @@ poweredBy: false,
 | असिस्टेंट (अन्य एडाप्टर) | एडाप्टर का डिफ़ॉल्ट कुंजी एन्व चर (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `XAI_API_KEY`, `OPENROUTER_API_KEY`, `LLMGATEWAY_API_KEY`, `INKEEP_API_KEY`), या आपके द्वारा उसे पास किया गया `apiKeyEnv` |
 | [असिस्टेंट बॉट सुरक्षा](/docs/configuration/assistant#bot-protection) | `TURNSTILE_SECRET_KEY` (`turnstile()`), `HCAPTCHA_SECRET_KEY` (`hcaptcha()`) |
 | [दर सीमित करना](/docs/configuration/rate-limiting) (`upstash()`) | `UPSTASH_REDIS_REST_URL` और `UPSTASH_REDIS_REST_TOKEN` |
+| [दर सीमित करना](/docs/configuration/rate-limiting) (`unkey()`) | `UNKEY_ROOT_KEY`, या आपके द्वारा उसे पास किया गया `rootKeyEnv` |
 | Mixedbread खोज | `MIXEDBREAD_API_KEY` |
 | [नैरेशन](/docs/configuration/narration) (जनरेट की गई आवाज़ें) | `gateway()` के लिए `AI_GATEWAY_API_KEY` (या Vercel OIDC), `openai()` के लिए `OPENAI_API_KEY` (`baseUrl` के साथ कोई नहीं, जब तक कि आप किसी का नाम न दें), या आपके द्वारा दोनों में से किसी को भी पास किया गया `apiKeyEnv` |
 | [कंटेंट स्रोत](/docs/content/sources) | `NOTION_TOKEN` (`notion()`), `SANITY_TOKEN` (`sanity()`), `CONTENTFUL_ACCESS_TOKEN` (`contentful()`, साथ ही `--preview` के लिए `CONTENTFUL_PREVIEW_TOKEN`, जिसके बिना यह विफल हो जाता है), `PAYLOAD_API_KEY` (`payload()`), `STRAPI_API_TOKEN` (`strapi()`), `GITHUB_TOKEN` (`githubReleases()`, और `github` के साथ `mdxRemote()`) |
@@ -276,7 +277,7 @@ poweredBy: false,
 
 ## बिल्ड कैश [#build-cache]
 
-Blume दो कैश रखता है जिनका एक बिल्ड पुन: उपयोग कर सकता है। Astro और Vite के कैश `.blume/.cache/` के अंतर्गत रहते हैं (इनमें कंटेंट स्टोर और इमेज ट्रांसफ़ॉर्म शामिल हैं)। रेंडर कि��� गए [OG कार्ड](/docs/discoverability/open-graph#card-cache) `node_modules/.cache/blume/og` में रहते हैं, ताकि एक रीबिल्ड केवल उन्हीं कार्डों को रेंडर करे जिनका शीर्षक, विवरण, या ब्रांडिंग बदली है। कोई प्लेटफ़ॉर्म डिप्लॉय के बीच उस डायरेक्टरी को बनाए रखता है या नहीं, यह अलग-अलग होता है:
+Blume दो कैश रखता है जिनका एक बिल्ड पुन: उपयोग कर सकता है। Astro और Vite के कैश `.blume/.cache/` के अंतर्गत रहते हैं (इनमें कंटेंट स्टोर और इमेज ट्रांसफ़ॉर्म शामिल हैं)। रेंडर किए गए [OG कार्ड](/docs/discoverability/open-graph#card-cache) `node_modules/.cache/blume/og` में रहते हैं, ताकि एक रीबिल्ड केवल उन्हीं कार्डों को रेंडर करे जिनका शीर्षक, विवरण, या ब्रांडिंग बदली है। कोई प्लेटफ़ॉर्म डिप्लॉय के बीच उस डायरेक्टरी को बनाए रखता है या नहीं, यह अलग-अलग होता है:
 
 - **Vercel** अपने बिल्ड कैश से `node_modules/**` को पुनर्स्थापित करता है, इसलिए कार्ड आगे बने रहते हैं (कैश 1 GB का होता है, एक महीने तक रखा जाता है, और प्रति ब्रांच कुंजीबद्ध होता है — एक नई ब्रांच प्रोडक्शन कैश से शुरू होती है)।
 - **Netlify** `node_modules` को पुनर्स्थापित करता है, इसलिए कार्ड आगे बने रहते हैं।

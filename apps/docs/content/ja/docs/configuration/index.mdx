@@ -101,7 +101,7 @@ export default defineConfig({
 | `description` | — | デフォルトの meta description。SEO と OG に使用されます。 |
 | `logo` | — | ヘッダーに表示されるブランドマークやワードマーク。 |
 | `banner` | — | ヘッダー上部に表示されるサイト全体のお知らせバー。 |
-| `footer` | — | コンテンツの下に表示される、リンクとソーシャルプロフィールアイコンの行。 |
+| `footer` | — | コンテンツの下に表示される、著作権表示、リンクの行、ソーシャルプロフィールアイコン。 |
 
 ### ロゴ [#logo]
 
@@ -204,10 +204,11 @@ banner: {
 
 ### フッター [#footer]
 
-すべてのページの末尾にはフッターが表示されます。ヘッダーと同じ高さの 1 行で、片側にリンク、もう片側にソーシャルプロフィールのアイコンが並びます。Blume がソーシャルプロフィールとリポジトリへのリンクを置くのはフッターだけなので、[`github`](#github) のリポジトリが設定されている場合は、常にアイコンの先頭に表示されます。残りは `footer` で追加します:
+すべてのページの末尾にはフッターが表示されます。ヘッダーと同じ高さの 1 行で、片側にリンク、もう片側にソーシャルプロフィールのアイコンが並び、その間の中央に著作権表示が置かれます。Blume がソーシャルプロフィールとリポジトリへのリンクを置くのはフッターだけなので、[`github`](#github) のリポジトリが設定されている場合は、常にアイコンの先頭に表示されます。残りは `footer` で追加します:
 
 ```ts blume.config.ts lineNumbers
 footer: {
+  copyright: "© 2026 Acme, Inc.",
   links: [
     { label: "Pricing", href: "https://acme.dev/pricing" },
     { label: "Changelog", href: "/changelog" },
@@ -220,9 +221,9 @@ footer: {
 },
 ```
 
-`links` は記述した順に表示されます。内部リンクはルートにマウントされているものとして記述してください。外部リンクは新しいタブで開きます。[多言語](/docs/content/i18n#per-locale-navigation) サイトでは、`label` にロケールコードからテキストへのマップを指定でき、読者のロケールがそのページを提供している場合、内部リンクはそのロケールに移動します。`socials` はプラットフォームをそのプロフィール URL に対応付けるもので、アイコンは記述した順に表示されます。使用できるプラットフォームは `bluesky`、`discord`、`facebook`、`github`、`hacker-news`、`instagram`、`linkedin`、`medium`、`podcast`、`reddit`、`slack`、`telegram`、`threads`、`website`、`x`、`youtube` です。`github` のソーシャルを指定すると、リポジトリリンクが置き換えられます。そのリンクを非表示にするには [`navigation.repo`](/docs/content/navigation#repository-link) を使ってください。
+`copyright` はプレーンテキストなので、`&copy;` ではなく `©` そのものを記述してください。年を常に最新に保つには、テンプレートリテラルを使います: `` `© ${new Date().getFullYear()} Acme, Inc.` ``。`links` は記述した順に表示されます。内部リンクはルートにマウントされているものとして記述してください。外部リンクは新しいタブで開きます。[多言語](/docs/content/i18n#per-locale-navigation) サイトでは、`copyright` と `label` にそれぞれロケールコードからテキストへのマップを指定でき、読者のロケールがそのページを提供している場合、内部リンクはそのロケールに移動します。`socials` はプラットフォームをそのプロフィール URL に対応付けるもので、アイコンは記述した順に表示されます。使用できるプラットフォームは `bluesky`、`discord`、`facebook`、`github`、`hacker-news`、`instagram`、`linkedin`、`medium`、`podcast`、`reddit`、`slack`、`telegram`、`threads`、`website`、`x`、`youtube` です。`github` のソーシャルを指定すると、リポジトリリンクが置き換えられます。そのリンクを非表示にするには [`navigation.repo`](/docs/content/navigation#repository-link) を使ってください。
 
-リンク、プロフィール、リポジトリのいずれもないサイトには、フッターは表示されません。`PageLayout` 上に構築したカスタムページでも、レイアウト自身の `footer` スロットを埋めない限りフッターが表示されます。フッターを完全に置き換えるには、[`Footer` レイアウトスロット](/docs/configuration/customization#layout-slots) を上書きしてください。
+著作権表示、リンク、プロフィール、リポジトリのいずれもないサイトには、フッターは表示されません。`PageLayout` 上に構築したカスタムページでも、レイアウト自身の `footer` スロットを埋めない限りフッターが表示されます。フッターを完全に置き換えるには、[`Footer` レイアウトスロット](/docs/configuration/customization#layout-slots) を上書きしてください。
 
 ## コンテンツ [#content]
 

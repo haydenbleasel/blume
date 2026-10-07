@@ -268,6 +268,7 @@ Quando um recurso precisa de um segredo, o Blume avisa no `blume dev`/`build` ca
 | Assistente (outros adaptadores) | a variável de ambiente padrão da chave do adaptador (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `XAI_API_KEY`, `OPENROUTER_API_KEY`, `LLMGATEWAY_API_KEY`, `INKEEP_API_KEY`), ou o `apiKeyEnv` que você passou a ele |
 | [Proteção contra bots do assistente](/docs/configuration/assistant#bot-protection) | `TURNSTILE_SECRET_KEY` (`turnstile()`), `HCAPTCHA_SECRET_KEY` (`hcaptcha()`) |
 | [Limitação de taxa](/docs/configuration/rate-limiting) (`upstash()`) | `UPSTASH_REDIS_REST_URL` e `UPSTASH_REDIS_REST_TOKEN` |
+| [Limitação de taxa](/docs/configuration/rate-limiting) (`unkey()`) | `UNKEY_ROOT_KEY`, ou o `rootKeyEnv` que você passou a ele |
 | Busca Mixedbread | `MIXEDBREAD_API_KEY` |
 | [Narração](/docs/configuration/narration) (vozes geradas) | `AI_GATEWAY_API_KEY` (ou OIDC da Vercel) para `gateway()`, `OPENAI_API_KEY` para `openai()` (nenhuma com um `baseUrl`, a menos que você indique uma), ou o `apiKeyEnv` que você passou a qualquer um deles |
 | [Fontes de conteúdo](/docs/content/sources) | `NOTION_TOKEN` (`notion()`), `SANITY_TOKEN` (`sanity()`), `CONTENTFUL_ACCESS_TOKEN` (`contentful()`, além de `CONTENTFUL_PREVIEW_TOKEN` para `--preview`, que falha sem ele), `PAYLOAD_API_KEY` (`payload()`), `STRAPI_API_TOKEN` (`strapi()`), `GITHUB_TOKEN` (`githubReleases()` e `mdxRemote()` com `github`) |

@@ -268,6 +268,7 @@ poweredBy: false,
 | アシスタント（その他のアダプター） | アダプターのデフォルトのキー環境変数（`OPENAI_API_KEY`、`ANTHROPIC_API_KEY`、`GEMINI_API_KEY`、`XAI_API_KEY`、`OPENROUTER_API_KEY`、`LLMGATEWAY_API_KEY`、`INKEEP_API_KEY`）、またはアダプターに渡した `apiKeyEnv` |
 | [アシスタントのボット対策](/docs/configuration/assistant#bot-protection) | `TURNSTILE_SECRET_KEY`（`turnstile()`）、`HCAPTCHA_SECRET_KEY`（`hcaptcha()`） |
 | [レート制限](/docs/configuration/rate-limiting)（`upstash()`） | `UPSTASH_REDIS_REST_URL` と `UPSTASH_REDIS_REST_TOKEN` |
+| [レート制限](/docs/configuration/rate-limiting)（`unkey()`） | `UNKEY_ROOT_KEY`、または `unkey()` に渡した `rootKeyEnv` |
 | Mixedbread 検索 | `MIXEDBREAD_API_KEY` |
 | [ナレーション](/docs/configuration/narration)（生成音声） | `gateway()` には `AI_GATEWAY_API_KEY`（または Vercel OIDC）、`openai()` には `OPENAI_API_KEY`（`baseUrl` を指定した場合は、変数名を指定しない限り不要）、またはいずれかに渡した `apiKeyEnv` |
 | [コンテンツソース](/docs/content/sources) | `NOTION_TOKEN`（`notion()`）、`SANITY_TOKEN`（`sanity()`）、`CONTENTFUL_ACCESS_TOKEN`（`contentful()`。`--preview` には `CONTENTFUL_PREVIEW_TOKEN` も必要で、ない場合は失敗します）、`PAYLOAD_API_KEY`（`payload()`）、`STRAPI_API_TOKEN`（`strapi()`）、`GITHUB_TOKEN`（`githubReleases()`、および `github` を指定した `mdxRemote()`） |

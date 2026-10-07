@@ -85,7 +85,7 @@ i18n: {
 
 各言語はそのロケールのファイルから構築された独自のサイドバーを持つため、翻訳ごとに構造、並び順、ラベルを変えることができます。フォルダーの [`meta.ts`](/docs/content/meta) ファイルもロケールごとに解決されます: 既定の `dir` パーサーでは、`fr/guides/` の下に `meta.ts` を置けばフランス語のグループを独立して並べ替えられます。ロケールに独自の `meta.ts`(または共有の `meta.$.ts`)がない間は、そのグループは[フォールバック](#fallbacks)ロケールのもの — そのフォルダーの `meta.ts` と、インデックスページで設定された `sidebar.display` — をミラーリングします。そのため、フォールバックするページも同じタイトル、並び順、折りたたみ可能なグループを保ちます。`dot` パーサーでは翻訳が元のファイルの隣にあるため、フォルダーの `meta.ts` はすべてのロケールに適用されます。[ナビゲーション](/docs/content/navigation)に関するその他の挙動は、言語ごとに同様に動作します。
 
-ヘッダータブ、ヘッダーのリンク、フッターはコンテンツから導出されるのではなく設定されるものなので、それらのラベルは `blume.config.ts` でローカライズします。設定されるラベルはいずれも、単純な文字列形式に加えてロケールごとのマップ(`{ en: "Docs", fr: "Documentation" }`)を受け付け、記入していないロケールについてはデフォルトロケールのエントリにフォールバックします: 対象は、タブとドロップダウンのラベル([タブ](/docs/content/navigation#tabs))、[注目リンク](/docs/content/navigation#featured-links)、[ヘッダーアクション](/docs/content/navigation#header-actions)とコールトゥアクション、[フッター](/docs/configuration#footer)のリンク、そして[バナー](/docs/configuration#banner)のテキストとリンクテキストです。
+ヘッダータブ、ヘッダーのリンク、フッターはコンテンツから導出されるのではなく設定されるものなので、それらのラベルは `blume.config.ts` でローカライズします。設定されるラベルはいずれも、単純な文字列形式に加えてロケールごとのマップ(`{ en: "Docs", fr: "Documentation" }`)を受け付け、記入していないロケールについてはデフォルトロケールのエントリにフォールバックします: 対象は、タブとドロップダウンのラベル([タブ](/docs/content/navigation#tabs))、[注目リンク](/docs/content/navigation#featured-links)、[ヘッダーアクション](/docs/content/navigation#header-actions)とコールトゥアクション、[フッター](/docs/configuration#footer)のリンク、[バナー](/docs/configuration#banner)のテキストとリンクテキスト、そして [MCP に接続](/docs/discoverability/mcp#connect-to-mcp-menu)メニューのカスタムクライアントです。
 
 ```ts blume.config.ts lineNumbers
 navigation: {

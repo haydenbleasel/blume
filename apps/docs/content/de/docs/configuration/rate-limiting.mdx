@@ -1,7 +1,7 @@
 ---
 title: Rate Limiting
 description: >-
-  Begrenze, wie oft ein einzelner Leser den Assistenten, den Proxy des API-Playgrounds und die serverseitige Suche aufrufen kann. Das ist standardmäßig aktiv, und die Zählung liegt im Speicher, bei Upstash oder bei Cloudflare.
+  Begrenze, wie oft ein einzelner Leser den Assistenten, den Proxy des API-Playgrounds und die serverseitige Suche aufrufen kann. Das ist standardmäßig aktiv, und die Zählung liegt im Speicher, bei Upstash, bei Cloudflare oder bei Unkey.
 ---
 
 Die Server-Routen, die ein Leser aufrufen kann, kosten dich bei jedem Aufruf etwas: Der [Assistent](/docs/configuration/assistant) verbraucht Modell-Tokens, der Proxy des [API-Playgrounds](/docs/references/openapi#cors-and-the-proxy) leitet Anfragen an deine API weiter, und die [Mixedbread-Suche](/docs/configuration/search#mixedbread) führt eine kostenpflichtige Abfrage aus. Blume begrenzt, wie oft ein einzelner Leser jede dieser Routen aufrufen kann. Erkannt wird er an seiner IP-Adresse. Überschreitet ein Leser das Limit, erhält er `429 Too Many Requests` mit einem `Retry-After`-Header, und der Assistent bittet ihn, es in ein paar Minuten erneut zu versuchen.
@@ -26,6 +26,7 @@ Jede Route zählt für sich. Eine intensive Playground-Sitzung verbraucht also n
 | `memory()` | Im Speicher des Servers (Standard) | Exakt auf einem Server, auf Serverless-Hosts pro Instanz |
 | `upstash()` | [Upstash Redis](https://upstash.com) | Exakt, auf jedem Host |
 | `cloudflare()` | Workers Rate Limiting von Cloudflare | Pro Cloudflare-Standort |
+| `unkey()` | [Unkey](https://unkey.com) | Auf jedem Host, die Regionen gleichen sich innerhalb weniger Augenblicke ab |
 
 ### Speicher [#memory]
 
@@ -68,6 +69,24 @@ export default defineConfig({
 ```
 
 Der Namespace des Bindings wird aus dem Namen des Workers abgeleitet, sodass sich zwei Seiten in einem Account keine Zählung teilen. Mit `namespaceId` legst du ihn selbst fest.
+
+### Unkey
+
+`unkey()` speichert die Zählung im [Rate Limiting von Unkey](https://www.unkey.com/docs/api-management/ratelimiting/overview), das alle Instanzen gemeinsam nutzen. Erstelle einen Root Key mit der Berechtigung `ratelimit.*.limit` und zusätzlich `ratelimit.*.create_namespace`, damit Unkey den Namespace bei der ersten Anfrage anlegen kann. Setze ihn dann als `UNKEY_ROOT_KEY`. Blume spricht direkt mit der REST-API von Unkey, du musst also nichts installieren. Solange der Key nicht gesetzt ist, zählen die Routen im Speicher, und `blume build` gibt eine Warnung aus.
+
+```ts blume.config.ts lineNumbers
+import { unkey } from "blume/ratelimit";
+
+rateLimit: unkey(),
+```
+
+Der Namespace heißt `docs`, sofern du mit `namespace` keinen anderen angibst. Den Namen der Variable, die den Key enthält, gibst du mit `rootKeyEnv` an:
+
+```ts blume.config.ts lineNumbers
+rateLimit: unkey({ namespace: "acme-docs", rootKeyEnv: "DOCS_UNKEY_ROOT_KEY" }),
+```
+
+Unkey zählt in jeder Region und gleicht die Zählungen innerhalb weniger Augenblicke zwischen den Regionen ab. Verteilt sich ein kurzer Ansturm von Anfragen auf mehrere Regionen, können also ein paar Anfragen mehr durchkommen, als das Limit erlaubt. Mit einem Key, den Unkey ablehnt, etwa weil ihm diese Berechtigungen fehlen, schlägt jede Zählung fehl. Eine Anfrage, die ein gemeinsamer Store nicht zählen kann, wird durchgelassen. Wenn der Server also `Rate limiting failed` loggt, prüfe den Key.
 
 ## Hinter einem Reverse Proxy [#behind-a-reverse-proxy]
 

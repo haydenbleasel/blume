@@ -1,7 +1,7 @@
 ---
 title: レート制限
 description: >-
-  1 人の読者がアシスタント、API プレイグラウンドのプロキシ、サーバーサイド検索を呼び出せる頻度を制限します。デフォルトで有効で、カウントはメモリ、Upstash、Cloudflare のいずれかに保持されます。
+  1 人の読者がアシスタント、API プレイグラウンドのプロキシ、サーバーサイド検索を呼び出せる頻度を制限します。デフォルトで有効で、カウントはメモリ、Upstash、Cloudflare、Unkey のいずれかに保持されます。
 ---
 
 読者が呼び出せるサーバールートは、呼び出されるたびにコストが発生します。[アシスタント](/docs/configuration/assistant)はモデルのトークンを消費し、[API プレイグラウンド](/docs/references/openapi#cors-and-the-proxy)のプロキシはリクエストをお使いの API に中継し、[Mixedbread 検索](/docs/configuration/search#mixedbread)は有料のクエリを実行します。Blume は、IP アドレスで識別される 1 人の読者がそれぞれのルートを呼び出せる頻度を制限します。制限を超えた読者には `Retry-After` ヘッダー付きの `429 Too Many Requests` が返され、アシスタントは数分後にもう一度試すよう読者に伝えます。
@@ -26,6 +26,7 @@ export default defineConfig({
 | `memory()` | サーバーのメモリ（デフォルト） | 単一サーバーでは正確。サーバーレスホストではインスタンスごと |
 | `upstash()` | [Upstash Redis](https://upstash.com) | すべてのホストで正確 |
 | `cloudflare()` | Cloudflare の Workers レート制限 | Cloudflare のロケーションごと |
+| `unkey()` | [Unkey](https://unkey.com) | すべてのホストで有効。リージョン間のカウントはすぐに同期 |
 
 ### メモリ [#memory]
 
@@ -68,6 +69,24 @@ export default defineConfig({
 ```
 
 バインディングの名前空間は Worker の名前から決まるため、同じアカウント上の 2 つのサイトがカウントを共有することはありません。名前空間を自分で指定するには、`namespaceId` を設定してください。
+
+### Unkey
+
+`unkey()` は、すべてのインスタンスで共有される [Unkey のレート制限](https://www.unkey.com/docs/api-management/ratelimiting/overview)にカウントを保持します。`ratelimit.*.limit` 権限に加えて、最初のリクエスト時に Unkey が名前空間を作成できるよう `ratelimit.*.create_namespace` 権限を持つルートキーを作成し、`UNKEY_ROOT_KEY` に設定してください。Blume は Unkey の REST API と直接通信するため、インストールが必要なものはありません。キーが設定されるまでは、ルートはメモリでカウントし、`blume build` が警告を表示します。
+
+```ts blume.config.ts lineNumbers
+import { unkey } from "blume/ratelimit";
+
+rateLimit: unkey(),
+```
+
+`namespace` で別の名前を指定しない限り、名前空間は `docs` になります。キーを保持する変数の名前は `rootKeyEnv` で指定してください。
+
+```ts blume.config.ts lineNumbers
+rateLimit: unkey({ namespace: "acme-docs", rootKeyEnv: "DOCS_UNKEY_ROOT_KEY" }),
+```
+
+Unkey はリージョンごとにカウントし、リージョン間ではすぐにカウントを共有します。そのため、複数のリージョンに分散した短時間の集中的なリクエストでは、上限より数件多くのリクエストが通過することがあります。上記の権限が不足しているキーなど、Unkey が拒否するキーではすべてのカウントが失敗します。また、共有ストアがカウントに失敗したリクエストは通過します。そのため、サーバーのログに `Rate limiting failed` と記録された場合は、キーを確認してください。
 
 ## リバースプロキシの背後に置く場合 [#behind-a-reverse-proxy]
 
