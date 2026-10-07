@@ -13,11 +13,7 @@ export const mcpClients = ["claude-code", "codex", "cursor", "vscode"] as const;
 
 export type McpClient = (typeof mcpClients)[number];
 
-/**
- * A client Blume doesn't ship: a menu row that copies `command`, with
- * `{name}` (the server name as an id, like `acme-docs`) and `{url}` (the
- * server's absolute URL) filled in.
- */
+/** A client Blume doesn't ship: a menu row that copies its `command`. */
 export interface McpCustomClient {
   /**
    * Command the row copies, with `{name}` (the server name as an id, like
