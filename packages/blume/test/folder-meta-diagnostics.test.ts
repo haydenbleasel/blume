@@ -53,6 +53,8 @@ describe("folderChildKeys", () => {
 });
 
 describe("BLUME_META_UNKNOWN_PAGE", () => {
+  // The first meta.ts in the run to import `blume`, so jiti compiles Blume's
+  // source cold here: under 2s on Linux, up to 9s on Windows.
   it("names each pages entry that matches no child, with its line and a likely fix", async () => {
     const root = await makeTree({
       "guides/meta.ts": [
@@ -97,7 +99,7 @@ describe("BLUME_META_UNKNOWN_PAGE", () => {
       }),
     ]);
     expect(byCode(diagnostics, "BLUME_META_UNKNOWN_PAGE")).toHaveLength(3);
-  });
+  }, 30_000);
 
   it("checks a locale's and a version's meta against the pages' nav paths", async () => {
     const root = await makeTree({
