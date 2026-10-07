@@ -1,5 +1,13 @@
 # blume
 
+## 2.2.1
+
+### Patch Changes
+
+- b24765c: Add a copyright line to the site footer. `footer.copyright` in `blume.config.ts` takes plain text, like `© 2026 Acme, Inc.`, or a map of locale code to text, and shows it centered in the footer, between the links and the social icons; on narrow screens the row wraps. A footer with only a copyright line still renders. The `blume-migrate` skill now carries a source site's footer copyright over to it instead of dropping it.
+- a51c087: Add `agents.mcp.clients` to choose the clients the "Connect to MCP" page action lists after "Copy server URL". `false` lists none, leaving just "Copy server URL", and an array of built-in keys (`"claude-code"`, `"codex"`, `"cursor"`, `"vscode"`) shows just those, in order. The array also takes clients Blume doesn't ship, as `{ label, command }`: the row copies `command` with `{name}` and `{url}` filled in, so a site can offer, say, `copilot mcp add --transport http {name} {url}`. A custom label can be a per-locale map, and `icon` sets its icon (`terminal` by default); an icon name outside Blume's set warns as `BLUME_UNKNOWN_ICON`.
+- ba672f7: Add an `unkey()` rate limiter to `blume/ratelimit`. It counts through Unkey's rate limit API with the root key in `UNKEY_ROOT_KEY` (or the env var `rootKeyEnv` names), in the namespace `namespace` names (`docs` by default), on any host and with nothing to install. Until the key is set, the routes count in memory and `blume build` warns. A request Unkey doesn't count within two seconds is let through, like one it fails to count.
+
 ## 2.2.0
 
 ### Minor Changes
