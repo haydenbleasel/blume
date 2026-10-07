@@ -1,5 +1,0 @@
----
-"blume": patch
----
-
-`blume validate` now reads link syntax the way the page renders it. A link destination in angle brackets, which Prettier writes for a URL with parentheses (`[x](<https://example.com/a(b>)`), was misread as a broken relative path (`BLUME_BROKEN_LINK`), and an image path with backslash-escaped parentheses (`![](image%20\(115\).png)`) was reported missing (`BLUME_BROKEN_ASSET`) though the build found it. Both are now read without the brackets and escapes. Links inside comments, which never render, are no longer checked: an HTML comment in a `.md` page, or a `{/* … */}` comment in an `.mdx` page. A code fence inside a block quote (`> ```ts`) now counts as code, so a quoted line in it like `>   [key: string]: string;` is no longer read as a link definition. A line whose `<` never closes, like `[1]: <src/x.ts - function x(`, isn't a link definition either, and when a label is defined twice, only the first definition, the one the page uses, is checked. A fragment link to an `<a name="…">` now resolves, like one to an element's `id`, instead of warning `BLUME_BROKEN_ANCHOR`.
