@@ -45,7 +45,6 @@ const adapterSecretOwners = (config: ResolvedConfig): SecretOwner[] => {
       secrets: consent.requiredSecrets,
     });
   }
-  // Upstash's endpoint and token.
   if (rateLimit) {
     owners.push({
       feature: `Rate limiting (${rateLimit.kind})`,

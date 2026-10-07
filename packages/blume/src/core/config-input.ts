@@ -1631,7 +1631,7 @@ export interface BlumeConfig {
    * Limit how often one reader (by IP address) can call the server routes —
    * the assistant, the API playground proxy, server-side search — with an
    * adapter from `blume/ratelimit`: `memory()` (the default, 30 requests per
-   * 10 minutes), `upstash()`, or `cloudflare()`. `false` turns it off.
+   * 10 minutes), `upstash()`, `cloudflare()`, or `unkey()`. `false` turns it off.
    */
   rateLimit?: false | RateLimitAdapter;
   /** React island behavior (compiler auto-memoization). */

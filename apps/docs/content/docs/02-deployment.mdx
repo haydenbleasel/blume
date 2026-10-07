@@ -267,6 +267,7 @@ When a feature needs a secret, Blume warns at `blume dev`/`build` if it's missin
 | Assistant (other adapters) | the adapter's default key env var (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `XAI_API_KEY`, `OPENROUTER_API_KEY`, `LLMGATEWAY_API_KEY`, `INKEEP_API_KEY`), or the `apiKeyEnv` you passed it |
 | [Assistant bot protection](/docs/configuration/assistant#bot-protection) | `TURNSTILE_SECRET_KEY` (`turnstile()`), `HCAPTCHA_SECRET_KEY` (`hcaptcha()`) |
 | [Rate limiting](/docs/configuration/rate-limiting) (`upstash()`) | `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` |
+| [Rate limiting](/docs/configuration/rate-limiting) (`unkey()`) | `UNKEY_ROOT_KEY`, or the `rootKeyEnv` you passed it |
 | Mixedbread search | `MIXEDBREAD_API_KEY` |
 | [Narration](/docs/configuration/narration) (generated voices) | `AI_GATEWAY_API_KEY` (or Vercel OIDC) for `gateway()`, `OPENAI_API_KEY` for `openai()` (none with a `baseUrl`, unless you name one), or the `apiKeyEnv` you passed to either |
 | [Content sources](/docs/content/sources) | `NOTION_TOKEN` (`notion()`), `SANITY_TOKEN` (`sanity()`), `CONTENTFUL_ACCESS_TOKEN` (`contentful()`, plus `CONTENTFUL_PREVIEW_TOKEN` for `--preview`, which fails without it), `PAYLOAD_API_KEY` (`payload()`), `STRAPI_API_TOKEN` (`strapi()`), `GITHUB_TOKEN` (`githubReleases()`, and `mdxRemote()` with `github`) |

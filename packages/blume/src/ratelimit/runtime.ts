@@ -11,11 +11,14 @@
  * the shared store fails to count (logged, not blocked). A shared store
  * without its secrets or binding falls back to counting in memory.
  */
+import { z } from "zod";
+
 import { clientAddressOf } from "../core/client-address.ts";
 import type { ClientContext } from "../core/client-address.ts";
 import { RATE_LIMIT_BINDING } from "./cloudflare.ts";
 import { DEFAULT_REQUESTS, DEFAULT_WINDOW } from "./memory.ts";
 import type { RateLimitAdapter } from "./schema.ts";
+import { UNKEY_MAX_WINDOW, UNKEY_NAMESPACE, unkeySecrets } from "./unkey.ts";
 import { upstashSecrets } from "./upstash.ts";
 
 /** What a limiter says about one request. */
@@ -152,6 +155,68 @@ export const upstashLimiter = (
   };
 };
 
+/** Unkey's rate limit endpoint. */
+const UNKEY_LIMIT_URL = "https://api.unkey.com/v2/ratelimit.limit";
+
+/**
+ * How long Unkey gets to count a request, in milliseconds, before the
+ * request is let through without it.
+ */
+export const UNKEY_TIMEOUT = 2000;
+
+/** The part of Unkey's reply the limiter reads. */
+const unkeyReplySchema = z.object({
+  data: z.object({
+    overrideId: z.string().optional(),
+    reset: z.number(),
+    success: z.boolean(),
+  }),
+});
+
+/**
+ * Count with Unkey's rate limit API. Unkey takes identifiers of letters,
+ * digits, and `_.:/-`, so anything else in the key (an IPv6 host's brackets,
+ * an address's `%` zone) becomes `_`. Its `reset` is a timestamp on Unkey's
+ * clock, which this server's may not match, so `retryAfter` is kept between
+ * one second and the window: the configured one, or Unkey's longest when an
+ * override set in Unkey replaced it.
+ */
+export const unkeyLimiter =
+  (
+    requests: number,
+    window: number,
+    namespace: string,
+    rootKey: string,
+    { fetch: fetchImpl = fetch, now = Date.now }: LimiterRuntime = {}
+  ): Limiter =>
+  async (key) => {
+    const response = await fetchImpl(UNKEY_LIMIT_URL, {
+      body: JSON.stringify({
+        duration: window * 1000,
+        identifier: key.replaceAll(/[^\w.:/-]/gu, "_"),
+        limit: requests,
+        namespace,
+      }),
+      headers: {
+        authorization: `Bearer ${rootKey}`,
+        "content-type": "application/json",
+      },
+      method: "POST",
+      signal: AbortSignal.timeout(UNKEY_TIMEOUT),
+    });
+    if (!response.ok) {
+      await response.body?.cancel();
+      throw new Error(`Unkey answered ${response.status}.`);
+    }
+    const { data } = unkeyReplySchema.parse(await response.json());
+    const seconds = Math.ceil((data.reset - now()) / 1000);
+    const longest = data.overrideId ? UNKEY_MAX_WINDOW : window;
+    return {
+      allowed: data.success,
+      retryAfter: Math.min(longest, Math.max(1, seconds)),
+    };
+  };
+
 /** Count with a Workers rate limiting binding. */
 export const bindingLimiter =
   (binding: RateLimitBinding, window: number): Limiter =>
@@ -185,6 +250,22 @@ export const createLimiter = (
     return null;
   }
   const { requests, window } = limitOf(adapter);
+  if (adapter.kind === "unkey") {
+    const [secret] = unkeySecrets(adapter.options);
+    const rootKey = runtime.secret?.(secret);
+    if (rootKey) {
+      return unkeyLimiter(
+        requests,
+        window,
+        adapter.options.namespace ?? UNKEY_NAMESPACE,
+        rootKey,
+        runtime
+      );
+    }
+    console.warn(
+      `Rate limiting counts in memory: set ${secret} to share the count through Unkey.`
+    );
+  }
   if (adapter.kind === "cloudflare") {
     if (runtime.binding) {
       return bindingLimiter(runtime.binding, window);

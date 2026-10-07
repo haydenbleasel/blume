@@ -70,6 +70,7 @@ import { TITLE_ID_KEY } from "../src/markdown/title-heading.ts";
 import {
   cloudflare as cloudflareRateLimit,
   memory,
+  unkey,
   upstash,
 } from "../src/ratelimit/index.ts";
 import { scalar } from "../src/reference/index.ts";
@@ -2811,12 +2812,14 @@ describe(rateLimitTemplate, () => {
     );
   });
 
-  it("hands Upstash its secrets and Cloudflare its binding", () => {
-    const shared = rateLimitTemplate(upstash(), "search");
-    expect(shared.imports).toContain(
-      'import { getSecret } from "astro:env/server";'
-    );
-    expect(shared.setup).toContain(", { secret: getSecret });");
+  it("hands a store that names secrets getSecret, and Cloudflare its binding", () => {
+    for (const adapter of [upstash(), unkey()]) {
+      const shared = rateLimitTemplate(adapter, "search");
+      expect(shared.imports).toContain(
+        'import { getSecret } from "astro:env/server";'
+      );
+      expect(shared.setup).toContain(", { secret: getSecret });");
+    }
     const bound = rateLimitTemplate(cloudflareRateLimit(), "api-proxy");
     expect(bound.imports).toContain(
       'import { env } from "cloudflare:workers";'

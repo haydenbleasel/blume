@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { cloudflareRateLimitAdapterSchema } from "./cloudflare.ts";
 import { memory, memoryAdapterSchema } from "./memory.ts";
+import { unkeyAdapterSchema } from "./unkey.ts";
 import { upstashAdapterSchema } from "./upstash.ts";
 
 const ADAPTER_HINT =
@@ -12,6 +13,7 @@ export const rateLimitAdapterSchema = z.discriminatedUnion("kind", [
   cloudflareRateLimitAdapterSchema,
   memoryAdapterSchema,
   upstashAdapterSchema,
+  unkeyAdapterSchema,
 ]);
 
 export type RateLimitAdapter = z.output<typeof rateLimitAdapterSchema>;

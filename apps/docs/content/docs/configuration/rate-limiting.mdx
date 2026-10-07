@@ -1,6 +1,6 @@
 ---
 title: Rate limiting
-description: Limit how often one reader can call the assistant, the API playground proxy, and server-side search, on by default, with the count kept in memory, Upstash, or Cloudflare.
+description: Limit how often one reader can call the assistant, the API playground proxy, and server-side search, on by default, with the count kept in memory, Upstash, Cloudflare, or Unkey.
 ---
 
 The server routes a reader can call cost you something each time: the [assistant](/docs/configuration/assistant) spends model tokens, the [API playground](/docs/references/openapi#cors-and-the-proxy) proxy relays requests to your API, and [Mixedbread search](/docs/configuration/search#mixedbread) runs a paid query. Blume limits how often one reader, identified by IP address, can call each of them. A reader over the limit gets `429 Too Many Requests` with a `Retry-After` header, and the assistant tells them to try again in a few minutes.
@@ -25,6 +25,7 @@ Each route keeps its own count, so a busy playground session doesn't use up the 
 | `memory()` | The server's memory (the default) | Exactly on one server; per instance on serverless hosts |
 | `upstash()` | [Upstash Redis](https://upstash.com) | Exactly, on every host |
 | `cloudflare()` | Cloudflare's Workers rate limiting | Per Cloudflare location |
+| `unkey()` | [Unkey](https://unkey.com) | On every host; regions catch up within moments |
 
 ### Memory
 
@@ -67,6 +68,24 @@ export default defineConfig({
 ```
 
 The binding's namespace comes from the Worker's name, so two sites on one account don't share a count. Set `namespaceId` to choose it yourself.
+
+### Unkey
+
+`unkey()` keeps the count in [Unkey's rate limiting](https://www.unkey.com/docs/api-management/ratelimiting/overview), which every instance shares. Create a root key with the `ratelimit.*.limit` permission, plus `ratelimit.*.create_namespace` so Unkey can create the namespace on the first request, then set it as `UNKEY_ROOT_KEY`. Blume talks to Unkey's REST API, so there's nothing to install. Until the key is set, the routes count in memory and `blume build` warns.
+
+```ts blume.config.ts lineNumbers
+import { unkey } from "blume/ratelimit";
+
+rateLimit: unkey(),
+```
+
+The namespace is `docs` unless you name another with `namespace`. Name the variable that holds the key with `rootKeyEnv`:
+
+```ts blume.config.ts lineNumbers
+rateLimit: unkey({ namespace: "acme-docs", rootKeyEnv: "DOCS_UNKEY_ROOT_KEY" }),
+```
+
+Unkey counts in each region and shares the counts between regions within moments, so a short burst split across regions can get a few more requests through than the limit. Every count fails with a key Unkey refuses, like one missing those permissions, and a request a shared store fails to count is let through, so if the server logs `Rate limiting failed`, check the key.
 
 ## Behind a reverse proxy
 

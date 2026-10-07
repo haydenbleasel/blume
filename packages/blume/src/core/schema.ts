@@ -2361,7 +2361,7 @@ export const blumeConfigSchema = z
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message:
-          'rateLimit: cloudflare() counts with a Workers binding, so it needs `deployment: cloudflare()` from "blume/deploy". On another host, use upstash() or memory() from "blume/ratelimit".',
+          'rateLimit: cloudflare() counts with a Workers binding, so it needs `deployment: cloudflare()` from "blume/deploy". On another host, use upstash(), unkey(), or memory() from "blume/ratelimit".',
         path: ["rateLimit"],
       });
     }

@@ -35,7 +35,7 @@ export const memoryAdapterSchema = adapterDescriptorSchema(
  * platform that runs many short-lived instances (Vercel, Netlify,
  * Cloudflare) each instance keeps its own, so it stops a burst from one
  * reader rather than enforcing the limit exactly. For that, share the count
- * with `upstash()` or `cloudflare()`.
+ * with `upstash()`, `cloudflare()`, or `unkey()`.
  */
 export const memory = (options: RateLimitOptions = {}): MemoryAdapter => ({
   kind: "memory",

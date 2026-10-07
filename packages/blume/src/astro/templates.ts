@@ -1244,9 +1244,9 @@ interface RateLimitTemplate {
  * `rateLimit` for one server route: a limiter built at module scope from the
  * configured adapter, checked against every request, keyed by the reader's
  * address and `scope` so each route keeps its own budget (see
- * `ratelimit/runtime.ts`). Upstash reads its secrets through `getSecret`;
- * Cloudflare's binding comes from the Worker's env. Nothing at all when
- * rate limiting is off.
+ * `ratelimit/runtime.ts`). An adapter that names secrets reads them through
+ * `getSecret`; Cloudflare's binding comes from the Worker's env. Nothing at
+ * all when rate limiting is off.
  */
 export const rateLimitTemplate = (
   adapter: RateLimitAdapter | null | undefined,
@@ -1259,7 +1259,7 @@ export const rateLimitTemplate = (
     'import { createLimiter, rateLimited } from "blume/ratelimit/runtime.ts";',
   ];
   let runtime = "";
-  if (adapter.kind === "upstash") {
+  if (adapter.requiredSecrets.length > 0) {
     imports.push('import { getSecret } from "astro:env/server";');
     runtime = ", { secret: getSecret }";
   } else if (adapter.kind === "cloudflare") {
