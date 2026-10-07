@@ -8,6 +8,7 @@ import { generateRuntime } from "../src/astro/generate.ts";
 import {
   cloudflaredArgs,
   createCloudflareTunnelSpawner,
+  resolveQuickTunnelHosts,
   startCloudflareTunnel,
 } from "../src/cli/cloudflare-tunnel.ts";
 import { scanProject } from "../src/core/project-graph.ts";
@@ -85,6 +86,26 @@ describe("blume dev tunnel flags", () => {
       "http://127.0.0.1:4387",
     ]);
     expect(cloudflaredArgs(4387, "::1")[3]).toBe("http://[::1]:4387");
+    expect(resolveQuickTunnelHosts()).toEqual({
+      devServer: "127.0.0.1",
+      origin: "127.0.0.1",
+    });
+    expect(resolveQuickTunnelHosts("localhost")).toEqual({
+      devServer: "127.0.0.1",
+      origin: "127.0.0.1",
+    });
+    expect(resolveQuickTunnelHosts("")).toEqual({
+      devServer: true,
+      origin: "127.0.0.1",
+    });
+    expect(resolveQuickTunnelHosts("0.0.0.0")).toEqual({
+      devServer: "0.0.0.0",
+      origin: "127.0.0.1",
+    });
+    expect(resolveQuickTunnelHosts("::")).toEqual({
+      devServer: "::",
+      origin: "::1",
+    });
     expect(events).toEqual([
       "spawn:cloudflared tunnel --url http://127.0.0.1:4387",
     ]);

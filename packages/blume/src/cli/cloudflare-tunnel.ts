@@ -1,6 +1,8 @@
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 
+import { normalizeHost } from "./host-args.ts";
+
 export interface CloudflareTunnelProcess {
   readonly exited: Promise<number>;
   readonly exitCode: number | null;
@@ -20,6 +22,30 @@ export type CloudflareTunnelSpawner = (
 export interface CloudflareTunnelCallbacks {
   onError: (error: Error) => void;
 }
+
+export interface QuickTunnelHosts {
+  devServer: boolean | string;
+  origin: string;
+}
+
+const originHostFor = (host?: string): string => {
+  if (!host || host === "localhost" || host === "0.0.0.0") {
+    return "127.0.0.1";
+  }
+  if (host === "::" || host === "::0") {
+    return "::1";
+  }
+  return host;
+};
+
+export const resolveQuickTunnelHosts = (host?: string): QuickTunnelHosts => {
+  const devServer =
+    host === undefined || host === "localhost"
+      ? "127.0.0.1"
+      : normalizeHost(host);
+
+  return { devServer, origin: originHostFor(host) };
+};
 
 export const cloudflaredArgs = (port: number, host = "127.0.0.1"): string[] => [
   "cloudflared",

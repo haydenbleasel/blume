@@ -14,7 +14,10 @@ import { resolveRuntimeDir } from "../../core/project.ts";
 import { referenceSpecFiles } from "../../openapi/references.ts";
 import { parsePort } from "../args.ts";
 import { astroBuildDiagnostics } from "../build-failure.ts";
-import { startCloudflareTunnel } from "../cloudflare-tunnel.ts";
+import {
+  resolveQuickTunnelHosts,
+  startCloudflareTunnel,
+} from "../cloudflare-tunnel.ts";
 import { commandMeta } from "../command-meta.ts";
 import {
   acquireDevLock,
@@ -143,11 +146,16 @@ export const devCommand = defineCommand({
     // structural (route-set) change can't be re-synced in place (see below).
     // `open` is honored on first boot only — a restart must not reopen the
     // browser.
+    const tunnelHosts = tunnel ? resolveQuickTunnelHosts(args.host) : undefined;
     const createServer = (listenPort: number | undefined, open: boolean) =>
       dev({
         logLevel: args.debug ? "debug" : "info",
         root: project.context.outDir,
-        server: { host: normalizeHost(args.host), open, port: listenPort },
+        server: {
+          host: tunnelHosts?.devServer ?? normalizeHost(args.host),
+          open,
+          port: listenPort,
+        },
       });
 
     let server: Awaited<ReturnType<typeof createServer>>;
@@ -179,17 +187,20 @@ export const devCommand = defineCommand({
     let tunnelFailedToStart = false;
     let tunnelProcess: ReturnType<typeof startCloudflareTunnel> | undefined;
     if (tunnel) {
-      const tunnelHost = args.host || "127.0.0.1";
-      tunnelProcess = startCloudflareTunnel(boundPort, tunnelHost, {
-        onError(error) {
-          tunnelFailedToStart = true;
-          if (!shuttingDown) {
-            logger.error(
-              `Could not start Cloudflare Tunnel. Install cloudflared and make sure it is available on PATH. ${error.message}`
-            );
-          }
-        },
-      });
+      tunnelProcess = startCloudflareTunnel(
+        boundPort,
+        tunnelHosts?.origin ?? "127.0.0.1",
+        {
+          onError(error) {
+            tunnelFailedToStart = true;
+            if (!shuttingDown) {
+              logger.error(
+                `Could not start Cloudflare Tunnel. Install cloudflared and make sure it is available on PATH. ${error.message}`
+              );
+            }
+          },
+        }
+      );
       void (async () => {
         const exitCode = await tunnelProcess?.exited;
         if (!shuttingDown && !tunnelFailedToStart && exitCode !== undefined) {
