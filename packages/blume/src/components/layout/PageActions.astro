@@ -1,6 +1,12 @@
 ---
 import { EN_UI } from "../../core/i18n-ui.ts";
 import type { UIStrings } from "../../core/i18n-ui.ts";
+import {
+  isBuiltInMcpClient,
+  mcpClients,
+  mcpMenuRows,
+} from "../../core/mcp-clients.ts";
+import type { McpMenuEntry } from "../../core/mcp-clients.ts";
 import { NEW_TAB_ATTRS } from "../../core/new-tab.ts";
 import { openInChatProviders } from "../../core/open-in-chat.ts";
 import type { OpenInChatProvider } from "../../core/open-in-chat.ts";
@@ -18,6 +24,11 @@ interface Props {
   mcpUrl?: string | null;
   /** Display name of the MCP server (defaults to the site title). */
   mcpName?: string | null;
+  /**
+   * "Connect to MCP" clients to list after "Copy server URL", in order, with
+   * custom labels resolved; omitting the prop lists every built-in client.
+   */
+  mcpMenu?: readonly McpMenuEntry[];
   /**
    * "Open in chat" providers to list, in order; an empty list hides the
    * action, and omitting the prop shows every provider.
@@ -40,6 +51,7 @@ const {
   exportEpub,
   mcpUrl,
   mcpName,
+  mcpMenu,
   openInChat,
   strings,
   divider = true,
@@ -88,6 +100,10 @@ const providers = (openInChat ?? openInChatProviders).map((key) => ({
 // The default list opens with v0 and separates it from the chat assistants;
 // keep that separator only while a configured list preserves v0 first.
 const chatSeparator = providers.length > 1 && providers[0]?.key === "v0";
+
+// `agents.mcp.clients` picks and orders the clients after "Copy server URL",
+// with a rule between the commands to copy and the install links.
+const mcpRows = mcpMenuRows(mcpMenu ?? mcpClients);
 
 // The block renders once, for the right rail. Below `xl` the script moves it
 // into the mobile "On this page" dropdown, and the global styles below the
@@ -230,29 +246,57 @@ const panelClass =
               {a.copyServerUrl}
             </span>
           </button>
-          <button class={menuRowClass} data-mcp-copy-claude type="button">
-            <span set:html={LOGOS.claude} />
-            <span class="flex-1" data-mcp-claude-label>
-              {a.copyClaudeCode}
-            </span>
-          </button>
-          <button class={menuRowClass} data-mcp-copy-codex type="button">
-            <span set:html={LOGOS.codex} />
-            <span class="flex-1" data-mcp-codex-label>
-              {a.copyCodex}
-            </span>
-          </button>
-          <hr class="my-1 border-border border-t" />
-          <a class={menuRowClass} data-mcp-cursor rel="noreferrer">
-            <span set:html={LOGOS.cursor} />
-            <span class="flex-1">{a.addToCursor}</span>
-            <Icon name="external-link" size={13} />
-          </a>
-          <a class={menuRowClass} data-mcp-vscode rel="noreferrer">
-            <Icon name="code" size={16} />
-            <span class="flex-1">{a.addToVscode}</span>
-            <Icon name="external-link" size={13} />
-          </a>
+          {mcpRows.map(({ client, rule }) => (
+            <>
+              {rule && <hr class="my-1 border-border border-t" />}
+              {client === "claude-code" && (
+                <button
+                  class={menuRowClass}
+                  data-mcp-copy-claude
+                  type="button"
+                >
+                  <span set:html={LOGOS.claude} />
+                  <span class="flex-1" data-mcp-claude-label>
+                    {a.copyClaudeCode}
+                  </span>
+                </button>
+              )}
+              {client === "codex" && (
+                <button class={menuRowClass} data-mcp-copy-codex type="button">
+                  <span set:html={LOGOS.codex} />
+                  <span class="flex-1" data-mcp-codex-label>
+                    {a.copyCodex}
+                  </span>
+                </button>
+              )}
+              {client === "cursor" && (
+                <a class={menuRowClass} data-mcp-cursor rel="noreferrer">
+                  <span set:html={LOGOS.cursor} />
+                  <span class="flex-1">{a.addToCursor}</span>
+                  <Icon name="external-link" size={13} />
+                </a>
+              )}
+              {client === "vscode" && (
+                <a class={menuRowClass} data-mcp-vscode rel="noreferrer">
+                  <Icon name="code" size={16} />
+                  <span class="flex-1">{a.addToVscode}</span>
+                  <Icon name="external-link" size={13} />
+                </a>
+              )}
+              {!isBuiltInMcpClient(client) && (
+                <button
+                  class={menuRowClass}
+                  data-mcp-copy-command={client.command}
+                  type="button"
+                >
+                  <Icon name={client.icon ?? "terminal"} size={16} />
+                  <span class="flex-1" data-mcp-command-label>
+                    {client.label}
+                  </span>
+                </button>
+              )}
+            </>
+          ))}
         </div>
       </details>
     )
@@ -299,6 +343,7 @@ const panelClass =
 </style>
 
 <script>
+  import { mcpClientCommand } from "../../core/mcp-clients.ts";
   import { copyDeferredText, copyText, flashLabel } from "../copy-feedback.ts";
   import { installDropdownDismiss } from "../dropdown-dismiss.ts";
   import { mountBase } from "../islands/base-path.ts";
@@ -572,6 +617,19 @@ hr { border: 0; border-top: 1px solid #ddd; margin: 2em 0; }`;
             root.querySelector("[data-mcp-codex-label]")
           )
         );
+      for (const button of root.querySelectorAll<HTMLElement>(
+        "[data-mcp-copy-command]"
+      )) {
+        button.addEventListener("click", () =>
+          copy(
+            mcpClientCommand(button.dataset.mcpCopyCommand ?? "", {
+              name: id,
+              url: mcpUrl,
+            }),
+            button.querySelector("[data-mcp-command-label]")
+          )
+        );
+      }
     }
 
     const label = root.querySelector("[data-blume-copy-label]");

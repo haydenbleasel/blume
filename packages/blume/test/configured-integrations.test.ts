@@ -543,6 +543,63 @@ it("passes invalid integration elements through to Astro validation", async () =
   // Budget for a killed-and-retried 90s build attempt.
 }, 240_000);
 
+it("renders agents.mcp.clients in the built Connect to MCP menu", async () => {
+  const root = await writeProject({
+    "blume.config.ts": `
+import { node } from "blume/deploy";
+
+export default {
+  agents: {
+    mcp: {
+      clients: [
+        {
+          command: "copilot mcp add --transport http {name} {url}",
+          label: "Copy Copilot CLI command",
+        },
+        "vscode",
+      ],
+      enabled: true,
+    },
+  },
+  deployment: node({ site: "https://docs.example.com" }),
+  ${offlineFontsSource},
+};
+`,
+    "docs/index.md": "# Home\n",
+  });
+
+  const built = await runIsolatedBuild(root);
+  expect(built.exitCode, built.output).toBe(0);
+  const html = await readFile(
+    join(root, ".blume-verify/dist/client/index.html"),
+    "utf-8"
+  );
+  // The menu's rows in order: the server URL, the configured clients, and a
+  // rule where the commands to copy give way to the install links.
+  const menu = html.slice(
+    html.indexOf("data-mcp-copy-url"),
+    html.indexOf("</details>", html.indexOf("data-mcp-copy-url"))
+  );
+  expect(
+    [...menu.matchAll(/<hr\b|data-mcp-(?:copy-[a-z]+|cursor|vscode)\b/gu)].map(
+      ([row]) => row
+    )
+  ).toStrictEqual([
+    "data-mcp-copy-url",
+    "data-mcp-copy-command",
+    "<hr",
+    "data-mcp-vscode",
+  ]);
+  // The custom row carries its command for the script to fill in, under its
+  // label, beside the server the script fills it with.
+  expect(menu).toContain(
+    'data-mcp-copy-command="copilot mcp add --transport http {name} {url}"'
+  );
+  expect(menu).toContain("Copy Copilot CLI command");
+  expect(html).toContain('data-mcp-url="https://docs.example.com/mcp"');
+  // Budget for a killed-and-retried 90s build attempt.
+}, 240_000);
+
 it("serves a renamed content folder in dev without restarting the server", async () => {
   // Astro's glob watcher misses directory renames. Rather than restart the
   // dev server, the regenerate loop asks Astro's content layer to re-sync

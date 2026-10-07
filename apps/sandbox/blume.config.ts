@@ -19,7 +19,23 @@ import { z } from "zod";
  */
 export default defineConfig({
   agents: {
-    mcp: { enabled: true },
+    mcp: {
+      // A client Blume doesn't ship, between the built-in commands and links.
+      clients: [
+        "claude-code",
+        "codex",
+        {
+          command: "copilot mcp add --transport http {name} {url}",
+          label: {
+            de: "Copilot-CLI-Befehl kopieren",
+            en: "Copy Copilot CLI command",
+          },
+        },
+        "cursor",
+        "vscode",
+      ],
+      enabled: true,
+    },
     skills: "../../skills",
   },
   ai: {

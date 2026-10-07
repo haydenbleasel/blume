@@ -1,6 +1,9 @@
 import { isAssetIcon } from "../theme/icon-kind.ts";
 import { hasIcon } from "../theme/icons.ts";
 import { isInternalPath } from "./base-path.ts";
+import { resolveLocalizable } from "./localizable.ts";
+import { isBuiltInMcpClient } from "./mcp-clients.ts";
+import type { McpClientEntry } from "./mcp-clients.ts";
 import { isPageRef, normalizeRef } from "./navigation.ts";
 import type { SidebarItemConfig } from "./schema.ts";
 import type { Diagnostic, NavNode, Navigation, PageRecord } from "./types.ts";
@@ -95,6 +98,28 @@ export const validateSearchPopularIcons = (
   const icons = popular.flatMap((link) =>
     link.icon
       ? [{ icon: link.icon, where: `popular link "${link.label}"` }]
+      : []
+  );
+  return unknownIconDiagnostics(icons, ICON_FORMAT_HINT);
+};
+
+/**
+ * Warn about unknown icons on custom "Connect to MCP" clients
+ * (`agents.mcp.clients`), which live outside the navigation model too. A
+ * per-locale label is named in the default locale.
+ */
+export const validateMcpClientIcons = (
+  clients: readonly McpClientEntry[],
+  defaultLocale?: string
+): Diagnostic[] => {
+  const icons = clients.flatMap((client) =>
+    !isBuiltInMcpClient(client) && client.icon
+      ? [
+          {
+            icon: client.icon,
+            where: `MCP client "${resolveLocalizable(client.label, defaultLocale, defaultLocale)}"`,
+          },
+        ]
       : []
   );
   return unknownIconDiagnostics(icons, ICON_FORMAT_HINT);

@@ -73,6 +73,7 @@ import { resolveFallbackLocale } from "../core/i18n.ts";
 import { buildIncludeGraph } from "../core/includes.ts";
 import { resolveLocalizable } from "../core/localizable.ts";
 import {
+  validateMcpClientIcons,
   validateNavTargets,
   validateSearchPopularIcons,
 } from "../core/nav-diagnostics.ts";
@@ -1273,6 +1274,7 @@ export const buildRuntimeData = (project: BlumeProject): string => {
       logo,
       mcp: config.agents.mcp.enabled
         ? {
+            clients: config.agents.mcp.clients,
             name: config.agents.mcp.name ?? config.title,
             route: config.agents.mcp.route,
           }
@@ -2437,10 +2439,10 @@ export const generateRuntime = async (
 
   // Missing-navigation-target check, now that every servable route is known
   // (see `navTargetRoutes`).
-  // Curated `search.popular` icons live outside the navigation model, so they
-  // miss `validateNavIcons` in the graph build — they're checked here too,
-  // where the search config is known. A typo otherwise just renders the
-  // default glyph.
+  // Curated `search.popular` icons and custom MCP clients' icons live outside
+  // the navigation model, so they miss `validateNavIcons` in the graph build —
+  // they're checked here too, where their config is known. A typo otherwise
+  // just renders the default glyph, or no icon at all.
   warnings.push(
     ...[
       ...validateNavTargets(
@@ -2449,6 +2451,12 @@ export const generateRuntime = async (
         servedFiles(project)
       ),
       ...validateSearchPopularIcons(config.search.popular),
+      ...(config.agents.mcp.enabled
+        ? validateMcpClientIcons(
+            config.agents.mcp.clients,
+            config.i18n?.defaultLocale
+          )
+        : []),
     ].map(diagnosticWarning)
   );
 

@@ -306,4 +306,40 @@ test.describe("dropdowns", () => {
     await page.locator("#blume-content h1").click();
     await expect(switcher).not.toHaveAttribute("open");
   });
+
+  test("Connect to MCP lists every built-in client by default", async ({
+    page,
+  }) => {
+    await page.goto("/docs/quickstart");
+    const menu = page
+      .locator("[data-blume-toc] [data-blume-page-actions] details")
+      .filter({ has: page.locator("[data-mcp-copy-url]") })
+      .locator("[data-blume-menu]");
+    // The commands to copy, a rule, then the install links.
+    expect(
+      await menu.evaluate((element) =>
+        [...element.children].map(
+          (row) =>
+            row
+              .getAttributeNames()
+              .find((name) => name.startsWith("data-mcp-")) ?? row.localName
+        )
+      )
+    ).toStrictEqual([
+      "data-mcp-copy-url",
+      "data-mcp-copy-claude",
+      "data-mcp-copy-codex",
+      "hr",
+      "data-mcp-cursor",
+      "data-mcp-vscode",
+    ]);
+    await expect(menu.locator("[data-mcp-cursor]")).toHaveAttribute(
+      "href",
+      /^cursor:\/\/anysphere\.cursor-deeplink\/mcp\/install\?/u
+    );
+    await expect(menu.locator("[data-mcp-vscode]")).toHaveAttribute(
+      "href",
+      /^vscode:mcp\/install\?/u
+    );
+  });
 });

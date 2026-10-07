@@ -43,6 +43,7 @@ import { isExternalUrl, normalizeBasePath } from "./base-path.ts";
 import { FOOTER_SOCIALS } from "./footer.ts";
 import { PUBLIC_HOST_URL } from "./github.ts";
 import { uiLocaleOverridesSchema } from "./i18n-ui.ts";
+import { isBuiltInMcpClient, mcpClients } from "./mcp-clients.ts";
 import { openInChatProviders } from "./open-in-chat.ts";
 import { PAGE_MODES } from "./page-modes.ts";
 import { redirectPatternError } from "./redirect-patterns.ts";
@@ -891,7 +892,91 @@ const publicJwkSchema = z
     }
   });
 
+// The label is the row button's only accessible name (its icon is
+// decorative), so unlike a header link's it can't be blank in any locale.
+const mcpClientLabelSchema = z.union(
+  [
+    z.string().trim().min(1),
+    z
+      .record(z.string(), z.string().trim().min(1))
+      .refine((value) => Object.keys(value).length > 0, {
+        message: "Provide at least one locale's label.",
+      }),
+  ],
+  { error: "Expected a label, or a map of locale code to label" }
+);
+
+// A "Connect to MCP" row for a client Blume doesn't ship: its `command` is
+// copied with `{name}` and `{url}` filled in.
+const mcpCustomClientSchema = z.strictObject({
+  command: z.string().trim().min(1),
+  icon: iconName.optional(),
+  label: mcpClientLabelSchema,
+});
+
+const ACCEPTED_MCP_CLIENTS = `${mcpClients.map((key) => `"${key}"`).join(", ")}, or a custom client { label, command, icon? }`;
+
+/** A union's issue: every member failed, each with issues of its own. */
+const isUnionIssue = (
+  issue: z.core.$ZodIssue
+): issue is z.core.$ZodIssueInvalidUnion => issue.code === "invalid_union";
+
+// A bad entry fails the list member of `clients`, which zod reports as a bare
+// "Invalid input" on the whole list; that union issue is all this map sees.
+// The entries' issues ride along in `errors`. The culprit is an entry that
+// matches neither a built-in key nor a custom client, which fails as a union
+// at its index (a blank field or an unknown key elsewhere doesn't fail the
+// list on its own). Name that entry, and for a custom client its bad field.
+const mcpClientsError = (issue: z.core.$ZodRawIssue): string => {
+  const entryIssue = (issue.code === "invalid_union" ? issue.errors : [])
+    .flat()
+    .filter(isUnionIssue)
+    .find((nested) => Number.isInteger(nested.path[0]));
+  if (!entryIssue) {
+    return `agents.mcp.clients takes true, false, or a list whose entries are each ${ACCEPTED_MCP_CLIENTS}.`;
+  }
+  const index = Number(entryIssue.path[0]);
+  const at = `agents.mcp.clients.${String(index)}`;
+  const entry = Array.isArray(issue.input) ? issue.input[index] : null;
+  if (isString(entry)) {
+    return `${at} is "${entry}", which isn't a built-in client. Use ${ACCEPTED_MCP_CLIENTS}.`;
+  }
+  const fieldIssue = entryIssue.errors
+    .flat()
+    .find((nested) => nested.path.length > 0);
+  return fieldIssue
+    ? `${at}.${fieldIssue.path.map(String).join(".")}: ${fieldIssue.message}. A custom client is { label, command, icon? }.`
+    : `${at} isn't ${ACCEPTED_MCP_CLIENTS}.`;
+};
+
 const mcpConfigSchema = z.strictObject({
+  /**
+   * The "Connect to MCP" page action's clients. `true` (the default) lists
+   * every built-in client, `false` none (the menu keeps "Copy server URL"),
+   * and an array picks built-in clients by key and adds custom ones, in the
+   * given order. Normalized to the list so consumers read a plain array.
+   */
+  clients: z
+    .union(
+      [
+        z.boolean(),
+        z.array(z.union([z.enum(mcpClients), mcpCustomClientSchema])).refine(
+          (value) => {
+            const keys = value.filter(isBuiltInMcpClient);
+            return new Set(keys).size === keys.length;
+          },
+          { message: "agents.mcp.clients must not repeat a built-in client." }
+        ),
+      ],
+      { error: mcpClientsError }
+    )
+    .default(true)
+    .transform((value) => {
+      if (isBoolean(value)) {
+        return value ? [...mcpClients] : [];
+      }
+      return value;
+    }),
   enabled: z.boolean().default(false),
   /** Optional system hint passed to connecting agents. */
   instructions: z.string().optional(),
@@ -1182,6 +1267,8 @@ export type AssistantConfig = NonNullable<
 >;
 export { openInChatProviders } from "./open-in-chat.ts";
 export type { OpenInChatProvider } from "./open-in-chat.ts";
+export { mcpClients } from "./mcp-clients.ts";
+export type { McpClient, McpCustomClient } from "./mcp-clients.ts";
 
 // Reader-facing "Export" page action (PDF via print, EPUB via client-side
 // generation). Off by default. Accepts a shorthand boolean to toggle both

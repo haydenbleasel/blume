@@ -206,8 +206,15 @@ export interface BlumeDataConfig {
   /** `markdown.imageZoom`: click-to-zoom content images. */
   imageZoom: boolean;
   logo: BlumeLogo | null;
-  /** Hosted MCP server, or `null` when MCP is off. */
-  mcp: { name: string; route: string } | null;
+  /**
+   * Hosted MCP server, or `null` when MCP is off, with the clients its
+   * "Connect to MCP" page action lists (`agents.mcp.clients`), in order.
+   */
+  mcp: {
+    clients: ResolvedConfig["agents"]["mcp"]["clients"];
+    name: string;
+    route: string;
+  } | null;
   /** `seo.metatags`: the site's own tags for every page's head, or `null`. */
   metatags: Record<string, string> | null;
   /**
