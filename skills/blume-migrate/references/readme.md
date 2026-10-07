@@ -66,7 +66,7 @@ There's no config file in Git. Every page of a Refactored hub embeds the project
 | `integrations.intercom`, `zendesk` (a support widget readers click) | a `PageFooter` component (`defineComponents`, SKILL.md "analytics") that loads it | not `analytics`, which can hold it until consent. Check region settings (an AU Intercom workspace needs `api_base`) |
 | `integrations.google.site_verification`, `<meta>` tags in head HTML | `seo.metatags` | other head HTML: report |
 | `stylesheet_hub2` (custom CSS) | a root `theme.css` | rules for ReadMe's classes (`.rm-*`, `.callout_*`, hashed names) match nothing: carry only rules for the site's own markup |
-| Footer HTML | `footer: { links }` | report the rest |
+| Footer HTML | `footer: { copyright, links }` | a copyright line → `copyright`, plain text: strip the tags, decode entities (`&copy;` → `©`). Report the rest |
 | `variables.defaults` | `variables` | Content. **Defaults can be real credentials** (an API key): never copy one into config |
 | `glossaryTerms` | `--glossary hub.html` | the codemod writes `<Tooltip>`s |
 | `redirects` | `redirects` | URLs and redirects |

@@ -101,6 +101,10 @@ export default defineConfig({
   export: true,
   feedback: { comments: true },
   footer: {
+    copyright: {
+      de: "© 2026 Blume. MIT-lizenziert.",
+      en: "© 2026 Blume. MIT licensed.",
+    },
     links: [
       {
         href: "/docs",

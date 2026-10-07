@@ -1,8 +1,8 @@
 ---
 // The site footer, below the content on every page: one row, as tall as the
-// header, with `footer.links` on one side and the social profile icons on the
-// other. The site's repository (`github`, unless `navigation.repo` hides it)
-// is the first icon; the footer is the only place it's linked. With `consent` configured the links end with the
+// header, with `footer.links` on one side, the social profile icons on the
+// other, and `footer.copyright` centered between them. The site's repository
+// (`github`, unless `navigation.repo` hides it) is the first icon; the footer is the only place it's linked. With `consent` configured the links end with the
 // Cookie settings link, which reopens the reader's consent choices. Renders
 // nothing when there's none of these; a `components.ts` `Footer` replaces it.
 import data from "blume:data";
@@ -12,6 +12,7 @@ import type { Navigation } from "../../core/types.ts";
 import { EN_UI } from "../../core/i18n-ui.ts";
 import type { UIStrings } from "../../core/i18n-ui.ts";
 import { routeSetFor } from "../../core/locale-links.ts";
+import { resolveLocalizable } from "../../core/localizable.ts";
 import { newTabAttrs } from "../../core/new-tab.ts";
 import Icon from "../Icon.astro";
 import { withBase } from "../islands/base-path.ts";
@@ -21,8 +22,9 @@ import { footerSocialLinks } from "./footer-socials.ts";
 interface Props {
   footer?: BlumeDataConfig["footer"];
   /**
-   * Active locale of the page: labels written as per-locale maps show its
-   * entry, and internal links move into it (see `footer-links.ts`).
+   * Active locale of the page: the copyright and labels written as
+   * per-locale maps show its entry, and internal links move into it (see
+   * `footer-links.ts`).
    */
   locale?: string;
   /** The page's navigation: its `repoUrl` is the repository link. */
@@ -40,6 +42,14 @@ const socials = footerSocialLinks(
     ? { href: repoUrl, label: { ...EN_UI.nav, ...ui?.nav }.githubRepository }
     : null
 );
+const copyright =
+  footer?.copyright === undefined
+    ? null
+    : resolveLocalizable(
+        footer.copyright,
+        locale,
+        data.config.i18n?.defaultLocale
+      );
 const links = footerLinks(footer?.links ?? [], {
   basePath: data.config.basePath,
   i18n: data.config.i18n,
@@ -58,9 +68,17 @@ const hasLinks = links.length > 0 || consentSettings !== null;
 ---
 
 {
-  (hasLinks || socials.length > 0) && (
+  (copyright !== null || hasLinks || socials.length > 0) && (
     <footer class="border-border border-t px-4 md:px-6" data-blume-footer>
-      <div class="flex min-h-16 flex-wrap items-center justify-between gap-x-6 gap-y-3 py-3">
+      {/* With a copyright, three columns from `md`, the outer two sharing
+          what it leaves so it sits at the true center; without one, the
+          links keep the row's full width. Narrower, the row wraps. */}
+      <div
+        class:list={[
+          "flex min-h-16 flex-wrap items-center gap-x-6 gap-y-3 py-3",
+          copyright !== null && "md:grid md:grid-cols-[1fr_auto_1fr]",
+        ]}
+      >
         {hasLinks && (
           <ul class="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
             {links.map((link) => (
@@ -87,10 +105,15 @@ const hasLinks = links.length > 0 || consentSettings !== null;
             )}
           </ul>
         )}
+        {copyright !== null && (
+          <p class="text-muted-foreground text-sm md:col-start-2">
+            {copyright}
+          </p>
+        )}
         {/* Pulled out by the buttons' padding, so the glyphs line up with the
             footer's edge, and pushed to the far side even with no links. */}
         {socials.length > 0 && (
-          <ul class="-me-[9px] -my-[9px] ms-auto flex flex-wrap items-center gap-1">
+          <ul class="-me-[9px] -my-[9px] ms-auto flex flex-wrap items-center gap-1 md:col-start-3">
             {socials.map((social) => (
               <li>
                 <a

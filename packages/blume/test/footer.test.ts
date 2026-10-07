@@ -57,6 +57,21 @@ describe("the footer config", () => {
     expect(blumeConfigSchema.parse({}).footer).toBeUndefined();
   });
 
+  it("takes a copyright line, plain or per locale", () => {
+    expect(
+      blumeConfigSchema.parse({ footer: { copyright: "© 2026 Acme, Inc." } })
+        .footer
+    ).toEqual({ copyright: "© 2026 Acme, Inc.", links: [], socials: {} });
+    expect(
+      blumeConfigSchema.parse({
+        footer: { copyright: { en: "© Acme", fr: "© Acme SA" } },
+      }).footer?.copyright
+    ).toEqual({ en: "© Acme", fr: "© Acme SA" });
+    expect(
+      blumeConfigSchema.safeParse({ footer: { copyright: {} } }).success
+    ).toBe(false);
+  });
+
   it("rejects an unknown platform, and a column of links", () => {
     expect(footerIssues({ socials: { twitter: "https://x.com/a" } })).toEqual([
       'footer.socials: Unrecognized key: "twitter"',

@@ -1029,7 +1029,9 @@ const resolveFooter = (
 ): ResolvedConfig["footer"] | null => {
   const { footer } = config;
   return footer &&
-    (footer.links.length > 0 || Object.keys(footer.socials).length > 0)
+    (footer.copyright !== undefined ||
+      footer.links.length > 0 ||
+      Object.keys(footer.socials).length > 0)
     ? footer
     : null;
 };

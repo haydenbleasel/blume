@@ -35,7 +35,7 @@ Map what step 3 found or the user supplies; leave the rest at Blume's defaults.
 | Theme style, tint and semantic colors, corner, depth, link, and sidebar styles | drop (report); a root `theme.css` if one matters |
 | Header links; a button-styled one | `navigation.actions`; `navigation.cta` |
 | Announcement | `banner` (`{ content, link, dismissible, id }`) |
-| Footer | `footer.links`, flattened into one row; group titles, logo, and copyright drop (report) |
+| Footer | `footer.links`, flattened into one row; copyright → `footer.copyright`; group titles and logo drop (report) |
 | Social accounts | `footer.socials` |
 | Social preview image | `seo.image` on the landing page (Blume renders a card for every other page) |
 | Git Sync repository and branch | `github: { owner, repo, branch }`, plus `dir` or `host` when needed; GitLab has no equivalent (report) |
@@ -264,4 +264,4 @@ The old `gitbook-cli` toolchain and its fork HonKit:
 
 ## Dropped — report these
 
-Site themes and styles beyond accent, fonts, and mode; footer group titles, logo, and copyright; page covers; page and update tags; adaptive content and visitor authentication; GitBook Assistant unless the user adds `ai.assistant`; hint icons you didn't keep; button styles and search/ask buttons; `<mark>` colors; `fullWidth` and column widths; non-YouTube embeds as players; dark card covers and theme-aware images; inline image sizing; `{% openapi-schemas %}` and GitBook `x-*` spec extensions; automatic redirects you couldn't recover; case-insensitive URLs; page-group icons; sidebar positions Blume can't match (parent pages among loose pages, `***` dividers, external links); section groups flattened into tabs; spaces and translations not in the repo; integrations with no adapter; site redirects nobody could export; anything set only in the app that the user didn't supply.
+Site themes and styles beyond accent, fonts, and mode; footer group titles and logo; page covers; page and update tags; adaptive content and visitor authentication; GitBook Assistant unless the user adds `ai.assistant`; hint icons you didn't keep; button styles and search/ask buttons; `<mark>` colors; `fullWidth` and column widths; non-YouTube embeds as players; dark card covers and theme-aware images; inline image sizing; `{% openapi-schemas %}` and GitBook `x-*` spec extensions; automatic redirects you couldn't recover; case-insensitive URLs; page-group icons; sidebar positions Blume can't match (parent pages among loose pages, `***` dividers, external links); section groups flattened into tabs; spaces and translations not in the repo; integrations with no adapter; site redirects nobody could export; anything set only in the app that the user didn't supply.

@@ -101,7 +101,7 @@ export default defineConfig({
 | `description` | — | Default meta description, used for SEO and OG. |
 | `logo` | — | Brand mark and/or wordmark shown in the header. |
 | `banner` | — | Site-wide announcement bar above the header. |
-| `footer` | — | A row of links and social profile icons below the content. |
+| `footer` | — | A copyright line, a row of links, and social profile icons below the content. |
 
 ### Logo
 
@@ -204,10 +204,11 @@ A translated banner keys dismissal on the default locale's text, so one dismissa
 
 ### Footer
 
-Every page ends with a footer: one row, as tall as the header, with your links on one side and social profile icons on the other. The footer is the only place Blume links your social profiles and repository, so the [`github`](#github) repository comes first among the icons whenever it's set. `footer` adds the rest:
+Every page ends with a footer: one row, as tall as the header, with your links on one side, social profile icons on the other, and a copyright line centered between them. The footer is the only place Blume links your social profiles and repository, so the [`github`](#github) repository comes first among the icons whenever it's set. `footer` adds the rest:
 
 ```ts blume.config.ts lineNumbers
 footer: {
+  copyright: "© 2026 Acme, Inc.",
   links: [
     { label: "Pricing", href: "https://acme.dev/pricing" },
     { label: "Changelog", href: "/changelog" },
@@ -220,9 +221,9 @@ footer: {
 },
 ```
 
-`links` appear in the order you write them. Write internal links as if mounted at root; an external link opens in a new tab. On a [multilingual](/docs/content/i18n#per-locale-navigation) site, a `label` can be a map of locale code to text, and an internal link moves into the reader's locale whenever that locale serves the page. `socials` maps a platform to its profile URL, and the icons appear in the order you write them. The platforms are `bluesky`, `discord`, `facebook`, `github`, `hacker-news`, `instagram`, `linkedin`, `medium`, `podcast`, `reddit`, `slack`, `telegram`, `threads`, `website`, `x`, and `youtube`. A `github` social replaces the repository link; hide that link with [`navigation.repo`](/docs/content/navigation#repository-link).
+`copyright` is plain text, so write `©` itself rather than `&copy;`. For a year that keeps itself current, use a template literal: `` `© ${new Date().getFullYear()} Acme, Inc.` ``. `links` appear in the order you write them. Write internal links as if mounted at root; an external link opens in a new tab. On a [multilingual](/docs/content/i18n#per-locale-navigation) site, `copyright` and a `label` can each be a map of locale code to text, and an internal link moves into the reader's locale whenever that locale serves the page. `socials` maps a platform to its profile URL, and the icons appear in the order you write them. The platforms are `bluesky`, `discord`, `facebook`, `github`, `hacker-news`, `instagram`, `linkedin`, `medium`, `podcast`, `reddit`, `slack`, `telegram`, `threads`, `website`, `x`, and `youtube`. A `github` social replaces the repository link; hide that link with [`navigation.repo`](/docs/content/navigation#repository-link).
 
-A site with no links, profiles, or repository has no footer. Custom pages built on `PageLayout` show it too, unless they fill the layout's own `footer` slot. To replace it entirely, override the [`Footer` layout slot](/docs/configuration/customization#layout-slots).
+A site with no copyright, links, profiles, or repository has no footer. Custom pages built on `PageLayout` show it too, unless they fill the layout's own `footer` slot. To replace it entirely, override the [`Footer` layout slot](/docs/configuration/customization#layout-slots).
 
 ## Content
 

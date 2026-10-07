@@ -69,17 +69,9 @@ export default defineConfig({
   // Docs pages only: the landing, CLI, and Agents pages pass their own
   // footer (pages/_home/Footer.astro), which takes its place.
   footer: {
+    // The landing footer's line, with the same current year.
+    copyright: `© ${new Date().getFullYear()} Blume. MIT licensed.`,
     links: [
-      {
-        href: "/changelog",
-        label: {
-          de: "Änderungen",
-          en: "Changelog",
-          hi: "चेंजलॉग",
-          ja: "変更履歴",
-          pt: "Alterações",
-        },
-      },
       { href: "https://www.npmjs.com/package/blume", label: "npm" },
       {
         href: "https://github.com/sponsors/haydenbleasel",
@@ -99,16 +91,6 @@ export default defineConfig({
           hi: "समस्या बताएं",
           ja: "問題を報告",
           pt: "Reportar um problema",
-        },
-      },
-      {
-        href: "https://github.com/haydenbleasel/blume/blob/main/LICENSE",
-        label: {
-          de: "MIT-Lizenz",
-          en: "MIT License",
-          hi: "MIT लाइसेंस",
-          ja: "MIT ライセンス",
-          pt: "Licença MIT",
         },
       },
     ],

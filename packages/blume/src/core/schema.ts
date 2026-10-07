@@ -488,10 +488,13 @@ const apiConfigSchema = z.strictObject({
 });
 
 /**
- * The site footer: a row of links, and social profile icons. Unset, the site
- * has no footer (a `components.ts` `Footer` still renders).
+ * The site footer: a copyright line, a row of links, and social profile
+ * icons. Unset, the site has no footer (a `components.ts` `Footer` still
+ * renders).
  */
 const footerConfigSchema = z.strictObject({
+  /** A line of plain text between the links and the icons (`© 2026 Acme, Inc.`). */
+  copyright: localizableLabelSchema.optional(),
   /** Links in one row, in the order written. */
   links: z
     .array(z.strictObject({ href: z.string(), label: localizableLabelSchema }))

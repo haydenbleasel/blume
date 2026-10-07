@@ -187,7 +187,7 @@ export interface BlumeDataConfig {
   feedback: boolean;
   /** Whether the rating asks for a written comment after it (`feedback.comments`). */
   feedbackComments: boolean;
-  /** `footer`: social profile icons and link columns, or `null` when unset. */
+  /** `footer`: the copyright line, links, and social profile icons, or `null` when unset. */
   footer: ResolvedConfig["footer"] | null;
   /**
    * Repo coordinates for content components that address the API or build

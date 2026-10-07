@@ -744,6 +744,21 @@ describe("buildRuntimeData", () => {
     expect(JSON.parse(buildRuntimeData(project)).config.footer).toBeNull();
   });
 
+  it("keeps a footer that only has a copyright line", async () => {
+    const project = await scanProject(
+      await writeProject({
+        "blume.config.ts":
+          'export default { footer: { copyright: "© 2026 Acme" } };\n',
+        "docs/index.md": "# Home\n",
+      })
+    );
+    expect(JSON.parse(buildRuntimeData(project)).config.footer).toEqual({
+      copyright: "© 2026 Acme",
+      links: [],
+      socials: {},
+    });
+  });
+
   it("resolves github edit urls, repo url, banner, logo, mcp and og", async () => {
     const project = await scanProject(
       await writeProject({

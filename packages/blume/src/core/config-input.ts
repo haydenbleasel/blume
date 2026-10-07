@@ -149,9 +149,15 @@ export interface FooterLink {
 
 /**
  * The site footer, below the content on every page: a row of links on one
- * side, and social profile icons on the other.
+ * side, social profile icons on the other, and a copyright line centered
+ * between them.
  */
 export interface FooterConfig {
+  /**
+   * A line of plain text centered between the links and the icons, like
+   * `© 2026 Acme, Inc.`, or a map of locale code to text.
+   */
+  copyright?: LocalizableLabel;
   /** Links in one row, left to right. */
   links?: FooterLink[];
   /**
@@ -1595,8 +1601,8 @@ export interface BlumeConfig {
    */
   feedback?: boolean | FeedbackConfig;
   /**
-   * The site footer: social profile icons and up to four link columns. Unset,
-   * the site has no footer.
+   * The site footer: a copyright line, a row of links, and social profile
+   * icons. Unset, the site has no footer.
    */
   footer?: FooterConfig;
   /** Opt-in custom frontmatter keys, validated by schemas you supply. */

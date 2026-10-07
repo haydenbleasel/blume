@@ -2323,7 +2323,7 @@ const siteNotes = (root, files, sidebarFile, layout) => {
       .split("\n")
       .slice(0, MAX_NOTICE_LINES);
     notes.push(
-      `${footer}: ${text.join(" / ")} (links → footer.links; a "contribute to this wiki" footer drops with its link)`
+      `${footer}: ${text.join(" / ")} (links → footer.links; a copyright line → footer.copyright; a "contribute to this wiki" footer drops with its link)`
     );
   }
   return notes;
