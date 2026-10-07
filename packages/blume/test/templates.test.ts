@@ -1435,12 +1435,14 @@ describe("astroConfigTemplate", () => {
     expect(quickTunnel).toContain(
       'adapter: adapter({"imageService":"compile","prerenderEnvironment":"node","tunnel":{"autoStart":true}})'
     );
+    expect(quickTunnel).toContain("server: { allowedHosts: true }");
     expect(quickTunnel).toContain("cloudflareTunnelOutputPlugin(), ");
     expect(quickTunnel).toContain("cloudflareTunnelOutputPlugin");
     expect(render({ autoStart: true, name: "docs-share" })).toContain(
       'adapter: adapter({"imageService":"compile","prerenderEnvironment":"node","tunnel":{"autoStart":true,"name":"docs-share"}})'
     );
     const withoutTunnel = render();
+    expect(withoutTunnel).not.toContain("allowedHosts: true");
     expect(withoutTunnel).not.toContain('"tunnel"');
     expect(withoutTunnel).not.toContain("cloudflareTunnelOutputPlugin");
   });
@@ -1449,23 +1451,24 @@ describe("astroConfigTemplate", () => {
     const nodeConfig = renderTunnelConfig(
       blumeConfigSchema.parse({ deployment: node() })
     );
+    expect(nodeConfig).not.toContain("allowedHosts: true");
     expect(nodeConfig).not.toContain('"tunnel"');
     expect(nodeConfig).not.toContain("cloudflareTunnelOutputPlugin");
-    expect(
-      renderTunnelConfig(
-        blumeConfigSchema.parse({
-          deployment: cloudflare({ output: "static" }),
-        })
-      )
-    ).not.toContain('"tunnel"');
-    expect(
-      renderTunnelConfig(
-        blumeConfigSchema.parse({ deployment: cloudflare() }),
-        {
-          generatedModulesDir: "./src/generated",
-        }
-      )
-    ).not.toContain('"tunnel"');
+    const staticConfig = renderTunnelConfig(
+      blumeConfigSchema.parse({
+        deployment: cloudflare({ output: "static" }),
+      })
+    );
+    expect(staticConfig).not.toContain("allowedHosts: true");
+    expect(staticConfig).not.toContain('"tunnel"');
+    const ejectedConfig = renderTunnelConfig(
+      blumeConfigSchema.parse({ deployment: cloudflare() }),
+      {
+        generatedModulesDir: "./src/generated",
+      }
+    );
+    expect(ejectedConfig).not.toContain("allowedHosts: true");
+    expect(ejectedConfig).not.toContain('"tunnel"');
   });
 
   it("opts cloudflare builds out of the adapter's KV session and Images bindings", () => {

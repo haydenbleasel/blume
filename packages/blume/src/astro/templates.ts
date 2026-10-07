@@ -143,6 +143,15 @@ const renderTunnelOutputPlugin = (
       }
     : { importNames: [], pluginEntry: "" };
 
+const renderTunnelViteServerOption = (
+  config: ResolvedConfig,
+  tunnel: { autoStart: true; name?: string } | undefined,
+  ejected: boolean
+): string =>
+  usesCloudflareTunnel(config, tunnel, ejected)
+    ? "server: { allowedHosts: true },"
+    : "";
+
 const renderAstroAdapter = (
   deployment: ResolvedConfig["deployment"],
   context: ProjectContext,
@@ -973,6 +982,7 @@ ${userConfigSetup}export default defineConfig({
   // the overlap only adds memory.
   build: { concurrency: Math.min(8, availableParallelism()) },
   vite: {${viteCacheOption}
+    ${renderTunnelViteServerOption(config, options.tunnel, ejected)}
     plugins: [${runtimeModulesPluginEntry}${variablesPluginEntry}${tunnelOutput.pluginEntry}tailwindcss(), includeHmrPlugin(${configPath(
       `${context.outDir}/src/generated/includes.json`,
       ejected

@@ -122,6 +122,11 @@ describe("blume dev tunnel flags", () => {
     )({ command: "serve", mode: "development" });
     const server = await createServer(viteConfig);
     try {
+      await Promise.all(
+        Object.values(server.environments).map(
+          (environment) => environment.depsOptimizer?.scanProcessing
+        )
+      );
       expect(listenBeforeTunnel).toBeDefined();
       expect(listenAfterTunnel).toBeDefined();
       expect(listenAfterTunnel).not.toBe(listenBeforeTunnel);
