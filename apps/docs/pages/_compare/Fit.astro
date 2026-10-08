@@ -3,6 +3,7 @@
 // that only flatters Blume reads as an ad. A two-tone heading over a hairline
 // grid of the cases where the other tool is the better choice.
 import SectionHeading from "../_home/SectionHeading.astro";
+import { inlineCode } from "../_home/shared.ts";
 import type { CompareTool } from "./tools.ts";
 
 interface Props {
@@ -25,7 +26,10 @@ const { tool } = Astro.props;
           style={`--reveal-delay: ${index * 100}ms`}
         >
           <dt class="font-medium text-foreground">{item.title}</dt>
-          <dd class="mt-2 text-pretty text-muted-foreground">{item.body}</dd>
+          <dd
+            class="mt-2 text-pretty text-muted-foreground"
+            set:html={inlineCode(item.body)}
+          />
         </div>
       ))
     }

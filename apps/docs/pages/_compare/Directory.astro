@@ -1,17 +1,43 @@
 ---
 // The /compare index hero: the agents page's centered layout (the two-tone
 // headline, the summary, and its two links beneath), over a tray of one card
-// per compare page — the tool's mark, "Blume vs <tool>", its tagline, and a
-// chevron that nudges on hover. The cards come from _compare/tools.ts, so
-// a new entry there lands here too. Two columns until `xl`, where every card
-// shares one row; an odd last card spans the two-column row it would orphan.
+// per compare page, grouped into the same two camps as the "Three ways to ship
+// docs" columns below (each tool's `kind`). A card is a row: the tool's mark
+// on a tile, "Blume vs <tool>" over its tagline, and a chevron that nudges on
+// hover. The cards come from _compare/tools.ts, so a new entry there lands
+// here too. One column on phones, two from `sm`, three from `lg`; the
+// frameworks end on a dashed card for any source without a page, which runs
+// `blume migrate` with no source named.
 import TextLink from "../_home/TextLink.astro";
 import Tray from "../_home/Tray.astro";
 import { withUniqueIds } from "../_home/migrate-sources.ts";
-import { glyph } from "../_home/shared.ts";
+import { glyph, inlineCode } from "../_home/shared.ts";
 import { tools } from "./tools.ts";
 
 const chevron = glyph("chevron-right");
+const terminal = glyph("square-terminal");
+
+const groups = [
+  {
+    id: "hosted",
+    note: "Your docs live on the vendor's platform.",
+    title: "Hosted platforms",
+    tools: tools.filter((tool) => tool.kind === "hosted"),
+  },
+  {
+    id: "framework",
+    note: "Your docs, plus the project you run around them.",
+    title: "Frameworks you own",
+    tools: tools.filter((tool) => tool.kind === "framework"),
+  },
+];
+
+const card =
+  "group flex h-full items-center gap-4 rounded-[20px] p-4 sm:p-5";
+const raised =
+  "border border-transparent bg-background shadow-[0_1px_2px_rgb(28_40_64/0.06)] ring-1 ring-foreground/5 hover:shadow-[0_12px_32px_-12px_rgb(28_40_64/0.25)] motion-safe:transition-shadow dark:shadow-none dark:hover:ring-foreground/15";
+const tile =
+  "inline-flex size-11 shrink-0 items-center justify-center rounded-xl bg-muted inset-ring inset-ring-foreground/5";
 ---
 
 <section class="flex flex-col gap-12 pt-16 sm:pt-24 lg:gap-16">
@@ -33,50 +59,105 @@ const chevron = glyph("chevron-right");
     </div>
   </div>
 
-  <Tray innerClass="p-2">
-    <ul
-      class="grid gap-2 sm:grid-cols-2 xl:grid-cols-[repeat(var(--cols),minmax(0,1fr))]"
-      role="list"
-      style={`--cols: ${tools.length}`}
-    >
-      {
-        tools.map((tool) => (
-          <li class="sm:last:odd:col-span-2 xl:last:odd:col-span-1">
-            <a
-              class="group flex h-full flex-col gap-12 rounded-[20px] bg-background p-6 shadow-[0_1px_2px_rgb(28_40_64/0.06)] ring-1 ring-foreground/5 hover:shadow-[0_12px_32px_-12px_rgb(28_40_64/0.25)] motion-safe:transition-shadow dark:shadow-none dark:hover:ring-foreground/15"
-              href={`/compare/${tool.id}`}
+  <Tray innerClass="flex flex-col gap-2 p-2">
+    {
+      groups.map((group, index) => (
+        <section aria-labelledby={`compare-${group.id}`}>
+          <div
+            class:list={[
+              "flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 px-4 pb-4 sm:px-5",
+              index === 0 ? "pt-4" : "pt-6",
+            ]}
+          >
+            <h2
+              class="font-medium text-base text-foreground tracking-normal"
+              id={`compare-${group.id}`}
             >
-              <span
-                aria-hidden="true"
-                class="inline-flex size-8 shrink-0"
-                set:html={withUniqueIds(tool.source.logo)}
-              />
-              <span class="mt-auto flex flex-col gap-1">
-                <span class="font-medium text-foreground">
-                  Blume vs {tool.source.name}
-                </span>
-                <span class="text-pretty text-muted-foreground text-sm">
-                  {tool.tagline}
-                </span>
-              </span>
-              <span class="inline-flex items-center gap-1 font-medium text-accent text-sm group-hover:text-foreground">
-                Read the comparison
-                <svg
-                  aria-hidden="true"
-                  class="size-3.5 shrink-0 group-hover:translate-x-0.5 motion-safe:transition-transform"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  viewBox="0 0 24 24"
-                  set:html={chevron}
-                />
-              </span>
-            </a>
-          </li>
-        ))
-      }
-    </ul>
+              {group.title}
+            </h2>
+            <p class="text-muted-foreground text-sm">{group.note}</p>
+          </div>
+          <ul class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3" role="list">
+            {group.tools.map((tool) => (
+              <li>
+                <a class:list={[card, raised]} href={`/compare/${tool.id}`}>
+                  <span aria-hidden="true" class={tile}>
+                    <span
+                      class="inline-flex size-6"
+                      set:html={withUniqueIds(tool.source.logo)}
+                    />
+                  </span>
+                  <span class="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <span class="font-medium text-foreground">
+                      Blume vs {tool.source.name}
+                    </span>
+                    <span class="text-pretty text-muted-foreground text-sm">
+                      {tool.tagline}
+                    </span>
+                  </span>
+                  <svg
+                    aria-hidden="true"
+                    class="size-4 shrink-0 text-muted-foreground group-hover:translate-x-0.5 group-hover:text-foreground motion-safe:transition"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    viewBox="0 0 24 24"
+                    set:html={chevron}
+                  />
+                </a>
+              </li>
+            ))}
+            {group.id === "framework" && (
+              <li>
+                <a
+                  class:list={[
+                    card,
+                    "border border-foreground/15 border-dashed hover:border-foreground/30 hover:bg-background/60 motion-safe:transition-colors",
+                  ]}
+                  href="/docs/migrating#sources"
+                >
+                  <span aria-hidden="true" class={tile}>
+                    <svg
+                      class="size-5 text-muted-foreground"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      viewBox="0 0 24 24"
+                      set:html={terminal}
+                    />
+                  </span>
+                  <span class="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <span class="font-medium text-foreground">
+                      Using something else?
+                    </span>
+                    <span
+                      class="text-pretty text-muted-foreground text-sm"
+                      set:html={inlineCode(
+                        "Run `blume migrate` with no source named."
+                      )}
+                    />
+                  </span>
+                  <svg
+                    aria-hidden="true"
+                    class="size-4 shrink-0 text-muted-foreground group-hover:translate-x-0.5 group-hover:text-foreground motion-safe:transition"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    viewBox="0 0 24 24"
+                    set:html={chevron}
+                  />
+                </a>
+              </li>
+            )}
+          </ul>
+        </section>
+      ))
+    }
   </Tray>
 </section>

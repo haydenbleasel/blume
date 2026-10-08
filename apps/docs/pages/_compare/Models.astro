@@ -2,41 +2,51 @@
 // "Three ways to ship docs." — where Blume sits among the kinds of tools it's
 // compared with: a hosted platform, a framework you own, and Blume. A tray of
 // three columns, each with the marks of the tools in that camp, its name, and
-// the same four answers; Blume's column is the raised white card. Claims here
-// are about the camp, so keep them true of every tool named in it (see the
-// per-tool pages in _compare/tools.ts for the specifics).
+// the same four answers; Blume's column is the raised white card. From `lg`
+// each card is a subgrid of the tray's rows, so the marks, the headings, and
+// every answer row line up across the three columns however they wrap. The
+// camps come from each tool's `kind` in _compare/tools.ts, so a new entry
+// lands here too. Claims here are about the camp, so keep them true of every
+// tool in it (see the per-tool pages in tools.ts for the specifics).
 import data from "blume:data";
 import SectionHeading from "../_home/SectionHeading.astro";
 import Tray from "../_home/Tray.astro";
-import { logos, withUniqueIds } from "../_home/migrate-sources.ts";
+import { withUniqueIds } from "../_home/migrate-sources.ts";
+import type { CompareTool } from "./tools.ts";
+import { tools } from "./tools.ts";
 
 const { config } = data;
 const blumeLogo = config.logo?.svg ?? "";
+const camp = (kind: CompareTool["kind"]) => {
+  const members = tools.filter((tool) => tool.kind === kind);
+  return {
+    marks: members.map((tool) => tool.source.logo),
+    tools: members.map((tool) => tool.source.name).join(", "),
+  };
+};
 
 const models = [
   {
     answers: [
       "Your content, in their web editor or synced from Git",
-      "The vendor's cloud, or yours on an enterprise plan",
-      "A free tier, then paid plans with metered AI",
-      "Built in, on the vendor's platform",
+      "The vendor's cloud; self-hosting only on some enterprise plans",
+      "A free tier or trial, then paid plans, with AI often extra",
+      "Whatever the vendor builds in, often gated by plan or credits",
     ],
-    marks: [logos.mintlify],
     name: "A hosted platform",
     raised: false,
-    tools: "Mintlify",
+    ...camp("hosted"),
   },
   {
     answers: [
-      "Your content, plus the app around it",
+      "Your content, plus the project around it",
       "Any host you choose",
       "Free and open source",
       "Mostly plugins, or route code that lives in your app",
     ],
-    marks: [logos.fumadocs, logos.docusaurus, logos.starlight, logos.nextra],
     name: "A framework you own",
     raised: false,
-    tools: "Fumadocs, Docusaurus, Starlight, Nextra",
+    ...camp("framework"),
   },
   {
     answers: [
@@ -66,30 +76,33 @@ const questions = ["You maintain", "It runs on", "It costs", "Agent features"];
         models.map((model, index) => (
           <article
             class:list={[
-              "reveal-rise flex flex-col gap-8 rounded-[20px] p-6 sm:p-8",
+              "reveal-rise flex flex-col gap-8 rounded-[20px] p-6 sm:p-8 lg:row-span-6 lg:grid lg:grid-rows-subgrid lg:gap-0",
               model.raised &&
                 "bg-background shadow-[0_12px_32px_-12px_rgb(28_40_64/0.25)] ring-1 ring-foreground/5 dark:shadow-none",
             ]}
             style={`--reveal-delay: ${index * 100}ms`}
           >
-            <div class="flex flex-col gap-4">
-              <div aria-hidden="true" class="flex h-6 items-center gap-2">
+            <div class="flex flex-col gap-4 lg:contents">
+              <div
+                aria-hidden="true"
+                class="flex flex-wrap items-center gap-2 lg:self-start"
+              >
                 {model.marks.map((mark) => (
                   <span
                     class:list={[
-                      "inline-flex h-full shrink-0 text-foreground [&>svg]:h-full [&>svg]:w-auto",
+                      "inline-flex h-6 shrink-0 text-foreground [&>svg]:h-full [&>svg]:w-auto",
                       model.raised ? "" : "aspect-square",
                     ]}
                     set:html={withUniqueIds(mark)}
                   />
                 ))}
               </div>
-              <div>
+              <div class="lg:pt-4 lg:pb-8">
                 <h3 class="font-medium text-xl tracking-normal">{model.name}</h3>
                 <p class="mt-1 text-muted-foreground text-sm">{model.tools}</p>
               </div>
             </div>
-            <dl class="flex flex-col divide-y divide-border border-border border-t">
+            <dl class="flex flex-col divide-y divide-border border-border border-t lg:row-span-4 lg:grid lg:grid-rows-subgrid lg:gap-0">
               {questions.map((question, row) => (
                 <div class="flex flex-col gap-1 py-4">
                   <dt class="text-muted-foreground text-xs">{question}</dt>

@@ -1,7 +1,8 @@
 ---
 // The compare index (/compare): a directory of the per-tool pages (each card
-// from _compare/tools.ts), where Blume sits among hosted platforms and
-// frameworks you own, the homepage's Migrate picker, and the install CTA.
+// from _compare/tools.ts, grouped into hosted platforms and frameworks you
+// own), where Blume sits among those two camps, the homepage's Migrate picker,
+// and the install CTA.
 // Built in the homepage's design language, like the pages it links to.
 import PageLayout from "blume/components/layout/PageLayout.astro";
 import data from "blume:data";
@@ -15,12 +16,11 @@ import Motion from "../_home/Motion.astro";
 import { installCopyScript } from "../_home/shared.ts";
 
 const { config } = data;
-const names = new Intl.ListFormat("en", { type: "conjunction" }).format(
-  tools.map((tool) => tool.source.name)
-);
-// The title drops the list's "and" to stay inside a search result's width.
-const pageTitle = `Blume vs ${tools.map((tool) => tool.source.name).join(", ")}`;
-const pageDescription = `How Blume compares with ${names} on price, hosting, agent features, API references, and migration.`;
+// Every tool's name is too long for a search result, so the title and
+// description name the first few in tools.ts order and stand in for the rest.
+const leading = tools.slice(0, 3).map((tool) => tool.source.name);
+const pageTitle = `Blume vs ${leading.join(", ")}, and more`;
+const pageDescription = `How Blume compares with ${leading.join(", ")}, and ${tools.length - leading.length} other docs tools on price, hosting, agent features, API references, and migration.`;
 ---
 
 <PageLayout
