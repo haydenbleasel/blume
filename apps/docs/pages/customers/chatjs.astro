@@ -1,0 +1,185 @@
+---
+// ChatJS's story, from Francisco Moretti's answers (2026-10-08); the page
+// counts, dates, and pull requests are checked against the public
+// FranciscoMoretti/chat-js repository and chatjs.dev/docs's sitemap.
+import { NEW_TAB_ATTRS } from "blume/core/new-tab.ts";
+import Quote from "../_customers/Quote.astro";
+import StoryPage from "../_customers/StoryPage.astro";
+import { storyById } from "../_customers/customers.ts";
+---
+
+<StoryPage story={storyById("chatjs")}>
+  <p>
+    <a href="https://chatjs.dev" {...NEW_TAB_ATTRS}>ChatJS</a> is an
+    open-source foundation for building AI apps. It starts developers with a
+    working chat application, with authentication, saved conversations, and
+    streaming responses, then lets them choose their AI providers and add
+    capabilities like web search, image generation, code execution, and MCP
+    integrations as they need them. Installed tools live as editable source in
+    the project, so every app can make the interface and behavior its own.
+  </p>
+  <p>
+    ChatJS is built with Next.js, React, TypeScript, and the AI SDK, and its
+    docs cover all of it: guides, a page for every feature, the gateways and
+    tools, the CLI, and a cookbook of patterns to copy into any project.
+  </p>
+
+  <h2>Looking for the balance</h2>
+  <p>
+    ChatJS's docs started on Mintlify. With the plan up for renewal in a couple
+    of months, Francisco Moretti, ChatJS's creator, reconsidered the setup. He
+    had found himself shaping the docs to fit the platform, and he wanted more
+    room to customize them.
+  </p>
+  <p>
+    He had been at the other end before, too. He'd built a docs site of his own
+    with Next.js, and while the control was great, getting it to feel polished
+    was a project in itself.
+  </p>
+  <p>
+    Blume sat between the two: a docs site that worked from the start, with the
+    freedom to customize or extend it later. ChatJS's docs were already
+    Markdown, written and changed through code, so Blume fit the way Francisco
+    already worked.
+  </p>
+
+  <Quote
+    avatar="/customers/francisco-moretti.webp"
+    name="Francisco Moretti"
+    role="Creator, ChatJS"
+  >
+    Blume was exactly what I needed: something I could start with that just
+    works, knowing I can customize or extend it later.
+  </Quote>
+
+  <h2>The move</h2>
+  <p>
+    Francisco moved the docs on July 14, 2026, the day after Blume 1.0 came
+    out. He handled it in a single AI chat: he pointed the agent at Blume,
+    asked it to migrate the docs, and barely had to steer.
+  </p>
+  <p>
+    The content was already in a portable format, so most of the work was
+    around it. 71 pages moved, from guides and feature docs to reference pages
+    and cookbook recipes. The navigation moved from Mintlify's{" "}
+    <code>docs.json</code> into <code>blume.config.ts</code>, the callouts and
+    accordions were adapted to Blume's, and the icons and images came along.
+  </p>
+  <p>
+    No page changed its path, so every URL under chatjs.dev/docs kept working.
+    A{" "}
+    <a href="/docs/deployment#subpath-deploys"><code>base</code></a> of{" "}
+    <code>/docs</code> builds the docs as a static site under that path. They
+    deploy to Vercel as their own project from the ChatJS monorepo, and
+    chatjs.dev routes <code>/docs</code> to them.
+  </p>
+  <p>
+    Before the switch,{" "}
+    <a href="/docs/cli/validate"><code>blume validate</code></a> checked every
+    link, and browser checks covered the rendered pages. The{" "}
+    <a
+      href="https://github.com/FranciscoMoretti/chat-js/pull/230"
+      {...NEW_TAB_ATTRS}>whole move</a
+    > was opened and merged the same day.
+  </p>
+  <p>
+    Checking the migrated pages also turned up outdated examples and links that
+    predated Blume, and Francisco used the move to clean them up. Since then,
+    CI checks every internal and external link whenever the docs change, and a
+    broken one fails the check.
+  </p>
+
+  <h2>Fixing it in Blume</h2>
+  <p>
+    One small thing didn't match. In dark mode, the sidebar's native scrollbar
+    stayed light: Blume switched its own colors with the theme but never told
+    the browser, so native controls kept their default light look. Another
+    Blume user had reported it that morning.
+  </p>
+  <p>
+    Francisco investigated and fixed it in Blume itself. That evening he opened
+    a{" "}
+    <a
+      href="https://github.com/haydenbleasel/blume/pull/59"
+      {...NEW_TAB_ATTRS}>pull request</a
+    > that sets the browser's <code>color-scheme</code> to match the active theme,
+    with tests and a changeset. It was merged within hours and released in Blume
+    1.0.4 the next morning, and ChatJS{" "}
+    <a
+      href="https://github.com/FranciscoMoretti/chat-js/pull/232"
+      {...NEW_TAB_ATTRS}>upgraded</a
+    > an hour and a half later: under 12 hours from opening the fix to running it
+    on chatjs.dev.
+  </p>
+  <p>
+    It was the flexibility Francisco had been looking for. He didn't need to
+    build a docs platform himself, but when he needed to improve this one, he
+    could.
+  </p>
+
+  <h2>Room to grow</h2>
+  <p>
+    The docs have kept growing with ChatJS. They're at 82 pages now, up from
+    71, with new sections for tools, file storage, and the registry, and six{" "}
+    <a href="/docs/deployment#redirects">redirects</a> keep the addresses of
+    pages that moved along the way.
+  </p>
+  <p>
+    In September, Francisco upgraded to Blume 1.6.3 and picked up features that
+    had shipped since: an <a href="/docs/cli/evals">eval suite</a> of questions
+    ChatJS's users ask, like how to deploy to Vercel, which{" "}
+    <code>blume eval</code> answers from the docs alone, and the monorepo's
+    agent skills, which the docs now{" "}
+    <a href="/docs/discoverability/agent-discovery#skills-discovery">publish</a>{" "}
+    for coding agents to find.
+  </p>
+
+  <h2>The results</h2>
+  <p>
+    The move took a single AI chat and kept every URL, and the docs have run
+    without deployment work since.
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th scope="col">What</th>
+        <th scope="col">Number</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <th scope="row">Pages moved</th><td>71, from guides to cookbook recipes</td>
+      </tr>
+      <tr><th scope="row">Pages today</th><td>82</td></tr>
+      <tr><th scope="row">URLs changed in the move</th><td>0</td></tr>
+      <tr>
+        <th scope="row">Blume fix, opened to deployed</th><td>Under 12 hours</td>
+      </tr>
+      <tr><th scope="row">Docs deployment work since</th><td>None</td></tr>
+    </tbody>
+  </table>
+  <p>
+    For Francisco, the value is a polished starting point that fits how he
+    works, with the freedom to change it later. And the time it frees goes back
+    into ChatJS.
+  </p>
+
+  <Quote
+    avatar="/customers/francisco-moretti.webp"
+    name="Francisco Moretti"
+    role="Creator, ChatJS"
+  >
+    Since moving to Blume, I haven't had to spend time on docs deployment.
+  </Quote>
+
+  <p>
+    The docs are live at{" "}
+    <a href="https://chatjs.dev/docs" {...NEW_TAB_ATTRS}>chatjs.dev/docs</a>,
+    and their source is{" "}
+    <a
+      href="https://github.com/FranciscoMoretti/chat-js/tree/main/apps/docs"
+      {...NEW_TAB_ATTRS}>public on GitHub</a
+    >. To make the same move, follow the{" "}
+    <a href="/guides/migrate-from-mintlify">Mintlify migration guide</a>.
+  </p>
+</StoryPage>

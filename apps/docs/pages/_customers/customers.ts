@@ -129,7 +129,8 @@ export interface CustomerStory {
 // Specific's story and photo are from Iman Radjavi (2026-09-26); Ordinal's
 // story is from Francisco's migration notes (2026-10-07); QuiverAI's story and
 // photos are from Nicklas Scharpff (2026-10-08); Telemetry's story and photos
-// are from Ephraim Atta-Duncan (2026-10-08).
+// are from Ephraim Atta-Duncan (2026-10-08); ChatJS's story and photos are
+// from Francisco Moretti (2026-10-08).
 export const stories: CustomerStory[] = [
   {
     color: "oklch(0.5 0.17 38)",
@@ -266,6 +267,41 @@ export const stories: CustomerStory[] = [
       "Telemetry, the observability platform for AI applications and agents, needed docs from scratch. It wanted to choose where they ran and make them easy for coding agents to work with, so it started on Blume.",
     tagline: "for its first docs.",
     title: "Telemetry chose Blume",
+  },
+  {
+    color: "oklch(0.3 0.012 70)",
+    customer: customers.chatjs,
+    facts: {
+      features: [
+        { href: "/docs/deployment#subpath-deploys", label: "Subpath deploys" },
+        { href: "/docs/cli/validate", label: "blume validate" },
+        { href: "/docs/cli/evals", label: "Evals" },
+        {
+          href: "/docs/discoverability/agent-discovery#skills-discovery",
+          label: "Agent skills",
+        },
+      ],
+      industry: "Foundation for AI apps",
+      migratedFrom: "mintlify",
+    },
+    id: "chatjs",
+    image: {
+      alt: "Francisco Moretti, creator of ChatJS, smiling in a sunlit room with a concrete wall and a brick-framed window behind him",
+      src: "/customers/chatjs.webp",
+    },
+    meta: {
+      description:
+        "ChatJS, the open-source foundation for AI apps, moved 71 pages of docs from Mintlify to Blume in a single AI chat, kept every chatjs.dev/docs URL, and fixed what it needed in Blume itself.",
+      title: "ChatJS moved its docs from Mintlify to Blume in a single AI chat",
+    },
+    stats: [
+      { label: "Pages moved in a single AI chat", value: "71" },
+      { label: "Hours spent on docs deployment since the move", value: "0" },
+    ],
+    summary:
+      "ChatJS, the open-source foundation for AI apps, wanted polished docs without building a docs platform, and room to change them later. Blume gave it both, and the move took a single AI chat.",
+    tagline: "in a single AI chat.",
+    title: "ChatJS moved its docs",
   },
 ];
 
