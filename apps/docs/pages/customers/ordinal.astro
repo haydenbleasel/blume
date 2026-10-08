@@ -1,0 +1,191 @@
+---
+// Ordinal's story, from Francisco's migration notes (2026-10-07); the
+// migration pull request's numbers are checked against GitHub.
+import { NEW_TAB_ATTRS } from "blume/core/new-tab.ts";
+import Quote from "../_customers/Quote.astro";
+import StoryPage from "../_customers/StoryPage.astro";
+import { storyById } from "../_customers/customers.ts";
+---
+
+<StoryPage story={storyById("ordinal")}>
+  <p>
+    <a href="https://www.tryordinal.com" {...NEW_TAB_ATTRS}>Ordinal</a> helps
+    B2B teams run social together, with LinkedIn at the center. Teams draft and
+    schedule posts for the company page and for executives and employees, route
+    them through approvals, coordinate likes, comments, and reposts with{" "}
+    <a
+      href="https://docs.tryordinal.com/posts/team-engagements"
+      {...NEW_TAB_ATTRS}>Team Engagements</a
+    >, and track performance in one analytics view. For developers and AI
+    assistants, Ordinal offers a REST API, an{" "}
+    <a href="https://docs.tryordinal.com/mcp/introduction" {...NEW_TAB_ATTRS}
+      >MCP server</a
+    >, and webhooks. Ordinal is a Y Combinator company.
+  </p>
+  <p>
+    Its docs cover all of it: a guide for every feature, references for two
+    APIs, and a page for every webhook event.
+  </p>
+
+  <h2>How the docs started</h2>
+  <p>
+    Ordinal's docs started on Mintlify, and Mintlify got them off the ground
+    fast. Francisco's co-founder, Jeffrey Zhao, signed the team up, and though
+    Jeffrey isn't an engineer, within a few days and with a $200 Cursor
+    subscription he had fed Mintlify all of Ordinal's product context and stood
+    up solid docs.
+  </p>
+  <p>
+    Mintlify's agent became part of how the team worked. It opened pull
+    requests to update the docs as the product changed, and wrote 46 of the
+    last 60 docs changes Ordinal merged before the move.
+  </p>
+  <p>
+    Day to day, the team worked in Git. The docs were MDX in their own
+    repository from the start, and changes went through GitHub pull requests,
+    so a hosted editor wasn't something Ordinal needed. With the yearly renewal
+    coming up, Francisco looked at moving the docs to a framework the team could
+    run itself.
+  </p>
+
+  <h2>The move</h2>
+  <p>
+    He'd had his eye on Blume for a few months. One evening in
+    September 2026, he ran <code>npx blume migrate mintlify</code>, which found
+    Ordinal's <code>docs.json</code> and handed the job to Claude Code with
+    Blume's migration playbook. Its bundled codemod rewrote the frontmatter and
+    icons on 68 pages in one pass, and Claude worked through the rest unattended
+    while Francisco walked the dog.
+  </p>
+  <p>
+    The content moved almost one to one. Cards (about 250 of them), Steps, Tabs,
+    Accordions, Expandables, CodeGroups, and Frames all have Blume equivalents
+    with nothing to import, and callouts became <code>:::</code> directives.
+    The 273 response fields on the 22 webhook event pages became type tables.
+  </p>
+  <p>
+    The real work was keeping URLs. Mintlify's sidebar groups lived only in{" "}
+    <code>docs.json</code>, so Claude rebuilt them as{" "}
+    <a href="/docs/content/navigation#folder-groups">group folders</a> like{" "}
+    <code>(calendar-and-posts)/</code>, which add no segment to the URL, and
+    gave pages that changed folders a <code>slug</code> that kept their old
+    address. The Guides tab sits at the site root, so nothing had to move under
+    a new prefix. Not one guide URL changed.
+  </p>
+  <p>
+    The API reference came for free: pointing{" "}
+    <a href="/docs/references/openapi"><code>openapi()</code></a> at Ordinal's
+    two existing specs built 72 endpoint pages with schemas, code samples, and
+    a Try it panel. Blume names endpoint pages by their operation ID, where
+    Mintlify used each one's summary, so 72 of the site's 79{" "}
+    <a href="/docs/deployment#redirects">redirects</a> send old endpoint URLs
+    to their new pages. On Vercel, they're real 301s.
+  </p>
+  <p>
+    Before cutover,{" "}
+    <a href="/docs/cli/validate"><code>blume validate</code></a> checked every
+    link and redirect. Its first run flagged 52 broken links, which exposed 19
+    pages a content glob had silently left out of the build. With those back,
+    the site went live on Vercel the next day.
+  </p>
+  <p>
+    Everything else was a line or two in <code>blume.config.ts</code>:{" "}
+    <a href="/docs/discoverability/llms-txt">llms.txt</a>, a{" "}
+    <a href="/docs/discoverability/markdown">Markdown version</a> of every page,
+    a <a href="/docs/discoverability/mcp">docs MCP server</a> beside Ordinal's
+    own product MCP server, the{" "}
+    <a href="/docs/configuration/assistant">assistant</a>, PostHog analytics,
+    and Edit on GitHub links.
+  </p>
+
+  <Quote
+    avatar="/customers/francisco.webp"
+    name="Francisco"
+    role="Co-founder, Ordinal"
+  >
+    I started the migration and went to walk the dog. About 20 minutes of my
+    time, and every URL still worked.
+  </Quote>
+
+  <h2>Docs that keep themselves current</h2>
+  <p>
+    Mintlify's agent had been writing most of the docs changes, so Ordinal
+    rebuilt that job as a scheduled Claude Code routine. Every weekday at 5pm
+    Chicago time, a cloud
+    Claude Code session checks out both the product and the docs repositories,
+    then:
+  </p>
+  <ol>
+    <li>
+      Lists the product pull requests merged in the last seven days, skipping
+      any that a docs pull request already references, so it never repeats
+      work that's already documented.
+    </li>
+    <li>
+      Reads each one's description and diff and decides whether customers would
+      notice. Bug fixes, refactors, backfills, internal automations, and work
+      behind feature flags are skipped.
+    </li>
+    <li>
+      Writes the docs change following the repository's <code>CLAUDE.md</code>,
+      which spells out Blume's syntax and conventions.
+    </li>
+    <li>
+      Runs <code>npm run build</code> and <code>npm run validate</code>, and
+      goes on only if both pass with no errors.
+    </li>
+    <li>Opens one pull request per change for a person to review and merge.</li>
+  </ol>
+  <p>
+    The routine needs only git, the GitHub CLI, and npm, so it runs with no
+    connectors attached. It reads pull request text that other people wrote,
+    and keeping email, Slack, and payments out of its reach limits what an
+    injected instruction could do.
+  </p>
+
+  <h2>The results</h2>
+  <p>
+    Every guide URL survived the move, the API references build from
+    Ordinal's own specs, and the docs keep themselves current through pull
+    requests the team reviews.
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th scope="col">What</th>
+        <th scope="col">Number</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <th scope="row">Hand-written pages</th><td>80, across 5 header tabs</td>
+      </tr>
+      <tr>
+        <th scope="row">API reference pages</th><td>72, from 2 OpenAPI specs</td>
+      </tr>
+      <tr>
+        <th scope="row">Redirects</th><td>79, 72 of them for endpoints</td>
+      </tr>
+      <tr><th scope="row">Guide URLs changed</th><td>0</td></tr>
+      <tr>
+        <th scope="row">Webhook fields converted</th><td>273, on 22 event pages</td>
+      </tr>
+      <tr>
+        <th scope="row">Francisco's hands-on time</th><td>About 20 minutes</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>
+    The whole move is one{" "}
+    <a href="https://github.com/ordinalhq/docs/pull/145" {...NEW_TAB_ATTRS}
+      >public pull request</a
+    >, and the new docs are live at{" "}
+    <a href="https://docs.tryordinal.com" {...NEW_TAB_ATTRS}
+      >docs.tryordinal.com</a
+    >.
+  </p>
+  <p>
+    To make the same move, follow the{" "}
+    <a href="/guides/migrate-from-mintlify">Mintlify migration guide</a>.
+  </p>
+</StoryPage>

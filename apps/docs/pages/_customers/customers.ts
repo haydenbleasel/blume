@@ -39,6 +39,11 @@ export const customers = {
     logo: { height: 45, src: "/logos/neon.svg", width: 157 },
     name: "Neon",
   },
+  ordinal: {
+    href: "https://docs.tryordinal.com/",
+    logo: { height: 31, src: "/logos/ordinal.svg", width: 113 },
+    name: "Ordinal",
+  },
   orpc: {
     href: "https://orpc.dev/docs/",
     logo: { height: 152, src: "/logos/orpc.svg", width: 527 },
@@ -79,6 +84,7 @@ export const logoWall: Customer[] = [
   customers.orpc,
   customers.quiverai,
   customers.specific,
+  customers.ordinal,
   customers.stagewise,
   customers.ultracite,
   customers.filesSdk,
@@ -120,7 +126,8 @@ export interface CustomerStory {
   title: string;
 }
 
-// Specific's story and photo are from Iman Radjavi (2026-09-26).
+// Specific's story and photo are from Iman Radjavi (2026-09-26); Ordinal's
+// story is from Francisco's migration notes (2026-10-07).
 export const stories: CustomerStory[] = [
   {
     color: "oklch(0.5 0.17 38)",
@@ -152,6 +159,38 @@ export const stories: CustomerStory[] = [
       "Specific, the cloud platform for coding agents, runs everything it can on itself. With Blume, that now includes its docs.",
     tagline: "in an afternoon.",
     title: "Specific migrated from Mintlify",
+  },
+  {
+    color: "oklch(0.42 0.06 179)",
+    customer: customers.ordinal,
+    facts: {
+      features: [
+        { href: "/docs/references/openapi", label: "OpenAPI reference" },
+        { href: "/docs/cli/validate", label: "blume validate" },
+        { href: "/docs/configuration/assistant", label: "Assistant" },
+        { href: "/docs/discoverability/mcp", label: "MCP server" },
+      ],
+      industry: "Social media for B2B teams",
+      migratedFrom: "mintlify",
+    },
+    id: "ordinal",
+    image: {
+      alt: "Francisco, right, and a colleague smiling over lunch at a sidewalk café table",
+      src: "/customers/ordinal.webp",
+    },
+    meta: {
+      description:
+        "Ordinal moved its docs from Mintlify to Blume in one evening, kept every guide URL, and now keeps its docs current with a scheduled Claude Code routine.",
+      title: "Ordinal migrated from Mintlify to Blume in one evening",
+    },
+    stats: [
+      { label: "Hands-on time; Claude Code did the rest", value: "20 min" },
+      { label: "Guide URLs changed in the move", value: "0" },
+    ],
+    summary:
+      "Ordinal, the social media platform for B2B teams, keeps its docs in Git and changes them through pull requests. Blume moved those docs in an evening, and a Claude Code routine now keeps them current.",
+    tagline: "while walking the dog.",
+    title: "Ordinal moved to Blume",
   },
 ];
 
