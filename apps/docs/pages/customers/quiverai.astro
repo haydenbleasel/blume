@@ -1,0 +1,131 @@
+---
+// QuiverAI's story, from Nicklas Scharpff's answers (2026-10-08); the page
+// counts are from docs.quiver.ai's sitemap.
+import { NEW_TAB_ATTRS } from "blume/core/new-tab.ts";
+import Quote from "../_customers/Quote.astro";
+import StoryPage from "../_customers/StoryPage.astro";
+import { storyById } from "../_customers/customers.ts";
+---
+
+<StoryPage story={storyById("quiverai")}>
+  <p>
+    <a href="https://quiver.ai" {...NEW_TAB_ATTRS}>QuiverAI</a> is a frontier
+    AI lab building models for graphic design. Its flagship, Arrow, is a model
+    for SVG generation: it turns a prompt into vector artwork, vectorizes
+    images, and edits and animates existing SVGs. Quiver serves Arrow in the
+    QuiverAI App and over the QuiverAI API, the main gateway for its business
+    customers, used by companies like Paper, Flora, Vercel, and ComfyUI.
+  </p>
+  <p>
+    Its docs cover all of it: the App, the API platform, the API reference,
+    and the MCP server and plugins that bring Arrow to Codex and Cursor.
+  </p>
+
+  <h2>How the docs started</h2>
+  <p>
+    Quiver's docs started on Mintlify, and Mintlify worked very well for the
+    team. But as Quiver wanted more control over how its docs looked, it
+    needed more room than Mintlify gave it.
+  </p>
+  <p>
+    The choice seemed to be Mintlify or a custom site. Quiver wanted both: the
+    freedom of building its own, with the professional feel and the support
+    for integrations that Mintlify had.
+  </p>
+
+  <h2>Building Blume together</h2>
+  <p>
+    Earlier in 2026, Nicklas Scharpff shared those concerns with Hayden
+    Bleasel, just as Hayden was starting on Blume. Hayden brought Quiver into
+    many of Blume's technical decisions, both to make sure Blume fit what
+    Quiver needed and as a stand-in for other companies at a similar scale.
+  </p>
+  <p>
+    That meant Quiver's workflows and existing docs worked from day one. The
+    migration was barely more than one CLI command,{" "}
+    <code>blume migrate mintlify</code>, plus a prompt or two to refine the
+    result, and the docs were in production in less than a day.
+  </p>
+
+  <h2>Docs that look like Quiver</h2>
+  <p>
+    What changed most was control over the design. Blume's{" "}
+    <a href="/docs/configuration/theming#design-tokens">design tokens</a>{" "}
+    carry Quiver's visual identity into every page, and{" "}
+    <a href="/docs/configuration/customization#component-overrides"
+      >component overrides</a
+    > let the team replace any built-in component with its own.
+  </p>
+
+  <Quote
+    avatar="/customers/nicklas-scharpff.webp"
+    name="Nicklas Scharpff"
+    role="Co-founder, QuiverAI"
+  >
+    The freedom to override any UI component, and how flexibly Blume adapts
+    design tokens, made adapting our vision for the docs very straightforward.
+  </Quote>
+
+  <p>
+    The same flexibility took Blume past the public docs. It's now also the
+    backbone of Quiver's internal design system documentation.
+  </p>
+
+  <h2>Ready for agents</h2>
+  <p>
+    Quiver's product reaches agents through its MCP server and plugins, and
+    its docs reach them too, with no extra work. Every page has a{" "}
+    <a href="/docs/discoverability/markdown">Markdown version</a>, the site
+    publishes <a href="/docs/discoverability/llms-txt">llms.txt</a> and
+    llms-full.txt, and an AI catalog lists its agent-facing resources.
+  </p>
+  <p>
+    The API reference builds from Quiver's OpenAPI spec with{" "}
+    <a href="/docs/references/openapi"><code>openapi()</code></a>: every
+    endpoint, from text to SVG to SVG animation, gets a page with its
+    schemas, code samples, and a Try it panel.
+  </p>
+
+  <h2>The results</h2>
+  <p>
+    Quiver went from Mintlify to production in less than a day, and Blume now
+    runs two of its docs sites: the public docs and the internal design
+    system.
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th scope="col">What</th>
+        <th scope="col">Number</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><th scope="row">Public docs pages</th><td>35</td></tr>
+      <tr>
+        <th scope="row">API endpoint pages</th><td>8, from an OpenAPI spec</td>
+      </tr>
+      <tr>
+        <th scope="row">Time to production</th><td>Less than a day</td>
+      </tr>
+      <tr>
+        <th scope="row">Docs sites on Blume</th><td>2, public and internal</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>For teams weighing the same move, Nicklas keeps it short.</p>
+
+  <Quote
+    avatar="/customers/nicklas-scharpff.webp"
+    name="Nicklas Scharpff"
+    role="Co-founder, QuiverAI"
+  >
+    Just try it out. It's so simple, and you get to an MVP super fast.
+  </Quote>
+
+  <p>
+    The new docs are live at{" "}
+    <a href="https://docs.quiver.ai" {...NEW_TAB_ATTRS}>docs.quiver.ai</a>. To
+    make the same move, follow the{" "}
+    <a href="/guides/migrate-from-mintlify">Mintlify migration guide</a>.
+  </p>
+</StoryPage>

@@ -127,7 +127,8 @@ export interface CustomerStory {
 }
 
 // Specific's story and photo are from Iman Radjavi (2026-09-26); Ordinal's
-// story is from Francisco's migration notes (2026-10-07).
+// story is from Francisco's migration notes (2026-10-07); QuiverAI's story and
+// photos are from Nicklas Scharpff (2026-10-08).
 export const stories: CustomerStory[] = [
   {
     color: "oklch(0.5 0.17 38)",
@@ -191,6 +192,42 @@ export const stories: CustomerStory[] = [
       "Ordinal, the social media platform for B2B teams, keeps its docs in Git and changes them through pull requests. Blume moved those docs in an evening, and a Claude Code routine now keeps them current.",
     tagline: "while walking the dog.",
     title: "Ordinal moved to Blume",
+  },
+  {
+    color: "oklch(0.48 0.1 230)",
+    customer: customers.quiverai,
+    facts: {
+      features: [
+        {
+          href: "/docs/configuration/customization#component-overrides",
+          label: "Component overrides",
+        },
+        { href: "/docs/configuration/theming", label: "Theming" },
+        { href: "/docs/references/openapi", label: "OpenAPI reference" },
+        { href: "/docs/discoverability/llms-txt", label: "llms.txt" },
+      ],
+      industry: "AI models for graphic design",
+      migratedFrom: "mintlify",
+    },
+    id: "quiverai",
+    image: {
+      alt: "Nicklas Scharpff and Joan Rodriguez of QuiverAI, smiling against a white wall",
+      src: "/customers/quiverai.webp",
+    },
+    meta: {
+      description:
+        "QuiverAI, the frontier AI lab behind the Arrow SVG models, helped shape Blume from the start, moved its docs from Mintlify in less than a day, and now runs its internal design system docs on Blume too.",
+      title:
+        "QuiverAI helped shape Blume, then moved its docs in less than a day",
+    },
+    stats: [
+      { label: "From Mintlify to production", value: "< 1 day" },
+      { label: "Docs sites on Blume, public and internal", value: "2" },
+    ],
+    summary:
+      "QuiverAI, the frontier AI lab for graphic design, wanted the freedom of a custom docs site without building one. It helped shape Blume from the start, then moved its docs over in less than a day.",
+    tagline: "from the start.",
+    title: "QuiverAI helped shape Blume",
   },
 ];
 
