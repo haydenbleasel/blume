@@ -99,7 +99,7 @@ const next = stories.length > 1 ? stories[(index + 1) % stories.length] : null;
           <span class="text-muted-foreground">{story.tagline}</span>
         </h1>
         <p
-          class="max-w-[52ch] text-pretty text-lg text-muted-foreground sm:text-xl"
+          class="max-w-[52ch] text-balance text-lg text-muted-foreground sm:text-xl"
         >
           {story.summary}
         </p>
@@ -117,7 +117,7 @@ const next = stories.length > 1 ? stories[(index + 1) % stories.length] : null;
           {
             story.stats.map((stat) => (
               <div class="flex flex-col-reverse justify-end gap-2">
-                <dt class="text-pretty text-sm text-white/80 sm:text-base">
+                <dt class="text-balance text-sm text-white/80 sm:text-base">
                   {stat.label}
                 </dt>
                 <dd class="font-medium text-5xl sm:text-6xl [font-family:var(--font-display)] tracking-[-0.05em]">

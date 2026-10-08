@@ -41,7 +41,7 @@ const { class: className, level: Heading = "h3", story } = Astro.props;
       {
         story.stats.map((stat) => (
           <div class="flex flex-col-reverse justify-end gap-2">
-            <dt class="text-pretty text-sm text-white/80">{stat.label}</dt>
+            <dt class="text-balance text-sm text-white/80">{stat.label}</dt>
             <dd class="font-medium text-4xl sm:text-5xl [font-family:var(--font-display)] tracking-[-0.05em]">
               {stat.value}
             </dd>
