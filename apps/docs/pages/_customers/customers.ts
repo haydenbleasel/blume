@@ -67,7 +67,7 @@ export const customers = {
   // Composed from the official telemetry.dev mark plus its Geist SemiBold
   // wordmark, converted to outlines so it renders identically everywhere.
   telemetry: {
-    href: "https://telemetry.dev/",
+    href: "https://telemetry.dev/docs",
     logo: { height: 115, src: "/logos/telemetry.svg", width: 753 },
     name: "Telemetry",
   },
@@ -128,7 +128,8 @@ export interface CustomerStory {
 
 // Specific's story and photo are from Iman Radjavi (2026-09-26); Ordinal's
 // story is from Francisco's migration notes (2026-10-07); QuiverAI's story and
-// photos are from Nicklas Scharpff (2026-10-08).
+// photos are from Nicklas Scharpff (2026-10-08); Telemetry's story and photos
+// are from Ephraim Atta-Duncan (2026-10-08).
 export const stories: CustomerStory[] = [
   {
     color: "oklch(0.5 0.17 38)",
@@ -228,6 +229,43 @@ export const stories: CustomerStory[] = [
       "QuiverAI, the frontier AI lab for graphic design, wanted the freedom of a custom docs site without building one. It helped shape Blume from the start, then moved its docs over in less than a day.",
     tagline: "from the start.",
     title: "QuiverAI helped shape Blume",
+  },
+  {
+    color: "oklch(0.27 0.006 286)",
+    customer: customers.telemetry,
+    facts: {
+      features: [
+        {
+          href: "/docs/configuration/customization#component-overrides",
+          label: "Component overrides",
+        },
+        {
+          href: "/docs/discoverability/markdown#custom-component-serializers",
+          label: "Markdown for agents",
+        },
+        { href: "/docs/discoverability/llms-txt", label: "llms.txt" },
+        { href: "/docs/deployment#subpath-deploys", label: "Subpath deploys" },
+      ],
+      industry: "Observability for AI applications",
+    },
+    id: "telemetry",
+    image: {
+      alt: "Ephraim Atta-Duncan of Telemetry speaking at a lectern, a slide titled AI SDK & Google Gemini on the screen behind",
+      src: "/customers/telemetry.webp",
+    },
+    meta: {
+      description:
+        "Telemetry, the open-source observability platform for AI applications and agents, started its docs on Blume: static files it hosts itself at telemetry.dev/docs, with a Markdown copy of every page for coding agents.",
+      title: "Telemetry chose Blume for its first docs",
+    },
+    stats: [
+      { label: "Pages, each with a Markdown copy for agents", value: "38" },
+      { label: "Integration guides, up from 11 at launch", value: "20" },
+    ],
+    summary:
+      "Telemetry, the observability platform for AI applications and agents, needed docs from scratch. It wanted to choose where they ran and make them easy for coding agents to work with, so it started on Blume.",
+    tagline: "for its first docs.",
+    title: "Telemetry chose Blume",
   },
 ];
 

@@ -1,0 +1,160 @@
+---
+// Telemetry's story, from Ephraim Atta-Duncan's answers (2026-10-08); the
+// page counts and history are from the public telemetry-dev/docs repository
+// and telemetry.dev/docs's sitemap.
+import { NEW_TAB_ATTRS } from "blume/core/new-tab.ts";
+import Quote from "../_customers/Quote.astro";
+import StoryPage from "../_customers/StoryPage.astro";
+import { storyById } from "../_customers/customers.ts";
+---
+
+<StoryPage story={storyById("telemetry")}>
+  <p>
+    <a href="https://telemetry.dev" {...NEW_TAB_ATTRS}>Telemetry</a> helps
+    developers find failures, slow calls, and unexpected costs in AI
+    applications and agents. An AI request can pass through several model
+    calls, tools, and retrievals before it produces an answer. Telemetry brings
+    those steps into one trace, with latency, errors, token usage, and cost
+    estimates, so developers can see where a request slowed down or failed.
+  </p>
+  <p>
+    Telemetry is open source and built on OpenTelemetry. It works with its own
+    TypeScript and Python SDKs or an existing OpenTelemetry setup, and its docs
+    cover all of it: a quickstart, both SDKs, the ingest API, and a guide for
+    each integration, from the Vercel AI SDK and LangChain to Claude Code and
+    Cursor.
+  </p>
+
+  <h2>Starting from scratch</h2>
+  <p>
+    Telemetry had no docs to move. Getting them started meant making a few
+    choices early: where they would run, how much work hosting them would take,
+    and how well coding agents could work with them. Blume fit all three, and
+    became Telemetry's first docs platform.
+  </p>
+  <p>
+    Ephraim Atta-Duncan, Telemetry's co-founder, committed the first version on
+    August 7, 2026: 29 pages covering the SDKs, the platform, the ingest API,
+    and the first 11 integrations.
+  </p>
+
+  <h2>Hosted where Telemetry chose</h2>
+  <p>
+    The first thing that stood out was control. Blume is open source and free
+    to use, and it builds docs into static files that any host can serve. Being
+    free mattered, but being easy to self-host is what made that freedom
+    practical.
+  </p>
+
+  <Quote
+    avatar="/customers/ephraim-atta-duncan.webp"
+    name="Ephraim Atta-Duncan"
+    role="Co-founder, Telemetry"
+  >
+    Blume gave us the freedom we wanted for our docs: an open-source framework
+    we could run ourselves, wherever we chose to host it.
+  </Quote>
+
+  <p>
+    Telemetry serves its docs from Cloudflare as static assets, with no server
+    to run. They started at docs.telemetry.dev, and a month in, the team moved
+    them next to the product at telemetry.dev/docs. That took two settings: a{" "}
+    <a href="/docs/deployment#subpath-deploys"><code>base</code></a> of{" "}
+    <code>/docs</code> in <code>blume.config.ts</code>, which moves the whole
+    site under the path, from every page to its sitemap, llms.txt, and Open
+    Graph images, and a route for the path in Cloudflare. Old links to the
+    subdomain redirect to the new address.
+  </p>
+
+  <h2>Built to work with agents</h2>
+  <p>
+    Telemetry helps developers understand what happens inside AI applications
+    and agents, so a docs framework that works well with agents made sense for
+    the product. Blume's CLI mattered as much as where the docs could run.
+  </p>
+
+  <Quote
+    avatar="/customers/ephraim-atta-duncan.webp"
+    name="Ephraim Atta-Duncan"
+    role="Co-founder, Telemetry"
+  >
+    We wanted coding agents to have clear information to work with. Blume's CLI
+    and agent integrations were a big part of why we chose it.
+  </Quote>
+
+  <p>
+    Blume's CLI reports problems where an agent can act on them:{" "}
+    <code>blume build</code> fails on a page that doesn't parse instead of
+    shipping without it, and{" "}
+    <a href="/docs/cli/doctor"><code>blume doctor</code></a> and{" "}
+    <a href="/docs/cli/validate"><code>blume validate</code></a> print JSON for
+    an agent to read. Blume's <a href="/docs/advanced/skills">agent skills</a>{" "}
+    teach Claude Code, Codex, and Cursor how a Blume site fits together.
+  </p>
+
+  <h2>An integration hub</h2>
+  <p>
+    The docs grew with the product. Telemetry has added 9 integration guides
+    since launch, for 20 across frameworks, model providers, and coding agents,
+    and the docs now start from them: send a first trace, then pick the
+    integration that matches your stack.
+  </p>
+  <p>
+    Two{" "}
+    <a href="/docs/configuration/customization#component-overrides"
+      >component overrides</a
+    > carry each integration's logo through the docs: one puts it beside the page
+    title, and an integration card built on Blume's own Card shows it on the
+    overview grid. The rest of the look comes from Blume's theme options, a
+    black-and-white accent and a medium corner radius, plus 36 lines of CSS for
+    the logos.
+  </p>
+  <p>
+    Agents get the same hub without the markup. Every page has a{" "}
+    <a href="/docs/discoverability/markdown">Markdown version</a>, and the site
+    publishes <a href="/docs/discoverability/llms-txt">llms.txt</a> and
+    llms-full.txt. A{" "}
+    <a href="/docs/discoverability/markdown#custom-component-serializers"
+      >serializer</a
+    > in <code>blume.config.ts</code> turns each integration card into a plain Markdown
+    link with its one-line description, so an agent reading the overview gets a
+    clean list of all 20 guides.
+  </p>
+
+  <h2>The results</h2>
+  <p>
+    Telemetry's docs have been on Blume since the first page. They run as static
+    files on Cloudflare at telemetry.dev/docs, next to the product, and every
+    page has a Markdown copy for agents.
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th scope="col">What</th>
+        <th scope="col">Number</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><th scope="row">Pages</th><td>38, up from 29 at launch</td></tr>
+      <tr>
+        <th scope="row">Integration guides</th><td>20, up from 11 at launch</td>
+      </tr>
+      <tr>
+        <th scope="row">Component overrides</th><td>2, for integration logos</td>
+      </tr>
+      <tr><th scope="row">Custom CSS</th><td>36 lines</td></tr>
+      <tr>
+        <th scope="row">Servers to run</th><td>0, static files on Cloudflare</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>
+    The docs are live at{" "}
+    <a href="https://telemetry.dev/docs" {...NEW_TAB_ATTRS}>telemetry.dev/docs</a
+    >, and their source is{" "}
+    <a href="https://github.com/telemetry-dev/docs" {...NEW_TAB_ATTRS}
+      >public on GitHub</a
+    >. To start docs of your own, follow the{" "}
+    <a href="/docs/quickstart">quickstart</a>.
+  </p>
+</StoryPage>
