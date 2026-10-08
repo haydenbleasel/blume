@@ -274,6 +274,7 @@ export default defineConfig({
         "/compare/starlight": "Blume vs Starlight",
         "/compare/vitepress": "Blume vs VitePress",
         "/compare/vuepress": "Blume vs VuePress",
+        "/customers/quiverai": "QuiverAI",
         "/pricing": "Pricing",
       },
     },
