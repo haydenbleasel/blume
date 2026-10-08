@@ -2936,7 +2936,7 @@ export const guides: Guide[] = [
       "Move a Material for MkDocs site to Blume with a coding agent and a codemod, rebuild its nav as folders, keep its heading anchors, and check that every old URL still works.",
     title: "Migrate your docs from MkDocs Material",
     topic: "migrate",
-    updated: "2026-10-05",
+    updated: "2026-10-07",
   },
   {
     author: "hayden",

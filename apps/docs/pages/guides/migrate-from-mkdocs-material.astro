@@ -196,6 +196,7 @@ export default defineConfig({
   logo: "/logo.svg",
   theme: { accent: "teal" },
   github: { owner: "acme", repo: "docs" },
+  footer: { copyright: "Copyright © 2026 Acme" },
   deployment: { site: "https://docs.acme.example" },
   navigation: {
     tabs: [
@@ -438,6 +439,10 @@ const prettierrc = `{
         <td><code>display: "group"</code> in each second-level section's <code>meta.ts</code></td>
       </tr>
       <tr>
+        <td><code>copyright</code></td>
+        <td><code>footer.copyright</code>, as plain text</td>
+      </tr>
+      <tr>
         <td>A page's <code># Heading</code></td>
         <td>Its <code>title</code>, with any inline code or emphasis removed</td>
       </tr>
@@ -549,10 +554,10 @@ const prettierrc = `{
         <td>Move the excerpt into its own file</td>
       </tr>
       <tr>
-        <td><code>copyright</code></td>
+        <td>A link inside <code>copyright</code></td>
         <td>
-          No footer text field; override the{" "}
-          <a href="/docs/configuration/customization#layout-slots">Footer slot</a>
+          Kept as text; add the link to{" "}
+          <a href="/docs/configuration#footer"><code>footer.links</code></a>
         </td>
       </tr>
       <tr>
@@ -690,9 +695,11 @@ const prettierrc = `{
       variable, so it goes.
     </li>
     <li>
-      <code>copyright</code> has nowhere to go. Links in{" "}
-      <code>extra.social</code> would move to{" "}
-      <a href="/docs/configuration#footer"><code>footer.socials</code></a>.
+      <code>copyright</code> becomes{" "}
+      <a href="/docs/configuration#footer"><code>footer.copyright</code></a>,
+      which is plain text, so <code>&amp;copy;</code> turns into{" "}
+      <code>©</code>. Links in <code>extra.social</code> would move to{" "}
+      <code>footer.socials</code>.
     </li>
   </ul>
   <p>
