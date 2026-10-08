@@ -115,13 +115,17 @@ const rowClass =
   "flex w-full items-center gap-2.5 py-1.5 text-start text-muted-foreground text-sm transition-colors hover:text-foreground";
 
 // Items inside the floating popovers keep menu affordances (padding + hover
-// background).
+// background). Their icons sit in a box one line tall, so a label that wraps
+// keeps them beside its first line.
 const menuRowClass =
-  "flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-start text-muted-foreground text-sm transition-colors hover:bg-muted hover:text-foreground";
-// At most out to the rail's edge, past its 1rem padding: the rail scrolls, so
-// it clips anything wider. Longer labels wrap instead.
+  "flex w-full items-start gap-2.5 rounded-md px-2 py-1.5 text-start text-muted-foreground text-sm transition-colors hover:bg-muted hover:text-foreground";
+const menuIconClass = "flex h-lh shrink-0 items-center";
+// At most out to the rail's edge, past its padding (`--blume-rail-inset`, set
+// by the layout), less 2px so the border never lands on the edge: the rail
+// scrolls, so it clips anything wider. Longer labels wrap instead. The minimum
+// width gives way to that cap in a narrower rail.
 const panelClass =
-  "absolute top-full end-0 z-50 mt-1 w-max min-w-[14rem] max-w-[calc(100%+1rem)] wrap-anywhere rounded-blume border border-border bg-background p-1 shadow-xl";
+  "absolute top-full end-0 z-50 mt-1 w-max [--blume-menu-room:calc(100%+var(--blume-rail-inset,1rem)-2px)] min-w-[min(14rem,var(--blume-menu-room))] max-w-(--blume-menu-room) wrap-anywhere rounded-blume border border-border bg-background p-1 shadow-xl";
 ---
 
 <div
@@ -174,13 +178,17 @@ const panelClass =
         <div class={panelClass} data-blume-menu>
           {exportPdf && (
             <button class={menuRowClass} data-blume-export-pdf type="button">
-              <Icon name="file" size={16} />
+              <span class={menuIconClass}>
+                <Icon name="file" size={16} />
+              </span>
               <span class="flex-1">{a.exportPdf}</span>
             </button>
           )}
           {exportEpub && (
             <button class={menuRowClass} data-blume-export-epub type="button">
-              <Icon name="book-open" size={16} />
+              <span class={menuIconClass}>
+                <Icon name="book-open" size={16} />
+              </span>
               <span class="flex-1" data-blume-epub-label>
                 {a.exportEpub}
               </span>
@@ -216,9 +224,11 @@ const panelClass =
                 data-open-in={provider.key}
                 {...NEW_TAB_ATTRS}
               >
-                <span set:html={LOGOS[provider.key]} />
+                <span class={menuIconClass} set:html={LOGOS[provider.key]} />
                 <span class="flex-1">{provider.label}</span>
-                <Icon name="external-link" size={13} />
+                <span class={menuIconClass}>
+                  <Icon name="external-link" size={13} />
+                </span>
               </a>
             </>
           ))}
@@ -243,7 +253,9 @@ const panelClass =
         </summary>
         <div class={panelClass} data-blume-menu>
           <button class={menuRowClass} data-mcp-copy-url type="button">
-            <Icon name="link" size={16} />
+            <span class={menuIconClass}>
+              <Icon name="link" size={16} />
+            </span>
             <span class="flex-1" data-mcp-url-label>
               {a.copyServerUrl}
             </span>
@@ -257,7 +269,7 @@ const panelClass =
                   data-mcp-copy-claude
                   type="button"
                 >
-                  <span set:html={LOGOS.claude} />
+                  <span class={menuIconClass} set:html={LOGOS.claude} />
                   <span class="flex-1" data-mcp-claude-label>
                     {a.copyClaudeCode}
                   </span>
@@ -265,7 +277,7 @@ const panelClass =
               )}
               {client === "codex" && (
                 <button class={menuRowClass} data-mcp-copy-codex type="button">
-                  <span set:html={LOGOS.codex} />
+                  <span class={menuIconClass} set:html={LOGOS.codex} />
                   <span class="flex-1" data-mcp-codex-label>
                     {a.copyCodex}
                   </span>
@@ -273,16 +285,22 @@ const panelClass =
               )}
               {client === "cursor" && (
                 <a class={menuRowClass} data-mcp-cursor rel="noreferrer">
-                  <span set:html={LOGOS.cursor} />
+                  <span class={menuIconClass} set:html={LOGOS.cursor} />
                   <span class="flex-1">{a.addToCursor}</span>
-                  <Icon name="external-link" size={13} />
+                  <span class={menuIconClass}>
+                    <Icon name="external-link" size={13} />
+                  </span>
                 </a>
               )}
               {client === "vscode" && (
                 <a class={menuRowClass} data-mcp-vscode rel="noreferrer">
-                  <Icon name="code" size={16} />
+                  <span class={menuIconClass}>
+                    <Icon name="code" size={16} />
+                  </span>
                   <span class="flex-1">{a.addToVscode}</span>
-                  <Icon name="external-link" size={13} />
+                  <span class={menuIconClass}>
+                    <Icon name="external-link" size={13} />
+                  </span>
                 </a>
               )}
               {!isBuiltInMcpClient(client) && (
@@ -291,7 +309,9 @@ const panelClass =
                   data-mcp-copy-command={client.command}
                   type="button"
                 >
-                  <Icon name={client.icon ?? "terminal"} size={16} />
+                  <span class={menuIconClass}>
+                    <Icon name={client.icon ?? "terminal"} size={16} />
+                  </span>
                   <span class="flex-1" data-mcp-command-label>
                     {client.label}
                   </span>
@@ -444,10 +464,15 @@ hr { border: 0; border-top: 1px solid #ddd; margin: 2em 0; }`;
       return;
     }
     const rect = summary.getBoundingClientRect();
+    // The rail scrolls, so it clips the menu at its own edges: its top sits
+    // under the sticky header, below the viewport's.
+    const room = details
+      .closest("[data-blume-toc]")
+      ?.getBoundingClientRect() ?? { bottom: window.innerHeight, top: 0 };
     const margin = 8;
     const flipUp =
-      rect.bottom + menu.offsetHeight + margin > window.innerHeight &&
-      rect.top - menu.offsetHeight - margin > 0;
+      rect.bottom + menu.offsetHeight + margin > room.bottom &&
+      rect.top - menu.offsetHeight - margin > room.top;
     menu.classList.toggle("top-full", !flipUp);
     menu.classList.toggle("mt-1", !flipUp);
     menu.classList.toggle("bottom-full", flipUp);
@@ -515,7 +540,7 @@ hr { border: 0; border-top: 1px solid #ddd; margin: 2em 0; }`;
     }
     // The action dropdowns are native <details>. Make them behave like a proper
     // menu: only one open at a time, and flip above the trigger when opening
-    // downward would run past the viewport bottom.
+    // downward would run past the rail's bottom and there's room above.
     const dropdowns = [...root.querySelectorAll<HTMLDetailsElement>("details")];
     for (const details of dropdowns) {
       details.addEventListener("toggle", () => {
