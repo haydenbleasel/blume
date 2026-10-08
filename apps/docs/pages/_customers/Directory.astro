@@ -1,11 +1,16 @@
 ---
 // The /customers hero: the compare index's centered layout (the two-tone
-// headline, the summary, and its two links beneath), over every story's panel,
-// stacked, newest first. The panels come from customers.ts, so a new story
-// there lands here and on the homepage carousel too.
+// headline, the summary, and its two links beneath), over every story's panel
+// in customers.ts order, two to a row from `md`, where each panel lays out as
+// a card with its photo on top. With an odd number of stories the first spans
+// both columns and opens out into the full split panel, so the rows below it
+// stay even. The panels come from customers.ts, so a new story there lands
+// here and on the homepage carousel too.
 import TextLink from "../_home/TextLink.astro";
 import { stories } from "./customers.ts";
 import StoryPanel from "./StoryPanel.astro";
+
+const leadSpans = stories.length % 2 === 1;
 ---
 
 <section class="flex flex-col gap-12 pt-16 sm:pt-24 lg:gap-16">
@@ -26,7 +31,15 @@ import StoryPanel from "./StoryPanel.astro";
     </div>
   </div>
 
-  <div class="flex flex-col gap-4">
-    {stories.map((story) => <StoryPanel level="h2" story={story} />)}
+  <div class="grid gap-4 md:grid-cols-2">
+    {
+      stories.map((story, index) => (
+        <StoryPanel
+          class={index === 0 && leadSpans ? "md:col-span-2" : undefined}
+          level="h2"
+          story={story}
+        />
+      ))
+    }
   </div>
 </section>
