@@ -34,11 +34,6 @@ export const customers = {
     logo: { height: 152, src: "/logos/files-sdk.svg", width: 768 },
     name: "Files SDK",
   },
-  infrats: {
-    href: "https://infra-ts.dev/",
-    logo: { height: 152, src: "/logos/infrats.svg", width: 621 },
-    name: "infrats",
-  },
   neon: {
     href: "https://ui.neon.com/installation",
     logo: { height: 45, src: "/logos/neon.svg", width: 157 },
@@ -88,7 +83,6 @@ export const logoWall: Customer[] = [
   customers.ultracite,
   customers.filesSdk,
   customers.betterResult,
-  customers.infrats,
   customers.chatjs,
   customers.telemetry,
 ];
