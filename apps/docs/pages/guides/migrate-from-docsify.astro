@@ -248,11 +248,13 @@ const historyMode = [
   "  if (id) location.replace(location.pathname + \"#\" + id);",
   "}",
 ].join("\n");
+// The opening tag's `\u003c` keeps Vite's dependency scan, which matches
+// script tags anywhere in the file, from reading this sample as one.
 const oldSiteStub = [
   "<!doctype html>",
   "<meta charset=\"utf-8\">",
   "<title>These docs have moved</title>",
-  "<script>",
+  "\u003cscript>",
   "  (() => {",
   "    const site = \"https://docs.acme.example\";",
   "    const routes = { \"/install\": \"/getting-started/install\" };",

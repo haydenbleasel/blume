@@ -168,8 +168,10 @@ const pinAnchors = [
   "node node_modules/blume/skills/blume-migrate/scripts/pin-heading-ids.mjs --old ../old-site",
 ].join("\n");
 
+// The opening tag's `\u003c` keeps Vite's dependency scan, which matches
+// script tags anywhere in the file, from reading this sample as one.
 const vueIsland = [
-  "<script setup>",
+  "\u003cscript setup>",
   'import { ref } from "vue";',
   "const props = defineProps({ start: { type: Number, default: 0 } });",
   "const count = ref(props.start);",
