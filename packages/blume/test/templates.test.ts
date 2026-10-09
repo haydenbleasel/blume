@@ -126,6 +126,27 @@ const askConfig = (ask: NonNullable<BlumeConfig["ai"]>["assistant"]) =>
 const withProvider = (search: BlumeConfig["search"]) =>
   blumeConfigSchema.parse({ search });
 
+const renderTunnelConfig = (
+  resolvedConfig: ReturnType<typeof blumeConfigSchema.parse>,
+  options: { generatedModulesDir?: string } = {}
+) =>
+  astroConfigTemplate({
+    askPath: ASK_PATH,
+    config: resolvedConfig,
+    consentClientPath: CONSENT_CLIENT_PATH,
+    contentRoutes: [],
+    context: context(),
+    examplesPath: EXAMPLES_PATH,
+    examplesThemePath: EXAMPLES_THEME_PATH,
+    featuresPath: FEATURES_PATH,
+    needsReact: false,
+    pages: [],
+    searchClientPath: SEARCH_CLIENT_PATH,
+    themePath: THEME_PATH,
+    tunnel: true,
+    ...options,
+  });
+
 const example = (over: Partial<ExampleSpec> = {}): ExampleSpec => ({
   client: "visible",
   file: "/project/examples/counter.tsx",
@@ -1387,6 +1408,61 @@ describe("astroConfigTemplate", () => {
     expect(out).toContain(
       'adapter: adapter({"imageService":"compile","prerenderEnvironment":"node"})'
     );
+  });
+
+  it("allows the Quick Tunnel hostname through Vite for any non-ejected dev config", () => {
+    const cloudflareConfig = blumeConfigSchema.parse({
+      deployment: cloudflare(),
+    });
+    const render = (tunnel?: true) =>
+      astroConfigTemplate({
+        askPath: ASK_PATH,
+        config: cloudflareConfig,
+        consentClientPath: CONSENT_CLIENT_PATH,
+        contentRoutes: [],
+        context: context(),
+        examplesPath: EXAMPLES_PATH,
+        examplesThemePath: EXAMPLES_THEME_PATH,
+        featuresPath: FEATURES_PATH,
+        needsReact: false,
+        pages: [],
+        searchClientPath: SEARCH_CLIENT_PATH,
+        themePath: THEME_PATH,
+        tunnel,
+      });
+
+    const quickTunnel = render(true);
+    expect(quickTunnel).toContain(
+      'adapter: adapter({"imageService":"compile","prerenderEnvironment":"node"})'
+    );
+    expect(quickTunnel).toContain("server: { allowedHosts: true }");
+    expect(quickTunnel).not.toContain('"tunnel"');
+    const withoutTunnel = render();
+    expect(withoutTunnel).not.toContain("allowedHosts: true");
+    expect(withoutTunnel).not.toContain('"tunnel"');
+  });
+
+  it("allows tunnel hosts for Node and static configs but not ejected apps", () => {
+    const nodeConfig = renderTunnelConfig(
+      blumeConfigSchema.parse({ deployment: node() })
+    );
+    expect(nodeConfig).toContain("server: { allowedHosts: true }");
+    expect(nodeConfig).not.toContain('"tunnel"');
+    const staticConfig = renderTunnelConfig(
+      blumeConfigSchema.parse({
+        deployment: cloudflare({ output: "static" }),
+      })
+    );
+    expect(staticConfig).toContain("server: { allowedHosts: true }");
+    expect(staticConfig).not.toContain('"tunnel"');
+    const ejectedConfig = renderTunnelConfig(
+      blumeConfigSchema.parse({ deployment: cloudflare() }),
+      {
+        generatedModulesDir: "./src/generated",
+      }
+    );
+    expect(ejectedConfig).not.toContain("allowedHosts: true");
+    expect(ejectedConfig).not.toContain('"tunnel"');
   });
 
   it("opts cloudflare builds out of the adapter's KV session and Images bindings", () => {

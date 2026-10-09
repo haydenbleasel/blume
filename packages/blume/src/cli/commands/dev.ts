@@ -14,6 +14,10 @@ import { resolveRuntimeDir } from "../../core/project.ts";
 import { referenceSpecFiles } from "../../openapi/references.ts";
 import { parsePort } from "../args.ts";
 import { astroBuildDiagnostics } from "../build-failure.ts";
+import {
+  resolveQuickTunnelHosts,
+  startCloudflareTunnel,
+} from "../cloudflare-tunnel.ts";
 import { commandMeta } from "../command-meta.ts";
 import {
   acquireDevLock,
@@ -85,12 +89,18 @@ export const devCommand = defineCommand({
       type: "boolean",
     },
     strict: { description: "Fail on diagnostics.", type: "boolean" },
+    tunnel: {
+      description:
+        "Expose a Cloudflare server dev site through a Quick Tunnel.",
+      type: "boolean",
+    },
   },
   meta: commandMeta.dev,
   async run({ args }) {
     const root = process.cwd();
     await refuseIfEjected(root, "dev");
     const preview = args.preview ?? false;
+    const tunnel: true | undefined = args.tunnel || undefined;
     const overrides = args["content-dir"]
       ? { contentRoot: args["content-dir"] }
       : undefined;
@@ -129,17 +139,23 @@ export const devCommand = defineCommand({
       preview,
       root,
       strict: args.strict,
+      tunnel,
     });
 
     // A factory so the regenerate loop can recreate the server when a
     // structural (route-set) change can't be re-synced in place (see below).
     // `open` is honored on first boot only — a restart must not reopen the
     // browser.
+    const tunnelHosts = tunnel ? resolveQuickTunnelHosts(args.host) : undefined;
     const createServer = (listenPort: number | undefined, open: boolean) =>
       dev({
         logLevel: args.debug ? "debug" : "info",
         root: project.context.outDir,
-        server: { host: normalizeHost(args.host), open, port: listenPort },
+        server: {
+          host: tunnelHosts?.devServer ?? normalizeHost(args.host),
+          open,
+          port: listenPort,
+        },
       });
 
     let server: Awaited<ReturnType<typeof createServer>>;
@@ -165,6 +181,32 @@ export const devCommand = defineCommand({
     if (boundPort !== port) {
       updateDevLockPort(outDir, boundPort);
       devServerUrl = `http://localhost:${boundPort}`;
+    }
+
+    let shuttingDown = false;
+    let tunnelFailedToStart = false;
+    let tunnelProcess: ReturnType<typeof startCloudflareTunnel> | undefined;
+    if (tunnel) {
+      tunnelProcess = startCloudflareTunnel(
+        boundPort,
+        tunnelHosts?.origin ?? "127.0.0.1",
+        {
+          onError(error) {
+            tunnelFailedToStart = true;
+            if (!shuttingDown) {
+              logger.error(
+                `Could not start Cloudflare Tunnel. Install cloudflared and make sure it is available on PATH. ${error.message}`
+              );
+            }
+          },
+        }
+      );
+      void (async () => {
+        const exitCode = await tunnelProcess?.exited;
+        if (!shuttingDown && !tunnelFailedToStart && exitCode !== undefined) {
+          logger.error(`Cloudflare Tunnel exited with code ${exitCode}.`);
+        }
+      })();
     }
 
     // Mirror any initial diagnostics into the browser overlay now the server
@@ -203,7 +245,7 @@ export const devCommand = defineCommand({
         const structural = nextSignature !== lastSignature;
         // Generate first: the new runtime data (and any staged remote content)
         // is on disk and published before the store re-syncs against it.
-        await generateRuntime(next);
+        await generateRuntime(next, { tunnel });
         if (structural && !(await refreshBlumeContent())) {
           await server.stop();
           server = await createServer(boundPort, false);
@@ -270,10 +312,15 @@ export const devCommand = defineCommand({
     ].filter((dispose) => dispose !== undefined);
 
     const shutdown = async () => {
+      if (shuttingDown) {
+        return;
+      }
+      shuttingDown = true;
       for (const dispose of disposers) {
         dispose();
       }
       releaseLock();
+      await tunnelProcess?.stop();
       await server.stop();
       process.exit(0);
     };
