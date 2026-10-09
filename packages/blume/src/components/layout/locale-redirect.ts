@@ -65,6 +65,7 @@ export const LOCALE_REDIRECT_SCRIPT = `(()=>{const s=document.currentScript;if(!
 interface ClosestTarget {
   closest: (selector: string) => {
     getAttribute: (name: string) => string | null;
+    setAttribute: (name: string, value: string) => void;
   } | null;
 }
 
@@ -76,27 +77,34 @@ interface Click {
 /** What {@link rememberLocaleChoice} listens on: the document. */
 export interface ChoiceTarget {
   addEventListener: (type: "click", listener: (event: Click) => void) => void;
+  location: { readonly hash: string };
 }
 
 const hasClosest = (target: Click["target"]): target is ClosestTarget =>
   target !== null && "closest" in target;
 
-/** The code of the switcher link a click landed on, if any. */
-const chosenCode = (target: Click["target"]): string | null | undefined =>
-  hasClosest(target)
-    ? target.closest("a[data-blume-locale-choice]")?.getAttribute("hreflang")
-    : null;
+/** The switcher link a click landed on, if any. */
+const chosenLink = (target: Click["target"]) =>
+  hasClosest(target) ? target.closest("a[data-blume-locale-choice]") : null;
 
 /**
  * Remember a language picked with the switcher, so routing by browser
- * language stops sending the reader elsewhere. One listener on the document
- * covers every switcher, on every page the client router swaps in.
+ * language stops sending the reader elsewhere, and keep the reader's place:
+ * the chosen link carries the current fragment (a heading the translation
+ * lacks leaves the reader at the top). One listener on the document covers
+ * every switcher, on every page the client router swaps in.
  */
 export const rememberLocaleChoice = (target: ChoiceTarget): void => {
   target.addEventListener("click", (event) => {
-    const code = chosenCode(event.target);
-    if (!code) {
+    const link = chosenLink(event.target);
+    const code = link?.getAttribute("hreflang");
+    if (!(link && code)) {
       return;
+    }
+    const href = link.getAttribute("href");
+    const { hash } = target.location;
+    if (href !== null && hash !== "") {
+      link.setAttribute("href", href.split("#")[0] + hash);
     }
     try {
       localStorage.setItem(LOCALE_STORAGE_KEY, code);

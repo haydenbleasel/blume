@@ -175,7 +175,6 @@ const storage = (throws = false) => {
 };
 
 const realStorage = globalThis.localStorage;
-
 afterEach(() => {
   globalThis.localStorage = realStorage;
 });
@@ -185,13 +184,14 @@ type ClickListener = Parameters<
   Parameters<typeof rememberLocaleChoice>[0]["addEventListener"]
 >[1];
 
-/** A document stand-in that hands back the click listeners it was given. */
-const listen = () => {
+/** A document stand-in at `hash` that hands back the click listeners it was given. */
+const listen = (hash = "") => {
   const listeners: ClickListener[] = [];
   rememberLocaleChoice({
     addEventListener: (_type, handler) => {
       listeners.push(handler);
     },
+    location: { hash },
   });
   return (event: Parameters<ClickListener>[0]) => {
     for (const listener of listeners) {
@@ -200,12 +200,24 @@ const listen = () => {
   };
 };
 
-/** A click on an element whose switcher link (if any) is `hreflang`. */
-const click = (hreflang: string | null) => ({
-  target: {
-    closest: () =>
-      hreflang === null ? null : { getAttribute: () => hreflang },
-  },
+/** A switcher link for `hreflang`, pointing at `href`. */
+const choice = (hreflang: string, href = "/fr/guide") => {
+  const attributes = new Map([
+    ["hreflang", hreflang],
+    ["href", href],
+  ]);
+  return {
+    attributes,
+    getAttribute: (name: string) => attributes.get(name) ?? null,
+    setAttribute: (name: string, value: string) => {
+      attributes.set(name, value);
+    },
+  };
+};
+
+/** A click on an element whose switcher link (if any) is `link`. */
+const click = (link: ReturnType<typeof choice> | null) => ({
+  target: { closest: () => link },
 });
 
 describe(rememberLocaleChoice, () => {
@@ -213,7 +225,7 @@ describe(rememberLocaleChoice, () => {
     const { items, local } = storage();
     globalThis.localStorage = local;
     const onClick = listen();
-    onClick(click("fr"));
+    onClick(click(choice("fr")));
     expect(items.get(LOCALE_STORAGE_KEY)).toBe("fr");
   });
 
@@ -223,7 +235,19 @@ describe(rememberLocaleChoice, () => {
     const onClick = listen();
     onClick(click(null));
     onClick({ target: null });
-    expect(() => onClick(click("fr"))).not.toThrow();
+    expect(() => onClick(click(choice("fr")))).not.toThrow();
     expect(items.size).toBe(0);
+  });
+
+  it("keeps the reader's place in the chosen language", () => {
+    globalThis.localStorage = storage().local;
+    const link = choice("fr");
+    const onClick = listen("#install");
+    onClick(click(link));
+    onClick(click(link));
+    expect(link.attributes.get("href")).toBe("/fr/guide#install");
+    const top = choice("fr");
+    listen()(click(top));
+    expect(top.attributes.get("href")).toBe("/fr/guide");
   });
 });
