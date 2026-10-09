@@ -1,5 +1,12 @@
 # blume
 
+## 2.2.2
+
+### Patch Changes
+
+- 6143000: A page actions menu (Export, Open in chat, Connect to MCP) now wraps a label too long for the right rail, as in many of the built-in translations (French, Portuguese, Russian, Swedish, and others) or with a long custom MCP client label. Before, the menu could reach past the rail's edge, and the rail, which scrolls, cut it off. A wrapped label keeps its icons beside its first line, and in a short window a menu opens upward only when it fits below the header, where the rail can show it, instead of tucking its top rows under the header.
+- ffbb7c0: The API reference playground's proxy (`playground: { proxy: true }`) now works on Cloudflare Workers. Before, every Try it request it forwarded to one of the spec's servers failed with a 502 "Illegal invocation" error, because the proxy called the runtime's `fetch` in a way Workers rejects and Node allows.
+
 ## 2.2.1
 
 ### Patch Changes
