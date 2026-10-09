@@ -429,6 +429,35 @@ describe("createPlaygroundProxyHandler", () => {
     });
   });
 
+  it("calls the default fetch unbound, as workerd requires", async () => {
+    // Workerd throws "Illegal invocation" when `fetch` runs with a `this`
+    // other than `globalThis` or `undefined`; Node and Bun don't, so the stub
+    // enforces it.
+    const realFetch = globalThis.fetch;
+    let target: URL | undefined;
+    globalThis.fetch = asFetch(function strictFetch(
+      this: typeof globalThis | undefined,
+      input
+    ) {
+      if (this !== undefined && this !== globalThis) {
+        throw new TypeError("Illegal invocation");
+      }
+      // SAFETY: the handler always dispatches upstream with a parsed `URL`
+      // instance (`followUpstream` receives and forwards `url: URL`).
+      target = input as URL;
+      return Promise.resolve(new Response("pong"));
+    });
+    try {
+      const handler = createPlaygroundProxyHandler(ORIGINS);
+      const response = await handler(proxyRequest("https://api.example/ping"));
+      expect(response.status).toBe(200);
+      expect(await response.text()).toBe("pong");
+      expect(must(target).href).toBe("https://api.example/ping");
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+  });
+
   it("gives up on an upstream that never answers, as a 502", async () => {
     // The client's own 30 s abort never reaches the server-side fetch, so
     // without a deadline here the request would hold a server slot for as

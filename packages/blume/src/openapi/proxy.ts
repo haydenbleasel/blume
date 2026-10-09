@@ -196,7 +196,11 @@ const followUpstream = async (args: {
   signal: AbortSignal;
   url: URL;
 }): Promise<Response> => {
-  const response = await args.fetchImpl(args.url, {
+  // Called bare, never as `args.fetchImpl(...)`: that would run the global
+  // `fetch` with `this` set to `args`, which Node allows and workerd rejects
+  // as an "Illegal invocation".
+  const { fetchImpl } = args;
+  const response = await fetchImpl(args.url, {
     body: args.body,
     headers: args.headers,
     method: args.method,
