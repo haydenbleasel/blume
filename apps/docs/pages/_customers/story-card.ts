@@ -12,6 +12,7 @@ import { render } from "takumi-js";
 import { container, image, text } from "takumi-js/helpers";
 import type { Node } from "takumi-js/helpers";
 
+import { headlineParts } from "./customers.ts";
 import type { CustomerStory } from "./customers.ts";
 
 const CARD_WIDTH = 1200;
@@ -33,6 +34,12 @@ const whiteSvg = async (publicDir: string, src: string): Promise<string> => {
   const svg = await readFile(path.join(publicDir, src), "utf-8");
   return svgSource(svg.replaceAll("currentColor", "#fff"));
 };
+
+// Headline text in `color`, its hyphenated words kept on one line.
+const headlineText = (value: string, color: string): Node[] =>
+  headlineParts(value).map((part) =>
+    text(part.text, part.whole ? { color, whiteSpace: "nowrap" } : { color })
+  );
 
 // The area a customer's wordmark covers beside Blume's: a 5:1 wordmark
 // stands 30px tall, a squarer one taller and a wider one shorter, so each
@@ -93,8 +100,8 @@ export const renderStoryCard = async (
 
   const headline = container({
     children: [
-      text(`${story.title} `, { color: "#fff" }),
-      text(story.tagline, { color: "rgb(255 255 255 / 0.65)" }),
+      ...headlineText(`${story.title} `, "#fff"),
+      ...headlineText(story.tagline, "rgb(255 255 255 / 0.65)"),
     ],
     style: {
       display: "block",

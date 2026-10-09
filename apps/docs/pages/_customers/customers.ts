@@ -338,6 +338,20 @@ export const stories: CustomerStory[] = [
   },
 ];
 
+/**
+ * A headline split around its hyphenated words ("Mintlify-level"), each
+ * flagged `whole` so the story panel, page, and OG card keep it on one line:
+ * in a narrow panel, browsers and the card's renderer otherwise break after
+ * the hyphen.
+ */
+export const headlineParts = (
+  text: string
+): { text: string; whole: boolean }[] =>
+  text
+    .split(/(?<hyphenated>\S+-\S+)/u)
+    .map((part, index) => ({ text: part, whole: index % 2 === 1 }))
+    .filter((part) => part.text !== "");
+
 /** A story by its id; throws at build time on a typo in a route file. */
 export const storyById = (id: string): CustomerStory => {
   const story = stories.find((entry) => entry.id === id);

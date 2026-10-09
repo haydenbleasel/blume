@@ -22,6 +22,7 @@ import TextLink from "../_home/TextLink.astro";
 import { sourceById, withUniqueIds } from "../_home/migrate-sources.ts";
 import { glyph, installCopyScript } from "../_home/shared.ts";
 import CustomerLogo from "./CustomerLogo.astro";
+import Headline from "./Headline.astro";
 import { type CustomerStory, stories } from "./customers.ts";
 import "./story.css";
 import StoryPanel from "./StoryPanel.astro";
@@ -98,8 +99,10 @@ const next = stories.length > 1 ? stories[(index + 1) % stories.length] : null;
         <h1
           class="max-w-[22ch] text-balance font-medium text-4xl sm:text-5xl lg:text-6xl"
         >
-          {story.title}{" "}
-          <span class="text-muted-foreground">{story.tagline}</span>
+          <Headline text={story.title} />{" "}
+          <span class="text-muted-foreground"
+            ><Headline text={story.tagline} /></span
+          >
         </h1>
         <p
           class="max-w-[52ch] text-balance text-lg text-muted-foreground sm:text-xl"
