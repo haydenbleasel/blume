@@ -184,17 +184,17 @@ export const stories: CustomerStory[] = [
     },
     meta: {
       description:
-        "Ordinal moved its docs from Mintlify to Blume in one evening, kept every guide URL, and now keeps its docs current with a scheduled Claude Code routine.",
+        "Ordinal moved its docs from Mintlify to Blume in one evening, kept every guide URL, and replaced Mintlify's docs agent with a scheduled Claude Code routine.",
       title: "Ordinal migrated from Mintlify to Blume in one evening",
     },
     stats: [
       { label: "Hands-on time; Claude Code did the rest", value: "20 min" },
-      { label: "Guide URLs changed in the move", value: "0" },
+      { label: "Saved every year at Mintlify's renewal", value: "$3,000" },
     ],
     summary:
-      "Ordinal, the social media platform for B2B teams, keeps its docs in Git and changes them through pull requests. Blume moved those docs in an evening, and a Claude Code routine now keeps them current.",
+      "Ordinal, the social media platform for B2B teams, was paying for a docs editor nobody used. Blume moved its docs in an evening, and a Claude Code routine now keeps them current.",
     tagline: "while walking the dog.",
-    title: "Ordinal moved to Blume",
+    title: "Ordinal moved from Mintlify",
   },
   {
     color: "oklch(0.48 0.1 230)",
@@ -302,7 +302,7 @@ export const stories: CustomerStory[] = [
     summary:
       "ChatJS, the open-source foundation for AI apps, wanted polished docs without building a docs platform, and room to change them later. Blume gave it both, and the move took a single AI chat.",
     tagline: "in a single AI chat.",
-    title: "ChatJS moved its docs",
+    title: "ChatJS moved from Mintlify",
   },
   {
     color: "oklch(0.5 0.17 359)",
@@ -332,9 +332,9 @@ export const stories: CustomerStory[] = [
       { label: "URLs changed in the move", value: "0" },
     ],
     summary:
-      "oRPC, the open-source framework for typesafe APIs, wanted the features of a full docs platform without moving its docs out of its monorepo. Blume moved all 96 pages over in less than a day, Twoslash examples and all.",
+      "oRPC, the open-source framework for typesafe APIs, wanted Mintlify-level docs without moving them out of its monorepo. Blume moved all 96 pages over in less than a day, Twoslash examples and all.",
     tagline: "inside its own repo.",
-    title: "oRPC got a full docs platform",
+    title: "oRPC got Mintlify-level docs",
   },
 ];
 

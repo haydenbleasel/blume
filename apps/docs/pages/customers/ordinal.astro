@@ -29,30 +29,39 @@ import { storyById } from "../_customers/customers.ts";
     APIs, and a page for every webhook event.
   </p>
 
-  <h2>How the docs started</h2>
+  <h2>The challenge</h2>
   <p>
     Ordinal's docs started on Mintlify, and Mintlify got them off the ground
     fast. Francisco's co-founder, Jeffrey Zhao, signed the team up, and though
     Jeffrey isn't an engineer, within a few days and with a $200 Cursor
     subscription he had fed Mintlify all of Ordinal's product context and stood
-    up solid docs.
+    up solid docs. The team paid for a yearly plan.
   </p>
   <p>
-    Mintlify's agent became part of how the team worked. It opened pull
-    requests to update the docs as the product changed, and wrote 46 of the
-    last 60 docs changes Ordinal merged before the move.
+    The web editor never caught on. It was used for two pull requests, and
+    every other change went through GitHub, because the docs had been MDX in
+    their own repository all along. What did earn its keep was Mintlify's
+    agent, which opened pull requests to update the docs as the product
+    changed: it wrote 46 of the last 60 docs changes Ordinal merged before the
+    move.
   </p>
   <p>
-    Day to day, the team worked in Git. The docs were MDX in their own
-    repository from the start, and changes went through GitHub pull requests,
-    so a hosted editor wasn't something Ordinal needed. With the yearly renewal
-    coming up, Francisco looked at moving the docs to a framework the team could
-    run itself.
+    Ordinal paid $1,500 for the year, on an old tier with a YC alum discount.
+    At renewal in January 2027, that would have doubled to $3,000.
   </p>
+
+  <Quote
+    avatar="/customers/francisco.webp"
+    name="Francisco"
+    role="Co-founder, Ordinal"
+  >
+    Our docs were already MDX in our own repo. Once you see that, the question
+    is what you're paying for.
+  </Quote>
 
   <h2>The move</h2>
   <p>
-    He'd had his eye on Blume for a few months. One evening in
+    Francisco had had his eye on Blume for a few months. One evening in
     September 2026, he ran <code>npx blume migrate mintlify</code>, which found
     Ordinal's <code>docs.json</code> and handed the job to Claude Code with
     Blume's migration playbook. Its bundled codemod rewrote the frontmatter and
@@ -111,8 +120,8 @@ import { storyById } from "../_customers/customers.ts";
 
   <h2>Docs that keep themselves current</h2>
   <p>
-    Mintlify's agent had been writing most of the docs changes, so Ordinal
-    rebuilt that job as a scheduled Claude Code routine. Every weekday at 5pm
+    Mintlify's agent was the one feature Ordinal relied on, so it became a
+    scheduled Claude Code routine. Every weekday at 5pm
     Chicago time, a cloud
     Claude Code session checks out both the product and the docs repositories,
     then:
@@ -120,8 +129,8 @@ import { storyById } from "../_customers/customers.ts";
   <ol>
     <li>
       Lists the product pull requests merged in the last seven days, skipping
-      any that a docs pull request already references, so it never repeats
-      work that's already documented.
+      any that a docs pull request already references, so it never redoes what
+      Mintlify's agent covered.
     </li>
     <li>
       Reads each one's description and diff and decides whether customers would
@@ -145,11 +154,20 @@ import { storyById } from "../_customers/customers.ts";
     injected instruction could do.
   </p>
 
+  <Quote
+    avatar="/customers/francisco.webp"
+    name="Francisco"
+    role="Co-founder, Ordinal"
+  >
+    The only thing Mintlify did that we couldn't do ourselves was keep the docs
+    up to date. That's now a Claude Code routine that opens PRs every weekday.
+  </Quote>
+
   <h2>The results</h2>
   <p>
-    Every guide URL survived the move, the API references build from
-    Ordinal's own specs, and the docs keep themselves current through pull
-    requests the team reviews.
+    Francisco hasn't found anything Mintlify did that Blume and the routine
+    don't cover. Every guide URL survived the move, and the docs now update
+    themselves for the cost of a routine instead of a $3,000 renewal.
   </p>
   <table>
     <thead>
@@ -175,6 +193,9 @@ import { storyById } from "../_customers/customers.ts";
       <tr>
         <th scope="row">Francisco's hands-on time</th><td>About 20 minutes</td>
       </tr>
+      <tr>
+        <th scope="row">Mintlify renewal avoided</th><td>$3,000 a year</td>
+      </tr>
     </tbody>
   </table>
   <p>
@@ -188,6 +209,7 @@ import { storyById } from "../_customers/customers.ts";
   </p>
   <p>
     To make the same move, follow the{" "}
-    <a href="/guides/migrate-from-mintlify">Mintlify migration guide</a>.
+    <a href="/guides/migrate-from-mintlify">Mintlify migration guide</a>, and
+    see <a href="/compare/mintlify">how Blume compares with Mintlify</a>.
   </p>
 </StoryPage>
