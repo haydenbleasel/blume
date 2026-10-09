@@ -32,6 +32,7 @@
         "@axe-core/playwright": "^4.13.0",
         "@playwright/test": "^1.63.0",
         "sharp": "^0.35.5",
+        "takumi-js": "^2.13.7",
         "wrangler": "^4.131.1",
       },
     },

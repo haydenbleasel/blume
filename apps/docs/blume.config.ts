@@ -1,7 +1,26 @@
+import type { AstroIntegration } from "astro";
 import { defineConfig } from "blume";
 import { openai } from "blume/ai";
 import { cloudflare } from "blume/deploy";
 import { filesystem, githubReleases } from "blume/sources";
+
+// Each customer story's cobranded OG card (pages/_customers/story-card.ts),
+// rendered at build from its entry in customers.ts. pages/ only routes .astro
+// files, so the endpoint is mounted here.
+const storyCards: AstroIntegration = {
+  hooks: {
+    "astro:config:setup": ({ injectRoute }) => {
+      injectRoute({
+        entrypoint: new URL(
+          "pages/_customers/story-card.jpg.ts",
+          import.meta.url
+        ),
+        pattern: "/customers/og/[id].jpg",
+      });
+    },
+  },
+  name: "customer-story-cards",
+};
 
 export default defineConfig({
   agents: {
@@ -124,6 +143,7 @@ export default defineConfig({
       },
     },
   },
+  integrations: [storyCards],
   lastModified: "git",
   logo: "/logo.svg",
   navigation: {
@@ -274,8 +294,6 @@ export default defineConfig({
         "/compare/starlight": "Blume vs Starlight",
         "/compare/vitepress": "Blume vs VitePress",
         "/compare/vuepress": "Blume vs VuePress",
-        "/customers/chatjs": "ChatJS",
-        "/customers/quiverai": "QuiverAI",
         "/pricing": "Pricing",
       },
     },

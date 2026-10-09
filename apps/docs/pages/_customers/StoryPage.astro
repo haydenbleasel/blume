@@ -50,6 +50,9 @@ const next = stories.length > 1 ? stories[(index + 1) % stories.length] : null;
   logo={config.logo}
   navigation={data.navigation}
   ogEnabled={config.og.enabled}
+  ogImage={`/customers/og/${story.id}.jpg`}
+  ogImageAlt={`Blume × ${story.customer.name}: ${story.title} ${story.tagline}`}
+  ogImageSize={{ height: 630, width: 1200 }}
   page={{
     description: story.meta.description,
     route: `/customers/${story.id}`,
