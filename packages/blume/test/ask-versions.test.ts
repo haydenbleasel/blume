@@ -39,9 +39,9 @@ const scan = async (files: Record<string, string>) => {
   return await scanProject(root);
 };
 
-/** The `## Title (route)` headings a grounded system prompt cites. */
+/** The `## [Title](route)` headings a grounded system prompt cites. */
 const cited = (system: string | undefined): string[] =>
-  [...(system ?? "").matchAll(/^## .+ \((?<route>\/[^)]*)\)/gmu)].map(
+  [...(system ?? "").matchAll(/^## \[.*\]\((?<route>\/[^)]*)\)/gmu)].map(
     (match) => match.groups?.route ?? ""
   );
 

@@ -6,6 +6,7 @@ import { join } from "pathe";
 
 import {
   createAskContext,
+  excerptHeading,
   parsePage,
   relevantExcerpt,
   sectionExcerpt,
@@ -1254,7 +1255,7 @@ const conversationCorpus = [
   ),
 ];
 const cited = (system: string | undefined): string[] =>
-  [...(system ?? "").matchAll(/^## .*\((?<route>\/[^)]*)\)/gmu)].map(
+  [...(system ?? "").matchAll(/^## \[.*\]\((?<route>\/[^)]*)\)/gmu)].map(
     (match) => match.groups?.route ?? ""
   );
 
@@ -1364,10 +1365,13 @@ describe("createAskContext", () => {
       { content: "how do I install the dev server", role: "user" },
     ]);
     expect(system).toContain("<docs>");
-    expect(system).toContain("Installation (/guides/install)");
+    expect(system).toContain("## [Installation](/guides/install)");
     expect(system).toContain("run the dev server");
-    expect(system).toContain("Markdown link");
+    expect(system).toContain("opens with a heading that links to its page");
     expect(system).toContain("[Page Title](/route)");
+    expect(system).toContain(
+      "with the link in the heading that opens their excerpt"
+    );
   });
 
   it("appends custom instructions after the base grounding contract", async () => {
@@ -1427,7 +1431,7 @@ describe("createAskContext", () => {
     const injected = docsBlock(
       await ground([{ content: "install guide", role: "user" }])
     );
-    // 300 characters of body, plus the `## Title (/route)` heading and the
+    // 300 characters of body, plus the `## [Title](/route)` heading and the
     // ellipses marking the trimmed edges.
     expect(injected.length).toBeLessThan(400);
     expect(injected).toContain("install");
@@ -1527,7 +1531,7 @@ describe("createAskContext", () => {
       path: "/guides/install/",
     });
     expect(system).toContain("the page the user is currently viewing");
-    expect(system).toContain("Installation (/guides/install)");
+    expect(system).toContain("## [Installation](/guides/install)");
   });
 
   it("filters retrieval to the current page's locale", async () => {
@@ -1611,7 +1615,7 @@ describe("createAskContext", () => {
       site: null,
     });
     const system = await ground([{ content: "ポイント", role: "user" }]);
-    expect(system).toContain("ポイントの扱い (/ja/points)");
+    expect(system).toContain("## [ポイントの扱い](/ja/points)");
 
     // A Japanese translation of an English-default site grounds it too,
     // asked from a Japanese page (a question from nowhere keeps to English).
@@ -1623,7 +1627,7 @@ describe("createAskContext", () => {
     const answer = await translated([{ content: "ポイント", role: "user" }], {
       path: "/ja",
     });
-    expect(answer).toContain("ポイントの扱い (/ja/points)");
+    expect(answer).toContain("## [ポイントの扱い](/ja/points)");
   });
 
   it("truncates long excerpts and returns undefined for an empty corpus", async () => {
@@ -1793,6 +1797,26 @@ describe("parsePage", () => {
     expect(parsePage("Plain page with no headings.").sections).toStrictEqual(
       []
     );
+  });
+});
+
+describe("excerptHeading", () => {
+  it("is the link to cite the page with", () => {
+    expect(
+      excerptHeading({ route: "/guides/install", title: "Installation" })
+    ).toBe("## [Installation](/guides/install)");
+    expect(excerptHeading({ route: "/ja/ポイント", title: "ポイント" })).toBe(
+      "## [ポイント](/ja/ポイント)"
+    );
+  });
+
+  it("escapes what would break the link", () => {
+    expect(
+      excerptHeading({ route: "/api", title: String.raw`API [beta] \ v2` })
+    ).toBe(String.raw`## [API \[beta\] \\ v2](/api)`);
+    expect(
+      excerptHeading({ route: "/guides/setup (beta) now", title: "Setup" })
+    ).toBe("## [Setup](/guides/setup%20%28beta%29%20now)");
   });
 });
 
