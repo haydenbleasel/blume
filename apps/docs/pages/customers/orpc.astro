@@ -1,0 +1,143 @@
+---
+// oRPC's story, from its own write-up (2026-10-08); the page counts, dates,
+// and dependencies are checked against the public middleapi/orpc repository
+// and its migration pull request, and the Lighthouse scores are oRPC's own
+// runs.
+import { NEW_TAB_ATTRS } from "blume/core/new-tab.ts";
+import StoryPage from "../_customers/StoryPage.astro";
+import { storyById } from "../_customers/customers.ts";
+---
+
+<StoryPage story={storyById("orpc")}>
+  <p>
+    <a href="https://orpc.dev" {...NEW_TAB_ATTRS}>oRPC</a> is an open-source
+    framework for building APIs that are typesafe end to end, with OpenAPI
+    built in. Developers write procedures, or start from a contract, and get a
+    fully typed client, an OpenAPI spec, and schemas from Zod, Valibot, or
+    ArkType. Around that core, oRPC integrates with Next.js, TanStack Query,
+    NestJS, the AI SDK, Cloudflare Workers, OpenTelemetry, and more.
+  </p>
+  <p>
+    Its docs cover all of it, for developers who read the code first. 44 pages
+    use <a href="/docs/content/syntax#display-types">Twoslash</a>, so readers
+    can hover over any token in a code example and see the type the compiler
+    infers.
+  </p>
+
+  <h2>The challenge</h2>
+  <p>
+    Those examples are why oRPC's docs live in its monorepo. The docs are a
+    package there, built against 14 of oRPC's own packages from the
+    workspace, so every Twoslash example checks against the code in the repo,
+    including changes that haven't been released yet. The team wanted the
+    polish of a full docs platform, but the docs had to stay next to the
+    packages.
+  </p>
+  <p>
+    VitePress handled that well. But Twoslash, Mermaid diagrams, and llms.txt
+    each came from a plugin, and as AI features mattered more to the team, the
+    list kept growing. Each new feature was another dependency to set up and
+    keep current.
+  </p>
+
+  <h2>The move</h2>
+  <p>
+    Blume runs as a normal package inside a repo, so the docs could stay where
+    they were. Định Lê, oRPC's maintainer, started the move on August 5, 2026,
+    and merged it the next day, less than 24 hours later, in{" "}
+    <a href="https://github.com/middleapi/orpc/pull/1793" {...NEW_TAB_ATTRS}
+      >one pull request</a
+    >.
+  </p>
+  <p>
+    All 96 pages moved to MDX, and none changed its URL. VitePress's
+    containers became Blume's <code>:::</code> directives, code groups became
+    tabs, collapsible details became expandables, shared snippets were
+    inlined, and the sidebar's order carried over into{" "}
+    <a href="/docs/content/navigation#ordering"><code>meta.ts</code></a> files.
+    The Twoslash blocks and code annotations came across unchanged.
+  </p>
+  <p>
+    The docs package got lighter, too. VitePress, Vue, Mermaid and the layout
+    libraries it needs, and the plugins for Twoslash, diagrams, and llms.txt,
+    16 dev dependencies in all, were replaced by one: <code>blume</code>.
+  </p>
+  <p>
+    What had been plugins came built in, and some features came along that
+    the team hadn't asked for: an Open Graph card for every page, a sitemap,
+    and content signals in robots.txt.
+  </p>
+
+  <h2>Built around the code</h2>
+  <p>
+    oRPC's readers search for the API they're using, so the team made code
+    searchable. An{" "}
+    <a href="/docs/configuration/customization#astro-integrations"
+      >Astro integration</a
+    > in <code>blume.config.ts</code> adds code blocks to the search index, and the
+    search dialog previews each match as it appears on the page. Others anchor
+    Twoslash popups beside their token, swap in oRPC's own header, and place
+    sponsor slots through the docs.
+  </p>
+  <p>
+    The theme takes oRPC's pink as its accent, with a dark mode based on the
+    Zed editor's One Dark palette.
+  </p>
+
+  <h2>Ready for agents</h2>
+  <p>
+    AI features were a big part of why oRPC moved, and now they're defaults or
+    a line of config. The site publishes{" "}
+    <a href="/docs/discoverability/llms-txt">llms.txt</a> and llms-full.txt,
+    which oRPC links from its header, and a{" "}
+    <a href="/docs/discoverability/mcp">docs MCP server</a> answers at{" "}
+    <code>/mcp</code>.
+  </p>
+  <p>
+    Blume also{" "}
+    <a href="/docs/discoverability/agent-discovery#skills-discovery"
+      >publishes</a
+    > the agent skills from the monorepo's <code>skills</code> folder, so a coding
+    agent finds oRPC's four skills, for contracts and OpenAPI among them, on the
+    docs site itself.
+  </p>
+
+  <h2>The results</h2>
+  <p>
+    On October 8, 2026, the oRPC team ran Lighthouse on mobile against{" "}
+    <code>/docs/getting-started</code>, on VitePress and on Blume. Each score
+    is the median of three runs, and the Blume page also loaded 76% less
+    JavaScript.
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th scope="col">Lighthouse, mobile</th>
+        <th scope="col">VitePress</th>
+        <th scope="col">Blume</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><th scope="row">Performance</th><td>48</td><td>76</td></tr>
+      <tr><th scope="row">Accessibility</th><td>88</td><td>97</td></tr>
+      <tr><th scope="row">Best Practices</th><td>100</td><td>100</td></tr>
+      <tr><th scope="row">SEO</th><td>100</td><td>100</td></tr>
+    </tbody>
+  </table>
+  <p>
+    The move kept every URL and every Twoslash example, and the docs section
+    has grown from 91 pages to 122 since. The docs are live at{" "}
+    <a href="https://orpc.dev" {...NEW_TAB_ATTRS}>orpc.dev</a>, and their
+    source is{" "}
+    <a
+      href="https://github.com/middleapi/orpc/tree/main/apps/content"
+      {...NEW_TAB_ATTRS}>public on GitHub</a
+    >. The v1 docs are still at{" "}
+    <a href="https://v1.orpc.dev" {...NEW_TAB_ATTRS}>v1.orpc.dev</a>, and
+    redirects send the v1 URLs search engines still index to their v2 pages.
+  </p>
+  <p>
+    To make the same move, follow the{" "}
+    <a href="/guides/migrate-from-vitepress">VitePress migration guide</a>.
+  </p>
+</StoryPage>

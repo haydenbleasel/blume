@@ -45,7 +45,7 @@ export const customers = {
     name: "Ordinal",
   },
   orpc: {
-    href: "https://orpc.dev/docs/",
+    href: "https://orpc.dev/",
     logo: { height: 152, src: "/logos/orpc.svg", width: 527 },
     name: "oRPC",
   },
@@ -130,7 +130,8 @@ export interface CustomerStory {
 // story is from Francisco's migration notes (2026-10-07); QuiverAI's story and
 // photos are from Nicklas Scharpff (2026-10-08); Telemetry's story and photos
 // are from Ephraim Atta-Duncan (2026-10-08); ChatJS's story and photos are
-// from Francisco Moretti (2026-10-08).
+// from Francisco Moretti (2026-10-08); oRPC's story is from its own write-up
+// (2026-10-08).
 export const stories: CustomerStory[] = [
   {
     color: "oklch(0.5 0.17 38)",
@@ -302,6 +303,38 @@ export const stories: CustomerStory[] = [
       "ChatJS, the open-source foundation for AI apps, wanted polished docs without building a docs platform, and room to change them later. Blume gave it both, and the move took a single AI chat.",
     tagline: "in a single AI chat.",
     title: "ChatJS moved its docs",
+  },
+  {
+    color: "oklch(0.5 0.17 359)",
+    customer: customers.orpc,
+    facts: {
+      features: [
+        { href: "/docs/content/syntax#display-types", label: "Twoslash" },
+        { href: "/docs/content/syntax#diagrams", label: "Mermaid diagrams" },
+        { href: "/docs/discoverability/mcp", label: "MCP server" },
+        { href: "/docs/discoverability/llms-txt", label: "llms.txt" },
+      ],
+      industry: "Typesafe API framework",
+      migratedFrom: "vitepress",
+    },
+    id: "orpc",
+    image: {
+      alt: "A laptop glowing on a dark wooden desk at night, a code editor on its screen with pink highlights and a type hint open over one line, a mug and a notebook beside it",
+      src: "/customers/orpc.webp",
+    },
+    meta: {
+      description:
+        "oRPC, the open-source framework for typesafe APIs, moved 96 pages from VitePress to Blume in less than a day, kept every URL and Twoslash example inside its monorepo, and replaced 16 dev dependencies with one.",
+      title: "oRPC moved 96 pages from VitePress to Blume in less than a day",
+    },
+    stats: [
+      { label: "Lighthouse performance on mobile, up from 48", value: "76" },
+      { label: "URLs changed in the move", value: "0" },
+    ],
+    summary:
+      "oRPC, the open-source framework for typesafe APIs, wanted the features of a full docs platform without moving its docs out of its monorepo. Blume moved all 96 pages over in less than a day, Twoslash examples and all.",
+    tagline: "inside its own repo.",
+    title: "oRPC got a full docs platform",
   },
 ];
 
