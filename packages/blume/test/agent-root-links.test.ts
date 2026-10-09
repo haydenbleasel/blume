@@ -119,7 +119,7 @@ describe("root-relative links on a translated page", () => {
     );
   });
 
-  it("leaves a remote page's relative links alone but moves its root links", async () => {
+  it("leaves the relative links of a page with neither a source file nor an entry id alone but moves its root links", async () => {
     const project = await scanFixture(files);
     const rewrite = relativeLinkRewriter(project);
     expect(

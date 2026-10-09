@@ -2,6 +2,7 @@ import type { BlumeProject } from "../core/project-graph.ts";
 import { buildSearchDocuments } from "../search/documents.ts";
 import type { OramaDoc } from "../search/orama-index.ts";
 import type { AskData } from "./ask-context.ts";
+import { relativeLinkRewriter } from "./relative-links.ts";
 
 /**
  * Build the grounding snapshot the assistant endpoint serves. Like the MCP server,
@@ -14,7 +15,11 @@ import type { AskData } from "./ask-context.ts";
  * from the docs instead of declining.
  * The reader is an AI agent, so `<Visibility>` resolves for the agents audience
  * (web-only content removed, agents-only unwrapped) and components downlevel to
- * Markdown, both matching llms-full.txt.
+ * Markdown, both matching llms-full.txt. Relative page links point at the
+ * routes they mean, as they do there too: the model cites the links it reads.
+ * Only those are rewritten, and to routes without the `deployment.base`, like
+ * the excerpt headings, since the chat panel mounts every link it renders
+ * under the base; other links stay as written.
  */
 export const buildAskData = async (project: BlumeProject): Promise<AskData> => {
   const documents = await buildSearchDocuments(project, {
@@ -22,12 +27,21 @@ export const buildAskData = async (project: BlumeProject): Promise<AskData> => {
     content: "markdown",
     includeWhenDisabled: true,
   });
+  const rewriteLinks = relativeLinkRewriter(project, { relativeOnly: true });
+  const pageByRoute = new Map(
+    project.graph.pages.map((page) => [page.route, page])
+  );
   const versioned = Boolean(project.config.versions);
   const data: AskData = {
     defaultLocale: project.config.i18n?.defaultLocale,
     documents: documents.map((doc) => {
+      const page = pageByRoute.get(doc.route);
       const document: OramaDoc = {
-        content: doc.content,
+        content: rewriteLinks(doc.content, {
+          entryId: page?.entryId,
+          route: doc.route,
+          sourcePath: page?.sourcePath,
+        }),
         description: doc.description,
         locale: doc.locale,
         route: doc.route,

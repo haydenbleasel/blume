@@ -13,6 +13,7 @@ import {
   isIndexFileName,
   resolveRelativeHref,
   resolveRootFileHref,
+  routeOfLinkedEntry,
   routeOfLinkedFile,
 } from "../core/links.ts";
 import type { RelativeLinkBase } from "../core/links.ts";
@@ -40,10 +41,17 @@ import { extractLinks } from "../core/sources/normalize.ts";
  * (`resolveRootFileHref`). Inline links, images, component
  * `href`s, and reference definitions are rewritten; fenced and inline code,
  * relative images and asset links, and external URLs are left as written.
+ * The assistant's excerpts take the relative rewrite alone, without the
+ * `deployment.base` (`relativeOnly`).
  */
 
 /** The page a Markdown text was written for. */
 export interface LinkedPage {
+  /**
+   * A staged page's path under its staging dir, which its links resolve from
+   * when it has no `sourcePath` (a remote or CMS source).
+   */
+  entryId?: string;
   route: string;
   sourcePath?: string;
 }
@@ -130,10 +138,20 @@ const collectSplices = (
  * fallback copies render another locale's file, so they never stand for one.
  */
 export const relativeLinkRewriter = (
-  project: BlumeProject
+  project: BlumeProject,
+  options?: {
+    /**
+     * Rewrite only relative page links, to routes without the
+     * `deployment.base`, and leave every other link as written.
+     */
+    relativeOnly?: boolean;
+  }
 ): RelativeLinkRewriter => {
   const { basePath, deployment, i18n } = project.config;
-  const deployBase = normalizeBasePath(deployment.options.base);
+  const relativeOnly = options?.relativeOnly === true;
+  const deployBase = relativeOnly
+    ? ""
+    : normalizeBasePath(deployment.options.base);
   const contentRoot = resolveDocsCollection(
     project.config,
     project.context.root
@@ -160,17 +178,25 @@ export const relativeLinkRewriter = (
   const relativeRoute = (
     page: LinkedPage
   ): ((target: string) => string | undefined) | undefined => {
-    const { sourcePath } = page;
-    if (!sourcePath) {
+    const { entryId, sourcePath } = page;
+    const file = sourcePath ?? entryId;
+    if (!file) {
       return;
     }
     const from: RelativeLinkBase = {
-      isIndex: isIndexFileName(basename(sourcePath), localeTokens),
+      isIndex: isIndexFileName(basename(file), localeTokens),
       route: page.route,
     };
-    const navPath = navPathBySource.get(sourcePath) ?? basename(sourcePath);
-    const resolveFile = (path: string): string | undefined =>
-      routeOfLinkedFile(fileRoutes, { navPath, sourcePath }, path);
+    // A staged page (a remote or CMS source) has no file on disk: it
+    // resolves a sibling by its entry id, as `blume validate` does.
+    let resolveFile: (path: string) => string | undefined;
+    if (sourcePath) {
+      const navPath = navPathBySource.get(sourcePath) ?? basename(sourcePath);
+      resolveFile = (path) =>
+        routeOfLinkedFile(fileRoutes, { navPath, sourcePath }, path);
+    } else {
+      resolveFile = (path) => routeOfLinkedEntry(fileRoutes, file, path);
+    }
     // A resolved route is one Blume serves, so the deployment base goes on
     // unconditionally — even over a route that starts with the base's name.
     return (target) => {
@@ -192,14 +218,15 @@ export const relativeLinkRewriter = (
         ? { basePath, deployBase, i18n, locale, routes }
         : undefined;
     // A root-relative link only changes when the site is mounted under a
-    // prefix or the page reads in a prefixed locale.
+    // prefix or the page reads in a prefixed locale, and never `relativeOnly`.
     const rootLinks =
-      deployBase !== "" || basePath !== "" || localize !== undefined;
+      !relativeOnly &&
+      (deployBase !== "" || basePath !== "" || localize !== undefined);
     if (
-      !(page.sourcePath || rootLinks) ||
+      !(page.sourcePath || page.entryId || rootLinks) ||
       !(
         (rootLinks ? MAYBE_PAGE_LINK : MAYBE_RELATIVE).test(text) ||
-        MAYBE_ROOT_FILE.test(text)
+        (!relativeOnly && MAYBE_ROOT_FILE.test(text))
       )
     ) {
       return text;
@@ -236,6 +263,9 @@ export const relativeLinkRewriter = (
     const routed = (target: string, raw: boolean): string | undefined => {
       if (!isInternalPath(target)) {
         return relative?.(target);
+      }
+      if (relativeOnly) {
+        return undefined;
       }
       return (raw ? undefined : rootFile(target)) ?? rooted(target);
     };

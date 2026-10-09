@@ -87,6 +87,7 @@ export const buildRawMarkdown = async (
       // agent fetched resolves it to, and `/install` gains the base and the
       // page's locale the rendered link has — remote content included.
       text = rewriteLinks(text, {
+        entryId: pageById.get(route.id)?.entryId,
         route: route.path,
         sourcePath: route.sourcePath,
       });

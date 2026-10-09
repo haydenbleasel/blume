@@ -696,6 +696,18 @@ export const routeOfLinkedFile = (
   index.byDefaultNavPath.get(normalize(join(dirname(from.navPath), path)));
 
 /**
+ * The route a file link written on a staged page lands on: the linked
+ * entry's, by its path under the staging dir (`entryId`), as the rendered
+ * link resolves it.
+ */
+export const routeOfLinkedEntry = (
+  index: FileRouteIndex,
+  entryId: string,
+  path: string
+): string | undefined =>
+  index.byEntryId.get(normalize(join(dirname(entryId), path)));
+
+/**
  * The path a relative link on `page` resolves to — the same reading the
  * Markdown pipeline rewrites the rendered `href` to (see
  * {@link resolveRelativeHref}), so what's checked is what ships. A relative
@@ -714,8 +726,7 @@ const relativeTarget = (
     resolveFile = (path) =>
       routeOfLinkedFile(ctx.fileRoutes, { navPath, sourcePath }, path);
   } else if (entryId) {
-    resolveFile = (path) =>
-      ctx.fileRoutes.byEntryId.get(normalize(join(dirname(entryId), path)));
+    resolveFile = (path) => routeOfLinkedEntry(ctx.fileRoutes, entryId, path);
   }
   return (
     resolveRelativeHref(rawPath, base, resolveFile, (route) =>
