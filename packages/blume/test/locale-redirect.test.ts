@@ -180,18 +180,22 @@ afterEach(() => {
   globalThis.localStorage = realStorage;
 });
 
-/** The listener `rememberLocaleChoice` adds. */
-type ClickListener = Parameters<
-  Parameters<typeof rememberLocaleChoice>[0]["addEventListener"]
->[1];
+/** How `rememberLocaleChoice` listens on the document. */
+type AddListener = Parameters<
+  typeof rememberLocaleChoice
+>[0]["addEventListener"];
 
-/** A document stand-in that hands back the click listeners it was given. */
-const listen = () => {
+/** The listener `rememberLocaleChoice` adds. */
+type ClickListener = Parameters<AddListener>[1];
+
+/** A document stand-in at `location` that hands back the click listeners it was given. */
+const listen = (location?: { hash: string }) => {
   const listeners: ClickListener[] = [];
   rememberLocaleChoice({
     addEventListener: (_type, handler) => {
       listeners.push(handler);
     },
+    location: location ?? { hash: "" },
   });
   return (event: Parameters<ClickListener>[0]) => {
     for (const listener of listeners) {
@@ -200,12 +204,24 @@ const listen = () => {
   };
 };
 
-/** A click on an element whose switcher link (if any) is `hreflang`. */
-const click = (hreflang: string | null) => ({
-  target: {
-    closest: () =>
-      hreflang === null ? null : { getAttribute: () => hreflang },
-  },
+/** A switcher link for `hreflang`, pointing at `href`. */
+const choice = (hreflang: string, href = "/fr/guide") => {
+  const attributes = new Map([
+    ["hreflang", hreflang],
+    ["href", href],
+  ]);
+  return {
+    attributes,
+    getAttribute: (name: string) => attributes.get(name) ?? null,
+    setAttribute: (name: string, value: string) => {
+      attributes.set(name, value);
+    },
+  };
+};
+
+/** A click on an element whose switcher link (if any) is `link`. */
+const click = (link: ReturnType<typeof choice> | null) => ({
+  target: { closest: () => link },
 });
 
 describe(rememberLocaleChoice, () => {
@@ -213,7 +229,7 @@ describe(rememberLocaleChoice, () => {
     const { items, local } = storage();
     globalThis.localStorage = local;
     const onClick = listen();
-    onClick(click("fr"));
+    onClick(click(choice("fr")));
     expect(items.get(LOCALE_STORAGE_KEY)).toBe("fr");
   });
 
@@ -223,7 +239,33 @@ describe(rememberLocaleChoice, () => {
     const onClick = listen();
     onClick(click(null));
     onClick({ target: null });
-    expect(() => onClick(click("fr"))).not.toThrow();
+    expect(() => onClick(click(choice("fr")))).not.toThrow();
     expect(items.size).toBe(0);
+  });
+
+  it("keeps the reader's place in the chosen language", () => {
+    globalThis.localStorage = storage().local;
+    const location = { hash: "#install" };
+    const link = choice("fr");
+    const onClick = listen(location);
+    onClick(click(link));
+    onClick(click(link));
+    expect(link.attributes.get("href")).toBe("/fr/guide#install");
+    // Back at the top, the fragment an earlier click left goes.
+    location.hash = "";
+    onClick(click(link));
+    expect(link.attributes.get("href")).toBe("/fr/guide");
+  });
+
+  it("listens before the client router reads the link", () => {
+    const options: Parameters<AddListener>[2][] = [];
+    rememberLocaleChoice({
+      addEventListener: (_type, _handler, given) => {
+        options.push(given);
+      },
+      location: { hash: "" },
+    });
+    // The router's bubbling listener on the document is registered first.
+    expect(options).toStrictEqual([{ capture: true }]);
   });
 });
