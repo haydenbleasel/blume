@@ -175,23 +175,27 @@ const storage = (throws = false) => {
 };
 
 const realStorage = globalThis.localStorage;
+
 afterEach(() => {
   globalThis.localStorage = realStorage;
 });
 
-/** The listener `rememberLocaleChoice` adds. */
-type ClickListener = Parameters<
-  Parameters<typeof rememberLocaleChoice>[0]["addEventListener"]
->[1];
+/** How `rememberLocaleChoice` listens on the document. */
+type AddListener = Parameters<
+  typeof rememberLocaleChoice
+>[0]["addEventListener"];
 
-/** A document stand-in at `hash` that hands back the click listeners it was given. */
-const listen = (hash = "") => {
+/** The listener `rememberLocaleChoice` adds. */
+type ClickListener = Parameters<AddListener>[1];
+
+/** A document stand-in at `location` that hands back the click listeners it was given. */
+const listen = (location?: { hash: string }) => {
   const listeners: ClickListener[] = [];
   rememberLocaleChoice({
     addEventListener: (_type, handler) => {
       listeners.push(handler);
     },
-    location: { hash },
+    location: location ?? { hash: "" },
   });
   return (event: Parameters<ClickListener>[0]) => {
     for (const listener of listeners) {
@@ -241,13 +245,27 @@ describe(rememberLocaleChoice, () => {
 
   it("keeps the reader's place in the chosen language", () => {
     globalThis.localStorage = storage().local;
+    const location = { hash: "#install" };
     const link = choice("fr");
-    const onClick = listen("#install");
+    const onClick = listen(location);
     onClick(click(link));
     onClick(click(link));
     expect(link.attributes.get("href")).toBe("/fr/guide#install");
-    const top = choice("fr");
-    listen()(click(top));
-    expect(top.attributes.get("href")).toBe("/fr/guide");
+    // Back at the top, the fragment an earlier click left goes.
+    location.hash = "";
+    onClick(click(link));
+    expect(link.attributes.get("href")).toBe("/fr/guide");
+  });
+
+  it("listens before the client router reads the link", () => {
+    const options: Parameters<AddListener>[2][] = [];
+    rememberLocaleChoice({
+      addEventListener: (_type, _handler, given) => {
+        options.push(given);
+      },
+      location: { hash: "" },
+    });
+    // The router's bubbling listener on the document is registered first.
+    expect(options).toStrictEqual([{ capture: true }]);
   });
 });

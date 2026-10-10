@@ -76,7 +76,11 @@ interface Click {
 
 /** What {@link rememberLocaleChoice} listens on: the document. */
 export interface ChoiceTarget {
-  addEventListener: (type: "click", listener: (event: Click) => void) => void;
+  addEventListener: (
+    type: "click",
+    listener: (event: Click) => void,
+    options: { capture: true }
+  ) => void;
   location: { readonly hash: string };
 }
 
@@ -92,24 +96,31 @@ const chosenLink = (target: Click["target"]) =>
  * language stops sending the reader elsewhere, and keep the reader's place:
  * the chosen link carries the current fragment (a heading the translation
  * lacks leaves the reader at the top). One listener on the document covers
- * every switcher, on every page the client router swaps in.
+ * every switcher, on every page the client router swaps in. It listens in
+ * the capture phase: the client router's own listener on the document reads
+ * the link's href and navigates, and it's registered first.
  */
 export const rememberLocaleChoice = (target: ChoiceTarget): void => {
-  target.addEventListener("click", (event) => {
-    const link = chosenLink(event.target);
-    const code = link?.getAttribute("hreflang");
-    if (!(link && code)) {
-      return;
-    }
-    const href = link.getAttribute("href");
-    const { hash } = target.location;
-    if (href !== null && hash !== "") {
-      link.setAttribute("href", href.split("#")[0] + hash);
-    }
-    try {
-      localStorage.setItem(LOCALE_STORAGE_KEY, code);
-    } catch {
-      // Storage can be off; routing then stays off too (see the script).
-    }
-  });
+  target.addEventListener(
+    "click",
+    (event) => {
+      const link = chosenLink(event.target);
+      const code = link?.getAttribute("hreflang");
+      if (!(link && code)) {
+        return;
+      }
+      // Rewritten even without a fragment, so one left by an earlier click
+      // (one that opened a new tab) doesn't stick.
+      const href = link.getAttribute("href");
+      if (href !== null) {
+        link.setAttribute("href", href.split("#")[0] + target.location.hash);
+      }
+      try {
+        localStorage.setItem(LOCALE_STORAGE_KEY, code);
+      } catch {
+        // Storage can be off; routing then stays off too (see the script).
+      }
+    },
+    { capture: true }
+  );
 };
