@@ -272,7 +272,7 @@ const isFollowUp = (message: string): boolean => {
 /**
  * The texts that retrieve for the latest question, in rank order.
  *
- * The question itself always leads, verbatim: Orama's own tokenizer and BM25
+ * The question itself always leads, verbatim: the index's tokenizer and BM25
  * weighting see the whole sentence (version numbers, single-character CJK
  * words, `--flags`, and the bigrams a ja/zh index depends on all survive), and
  * a short question that names its subject ("Does it support i18n?") is never

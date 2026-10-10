@@ -183,42 +183,69 @@ const TERM =
   /[\p{L}\p{M}\p{N}]+(?:(?:['’](?=\p{L})|(?<=\p{N})[.,](?=\p{N}))[\p{L}\p{M}\p{N}]+)*/gu;
 
 /**
- * A term written entirely in Latin script (plus digits and the separators
- * {@link TERM} keeps within a word). {@link latinTokenizer} folds the
- * diacritics of Latin words (café → cafe), so a segmented index folds
- * Latin terms too — otherwise switching a Cyrillic- or Greek-default site to
- * the segmenting tokenizer would silently drop the unaccented-query matches
- * the default tokenizer provided. Only all-Latin terms fold: marks are
- * spelling elsewhere (Thai vowels and tones; the breve that separates
- * Cyrillic й from и), so a term carrying any other script keeps its marks.
+ * A term written entirely in Latin script (plus digits, the separators
+ * {@link TERM} keeps within a word, and the marks on its letters — lowercase
+ * İ is i plus a combining dot). {@link latinTokenizer} folds the diacritics
+ * of Latin words (café → cafe), so a segmented index folds Latin terms too —
+ * otherwise switching a Cyrillic- or Greek-default site to the segmenting
+ * tokenizer would silently drop the unaccented-query matches the default
+ * tokenizer provided. Only all-Latin terms fold: marks are spelling elsewhere
+ * (Thai vowels and tones; the breve that separates Cyrillic й from и), so a
+ * term carrying any other script keeps its marks.
  */
-const LATIN_TERM = /^[\p{Script=Latin}\p{N}'’.,]+$/u;
+const LATIN_TERM = /^[\p{Script=Latin}\p{M}\p{N}'’.,]+$/u;
 
-const MARKS = /\p{M}+/gu;
+/** A Latin letter and the combining marks on it, which NFD splits off. */
+const LATIN_ACCENTS = /(?<letter>\p{Script=Latin})\p{M}+/gu;
+
+/**
+ * Latin letters with no accent for NFD to split off, spelled the way an
+ * unaccented query types them. Orama's own diacritics table folds the same
+ * letters, though its English splitter cuts words at them first.
+ */
+const LATIN_FOLDS = new Map([
+  ["ß", "ss"],
+  ["æ", "ae"],
+  ["œ", "oe"],
+  ["ø", "o"],
+  ["ł", "l"],
+  ["đ", "d"],
+  ["ð", "d"],
+  ["ħ", "h"],
+  ["ı", "i"],
+  ["þ", "th"],
+]);
+
+const UNDECOMPOSED = new RegExp(`[${[...LATIN_FOLDS.keys()].join("")}]`, "gu");
+
+/**
+ * Fold the diacritics of lowercased text's Latin letters (café → cafe, Łódź →
+ * lodz, ışık and IŞIK → isik). Marks on any other script, and marks on no
+ * letter at all (the keycap in 1️⃣), are left in place.
+ */
+const foldLatin = (lowered: string): string =>
+  lowered
+    .normalize("NFD")
+    .replace(LATIN_ACCENTS, "$<letter>")
+    .replace(UNDECOMPOSED, (letter) => LATIN_FOLDS.get(letter) ?? letter);
 
 const foldDiacritics = (term: string): string =>
-  LATIN_TERM.test(term) ? term.normalize("NFD").replace(MARKS, "") : term;
+  LATIN_TERM.test(term) ? foldLatin(term) : term;
 
-const LATIN_SEPARATOR = /[^\p{Script=Latin}\p{M}0-9_'-]+/u;
+const LATIN_SEPARATOR = /[^\p{Script=Latin}0-9_'-]+/u;
 
 /**
  * Modeled on Orama's default tokenizer, with the splitter widened from the
  * accented vowels it keeps (`àèéìòóù`) to every Latin letter: Prüfung, når and
- * İletişim index as whole words rather than splitting at ü, å and İ. Accents
- * fold (café → cafe), letters with none to strip (ø, ß) stay as written, and
- * ASCII text tokenizes exactly as in Orama's.
+ * İletişim index as whole words rather than splitting at ü, å and İ. Words
+ * fold with {@link foldLatin}, and ASCII text tokenizes exactly as in Orama's.
  */
 const latinTokenizer = (): Tokenizer => ({
   language: "english",
   normalizationCache: new Map(),
   tokenize: (raw: string): string[] => [
     ...new Set(
-      raw
-        .normalize("NFD")
-        .toLowerCase()
-        .split(LATIN_SEPARATOR)
-        .map((term) => term.replace(MARKS, ""))
-        .filter(Boolean)
+      foldLatin(raw.toLowerCase()).split(LATIN_SEPARATOR).filter(Boolean)
     ),
   ],
 });

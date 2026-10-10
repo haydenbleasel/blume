@@ -879,8 +879,8 @@ describe("orama index helpers", () => {
     expect(
       indexes.map((db) => db.tokenizer.tokenize("Søk Straße Łódź"))
     ).toEqual([
-      ["søk", "straße", "łodz"],
-      ["søk", "straße", "łodz"],
+      ["sok", "strasse", "lodz"],
+      ["sok", "strasse", "lodz"],
     ]);
     const hits = await Promise.all(
       indexes.flatMap((db) =>
@@ -895,6 +895,54 @@ describe("orama index helpers", () => {
       ["/tr"],
       ["/sv"],
       ["/de"],
+      ["/tr"],
+    ]);
+  });
+
+  it("folds Latin letters with no accent to strip, and only marks on Latin letters", async () => {
+    const db = await buildOramaIndex([]);
+    // Dotless ı has no accent to strip, so unfolded, the same Turkish word
+    // indexed differently in a heading and in body text.
+    expect(db.tokenizer.tokenize("IŞIK ışık đăng Encyclopædia")).toEqual([
+      "isik",
+      "dang",
+      "encyclopaedia",
+    ]);
+    // A keycap is a mark on a digit, not an accent: it still splits.
+    expect(db.tokenizer.tokenize("1️⃣Install 2️⃣Configure")).toEqual([
+      "1",
+      "install",
+      "2",
+      "configure",
+    ]);
+  });
+
+  it("folds Latin words the same way on a segmented index", async () => {
+    const docs = [
+      {
+        content: "İletişim İstanbul Łódź",
+        description: "",
+        locale: "tr",
+        route: "/tr",
+        title: "X",
+      },
+      {
+        content: "日本語のページです。",
+        description: "",
+        locale: "ja",
+        route: "/ja",
+        title: "X",
+      },
+    ];
+    const db = await buildOramaIndex(docs, "ja");
+    const hits = await Promise.all(
+      ["istanbul", "iletisim", "lodz"].map((term) =>
+        queryOramaIndex(db, term, 5)
+      )
+    );
+    expect(hits.map((found) => found.map((doc) => doc.route))).toEqual([
+      ["/tr"],
+      ["/tr"],
       ["/tr"],
     ]);
   });
