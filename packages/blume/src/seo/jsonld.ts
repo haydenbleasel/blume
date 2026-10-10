@@ -87,7 +87,10 @@ export type AuthorInput = string | { name: string; url?: string };
 /** Inputs for a page's JSON-LD, all known at render time in RootLayout. */
 export interface StructuredDataInput {
   jsonLd?: JsonLdEntities;
-  /** The page's absolute `og:image`, emitted as the page node's `image`. */
+  /**
+   * The page's `og:image`, emitted as the page node's `image`. Absolute when
+   * `siteUrl` is set, otherwise root-relative like every other URL here.
+   */
   image?: string | null;
   /** The page's own byline, which wins over `jsonLd.author`. */
   authors?: AuthorInput | AuthorInput[];
