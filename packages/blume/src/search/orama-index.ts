@@ -1,10 +1,4 @@
-import {
-  components,
-  create,
-  insert,
-  insertMultiple,
-  search,
-} from "@orama/orama";
+import { create, insert, insertMultiple, search } from "@orama/orama";
 import type {
   AnyOrama,
   EnumArrComparisonOperator,
@@ -13,6 +7,8 @@ import type {
   SearchParamsFullText,
   Tokenizer,
 } from "@orama/orama";
+
+import { foldLatin, foldLatinTerm, stripSoftHyphens } from "./fold.ts";
 
 /**
  * The minimal document shape both the client-side search dialog and the
@@ -82,10 +78,9 @@ const byBoostedScore = (a: RankedMatch, b: RankedMatch): number =>
   b[1] * (b[2].boost ?? 1) - a[1] * (a[2].boost ?? 1);
 
 /**
- * The script whose text Orama's default tokenizer keeps mostly intact. Its
- * delimiter class is `/[^A-Za-zàèéìòóù0-9_'-]+/`, so every character outside
- * that set counts as a separator: text in any other script collapses to zero
- * tokens and every query silently returns no hits. Unspaced scripts are the
+ * The script {@link latinTokenizer} indexes. {@link LATIN_SEPARATOR} splits on
+ * every character of any other script, so such text collapses to zero tokens
+ * and every query silently returns no hits. Unspaced scripts are the
  * best-known casualty, but the failure is not about spacing — Russian, Greek,
  * Hebrew and Hindi lose their tokens the same way Japanese does.
  */
@@ -189,22 +184,23 @@ const BIGRAM_SCRIPTS =
 const TERM =
   /[\p{L}\p{M}\p{N}]+(?:(?:['’](?=\p{L})|(?<=\p{N})[.,](?=\p{N}))[\p{L}\p{M}\p{N}]+)*/gu;
 
+const LATIN_SEPARATOR = /[^\p{Script=Latin}0-9_'-]+/u;
+
 /**
- * A term written entirely in Latin script (plus digits and the separators
- * {@link TERM} keeps within a word). Orama's default tokenizer folds the
- * accented vowels it recognizes (café → cafe), so a segmented index folds
- * Latin terms too — otherwise switching a Cyrillic- or Greek-default site to
- * the segmenting tokenizer would silently drop the unaccented-query matches
- * the default tokenizer provided. Only all-Latin terms fold: marks are
- * spelling elsewhere (Thai vowels and tones; the breve that separates
- * Cyrillic й from и), so a term carrying any other script keeps its marks.
+ * Modeled on Orama's default tokenizer, with the splitter widened from the
+ * accented vowels it keeps (`àèéìòóù`) to every Latin letter: Prüfung, når and
+ * İletişim index as whole words rather than splitting at ü, å and İ. Words
+ * fold with {@link foldLatin}, and ASCII text tokenizes exactly as in Orama's.
  */
-const LATIN_TERM = /^[\p{Script=Latin}\p{N}'’.,]+$/u;
-
-const MARKS = /\p{M}+/gu;
-
-const foldDiacritics = (term: string): string =>
-  LATIN_TERM.test(term) ? term.normalize("NFD").replace(MARKS, "") : term;
+const latinTokenizer = (): Tokenizer => ({
+  language: "english",
+  normalizationCache: new Map(),
+  tokenize: (raw: string): string[] => [
+    ...new Set(
+      foldLatin(raw.toLowerCase()).split(LATIN_SEPARATOR).filter(Boolean)
+    ),
+  ],
+});
 
 /**
  * Emit every overlapping 2-character window of `run`, or the lone character.
@@ -249,10 +245,11 @@ const hasSegmenter = (
  * pipelines) indexes the same terms a composed query produces, and Latin
  * terms ("GDPR", English pages on a mixed-locale site) still match
  * case-insensitively, with their diacritics folded by
- * {@link foldDiacritics}. Returns `undefined` for scripts the default
+ * {@link foldLatinTerm}. Soft hyphens go first, so a word they break still
+ * segments whole. Returns `undefined` for scripts the default
  * tokenizer already serves ({@link resolveLocale} decides, so `sr-Latn` keeps
  * the default while `az-Cyrl` is segmented), and on runtimes without
- * `Intl.Segmenter`, where the caller falls back to Orama's default.
+ * `Intl.Segmenter`, where the caller falls back to {@link latinTokenizer}.
  *
  * On a {@link BIGRAM_INDEX_SCRIPTS} index, runs of adjacent
  * {@link BIGRAM_SCRIPTS} segments are joined and re-cut into character
@@ -292,10 +289,10 @@ const segmentingTokenizer = (locale?: string): Tokenizer | undefined => {
           return;
         }
         flush();
-        tokens.add(foldDiacritics(term));
+        tokens.add(foldLatinTerm(term));
       };
       for (const segment of segmenter.segment(
-        raw.normalize("NFC").toLowerCase()
+        stripSoftHyphens(raw).normalize("NFC").toLowerCase()
       )) {
         if (!segment.isWordLike) {
           flush();
@@ -329,7 +326,7 @@ const segmentingTokenizer = (locale?: string): Tokenizer | undefined => {
  */
 const translationTokenizers = new WeakMap<AnyOrama, Map<string, Tokenizer>>();
 
-/** A segmenting tokenizer for each document locale Orama's can't serve. */
+/** A segmenting tokenizer for each document locale in a non-Latin script. */
 const localeTokenizers = (documents: OramaDoc[]): Map<string, Tokenizer> => {
   const tokenizers = new Map<string, Tokenizer>();
   for (const code of new Set(documents.map((doc) => doc.locale ?? ""))) {
@@ -345,25 +342,18 @@ const localeTokenizers = (documents: OramaDoc[]): Map<string, Tokenizer> => {
  * One tokenizer that hands each text to its locale's: Orama passes the
  * language given to `insert` and `search` through to `tokenize`, so a page
  * inserted under `ja` and a query searched under `ja` both reach the Japanese
- * tokenizer, and everything else reaches Orama's own, exactly as on an index
- * with no translations.
+ * tokenizer, and everything else reaches {@link latinTokenizer}, exactly as on
+ * an index with no translations.
  */
 const dispatchingTokenizer = (
   tokenizers: Map<string, Tokenizer>
 ): Tokenizer => {
-  const standard = components.tokenizer.createTokenizer();
+  const standard = latinTokenizer();
   return {
     language: standard.language,
     normalizationCache: standard.normalizationCache,
-    tokenize: (raw, language, prop, withCache) =>
-      // Orama's tokenizer rejects a language other than its own, so the
-      // locale that picked it is not passed on.
-      (tokenizers.get(language ?? "") ?? standard).tokenize(
-        raw,
-        undefined,
-        prop,
-        withCache
-      ),
+    tokenize: (raw, language) =>
+      (tokenizers.get(language ?? "") ?? standard).tokenize(raw),
   };
 };
 
@@ -372,10 +362,10 @@ const dispatchingTokenizer = (
  * Orama client loader (browser), the MCP server, and assistant grounding (Node),
  * so ranking is identical wherever docs are queried. `locale` — the site's
  * `i18n.defaultLocale` — swaps in a word-segmenting tokenizer for every
- * non-Latin script, all of which Orama's default tokenizer reduces to zero
+ * non-Latin script, all of which {@link latinTokenizer} reduces to zero
  * tokens. A non-Latin default's tokenizer serves every page: Latin words
  * survive segmentation intact, so English pages on a segmented index stay
- * searchable. A Latin default keeps Orama's tokenizer for its Latin-script
+ * searchable. A Latin default keeps {@link latinTokenizer} for its Latin-script
  * pages, and each page in a non-Latin locale (the Japanese and Hindi
  * translations of an English site) is indexed with its own locale's tokenizer.
  */
@@ -400,9 +390,10 @@ export const buildOramaIndex = async (
     }
     translationTokenizers.set(db, translations);
   } else {
-    db = tokenizer
-      ? create({ components: { tokenizer }, schema: SCHEMA })
-      : create({ schema: SCHEMA });
+    db = create({
+      components: { tokenizer: tokenizer ?? latinTokenizer() },
+      schema: SCHEMA,
+    });
     await insertMultiple(db, rows);
   }
   if (documents.some((doc) => (doc.boost ?? 1) !== 1)) {
@@ -492,8 +483,8 @@ const boostedScore = (hit: Hit): number =>
  * On an index whose translations have tokenizers of their own, a query scoped
  * to a locale is tokenized with that locale's tokenizer. An unscoped query
  * searches each locale's pages with its own tokenizer, and the Latin-script
- * pages with Orama's, then merges the matches by score: every search runs over
- * the one index, so their scores share its term statistics.
+ * pages with {@link latinTokenizer}, then merges the matches by score: every
+ * search runs over the one index, so their scores share its term statistics.
  */
 export const queryOramaIndex = async (
   db: AnyOrama,

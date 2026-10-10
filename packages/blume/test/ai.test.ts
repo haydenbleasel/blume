@@ -1751,6 +1751,11 @@ describe("relevantExcerpt", () => {
     expect(excerpt).toContain("café latte");
   });
 
+  it("centers on a match the index found by folding accents", () => {
+    const content = `${"x ".repeat(300)}Die Straße ist lang ${"y ".repeat(200)}`;
+    expect(relevantExcerpt(content, "strasse", 60)).toContain("Die Straße");
+  });
+
   it("falls back to regex term extraction without Intl.Segmenter", () => {
     const original = Intl.Segmenter;
     // SAFETY: deliberately unsetting the readonly global to exercise the
@@ -1813,6 +1818,20 @@ describe("sectionExcerpt", () => {
     expect(excerpt).not.toContain("## Cleanup");
     expect(excerpt.startsWith("…")).toBe(true);
     expect(excerpt.endsWith("…")).toBe(true);
+  });
+
+  it("picks the section a folded query names", () => {
+    // `prufung` retrieves the page through the index's accent folding, so the
+    // excerpt must find Prüfung too rather than fall back to the intro.
+    const content = [
+      "## Einleitung",
+      "Lorem ipsum dolor sit amet. ".repeat(20),
+      "## Prüfung",
+      "Die Prüfung findet jährlich statt.",
+    ].join("\n");
+    expect(sectionExcerpt(content, "prufung", 120)).toBe(
+      "…\n\n## Prüfung\nDie Prüfung findet jährlich statt."
+    );
   });
 
   it("orders multiple selected sections by their source position", () => {

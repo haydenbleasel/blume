@@ -53,17 +53,17 @@ import { guideById } from "../_guides/guides.ts";
 
   <h2>How Blume tokenizes CJK text</h2>
   <p>
-    Orama's standard tokenizer splits text on anything that isn't a basic Latin
-    letter, a digit, or one of a few accented vowels. That's not only a spacing
-    problem: every Han, kana and Hangul character counts as a separator, so on
-    its own it would index none of a CJK page's words.
+    The standard tokenizer splits text on anything that isn't a Latin letter or
+    a digit. That's not only a spacing problem: every Han, kana and Hangul
+    character counts as a separator, so on its own it would index none of a CJK
+    page's words.
   </p>
   <p>
     So for a locale whose code resolves to a non-Latin script, Blume uses a
     tokenizer built on <code>Intl.Segmenter</code>, the word segmenter built
     into browsers and Node.js. With a non-Latin default locale, that tokenizer
     reads every page. With a Latin-script default, like English, the Latin
-    pages keep Orama's tokenizer and each non-Latin translation gets its own
+    pages use the standard tokenizer and each non-Latin translation gets its own
     locale's. For Chinese and Japanese, Blume also indexes Han, hiragana and
     katakana as overlapping pairs of characters, so 署名検証 is stored as
     署名, 名検 and 検証. A query first looks for pages that carry all of its
@@ -637,7 +637,7 @@ search: typesense({
   <h2>Troubleshooting</h2>
   <h3>A translated page matches its code terms but not its words</h3>
   <p>
-    Orama indexed the page with its standard tokenizer, which keeps only the
+    Blume indexed the page with the standard tokenizer, which keeps only the
     Latin words, because the locale's code doesn't resolve to a CJK script.{" "}
     <code>jp</code>, <code>cn</code> and <code>kr</code> are country codes,
     not language codes: use <code>ja</code>, <code>zh</code> (or{" "}

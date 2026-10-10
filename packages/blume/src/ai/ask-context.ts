@@ -1,6 +1,11 @@
 import { normalizeRoute } from "../core/base-path.ts";
 import { nextFenceState } from "../core/code-fences.ts";
 import type { FenceState } from "../core/code-fences.ts";
+import {
+  accentInsensitive,
+  foldLatinTerm,
+  stripSoftHyphens,
+} from "../search/fold.ts";
 import { buildOramaIndex, queryOramaIndex } from "../search/orama-index.ts";
 import type { OramaDoc } from "../search/orama-index.ts";
 
@@ -196,7 +201,7 @@ const hasSegmenter = (
 ): segmenter is typeof Intl.Segmenter => typeof segmenter === "function";
 
 const segmentQuery = (query: string): string[] => {
-  const lowered = query.normalize("NFC").toLowerCase();
+  const lowered = stripSoftHyphens(query).normalize("NFC").toLowerCase();
   if (!hasSegmenter(Intl.Segmenter)) {
     return lowered.match(TERM) ?? [];
   }
@@ -210,9 +215,15 @@ const segmentQuery = (query: string): string[] => {
   return pieces;
 };
 
-/** Lowercase word tokens of `text`, cut at the same boundaries as a query. */
+/**
+ * Lowercase word tokens of `text`, cut at the same boundaries as a query.
+ * Latin words fold the way the search index folds them, so the section a page
+ * was retrieved for (Prüfung, for the question `prufung`) is the one excerpted.
+ */
 const tokenize = (text: string): string[] =>
-  segmentQuery(text).flatMap((piece) => piece.match(TERM) ?? []);
+  segmentQuery(text).flatMap((piece) =>
+    (piece.match(TERM) ?? []).map((term) => foldLatinTerm(term))
+  );
 
 /** Distinct, meaningful lowercase terms from a query (drops stopwords). */
 const queryTerms = (query: string): string[] =>
@@ -272,7 +283,7 @@ const isFollowUp = (message: string): boolean => {
 /**
  * The texts that retrieve for the latest question, in rank order.
  *
- * The question itself always leads, verbatim: Orama's own tokenizer and BM25
+ * The question itself always leads, verbatim: the index's tokenizer and BM25
  * weighting see the whole sentence (version numbers, single-character CJK
  * words, `--flags`, and the bigrams a ja/zh index depends on all survive), and
  * a short question that names its subject ("Does it support i18n?") is never
@@ -350,13 +361,15 @@ export const relevantExcerpt = (
     return `${prefix}${slice}${suffix}`;
   };
 
-  // Case-insensitive matching via regex rather than `indexOf` on a lowercased
-  // copy: length-changing case mappings (Turkish İ → "i" + U+0307) would shift
-  // every index in the copy, sliding the excerpt window off the match. Terms
-  // come from TERM (letters, marks and digits only), so no regex escaping.
+  // Case- and accent-insensitive matching via regex rather than `indexOf` on
+  // a folded copy: length-changing mappings (Turkish İ → "i" + U+0307, ß →
+  // "ss") would shift every index in the copy, sliding the excerpt window off
+  // the match.
   const positions: number[] = [];
   for (const term of queryTerms(query)) {
-    for (const match of trimmed.matchAll(new RegExp(term, "giu"))) {
+    for (const match of trimmed.matchAll(
+      new RegExp(accentInsensitive(term), "giu")
+    )) {
       positions.push(match.index);
     }
   }
