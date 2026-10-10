@@ -391,6 +391,16 @@ describe("search text helpers", () => {
     );
   });
 
+  it("marks and excerpts matches the index found by folding accents", () => {
+    // The index finds Prüfung for `prufung`; matching the raw query instead
+    // showed the page's opening with nothing marked.
+    expect(highlight("Prüfung der Anlage", "prufung")).toBe(
+      "<mark>Prüfung</mark> der Anlage"
+    );
+    const content = `${"Lorem ipsum dolor sit amet. ".repeat(20)}Die Prüfung findet jährlich statt.`;
+    expect(excerptFor("desc", content, "prufung")).toContain("Die Prüfung");
+  });
+
   it("returns a leading window and ellipsis for an empty query", () => {
     // An empty query yields no tokens, so matchIndex short-circuits to -1.
     const snippet = matchSnippet("a".repeat(50), "", 10);

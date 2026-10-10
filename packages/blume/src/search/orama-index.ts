@@ -8,6 +8,8 @@ import type {
   Tokenizer,
 } from "@orama/orama";
 
+import { foldLatin, foldLatinTerm, stripSoftHyphens } from "./fold.ts";
+
 /**
  * The minimal document shape both the client-side search dialog and the
  * server-side MCP `search_docs` tool index. Mirrors the `blume-search.json`
@@ -182,56 +184,6 @@ const BIGRAM_SCRIPTS =
 const TERM =
   /[\p{L}\p{M}\p{N}]+(?:(?:['’](?=\p{L})|(?<=\p{N})[.,](?=\p{N}))[\p{L}\p{M}\p{N}]+)*/gu;
 
-/**
- * A term written entirely in Latin script (plus digits, the separators
- * {@link TERM} keeps within a word, and the marks on its letters — lowercase
- * İ is i plus a combining dot). {@link latinTokenizer} folds the diacritics
- * of Latin words (café → cafe), so a segmented index folds Latin terms too —
- * otherwise switching a Cyrillic- or Greek-default site to the segmenting
- * tokenizer would silently drop the unaccented-query matches the default
- * tokenizer provided. Only all-Latin terms fold: marks are spelling elsewhere
- * (Thai vowels and tones; the breve that separates Cyrillic й from и), so a
- * term carrying any other script keeps its marks.
- */
-const LATIN_TERM = /^[\p{Script=Latin}\p{M}\p{N}'’.,]+$/u;
-
-/** A Latin letter and the combining marks on it, which NFD splits off. */
-const LATIN_ACCENTS = /(?<letter>\p{Script=Latin})\p{M}+/gu;
-
-/**
- * Latin letters with no accent for NFD to split off, spelled the way an
- * unaccented query types them. Orama's own diacritics table folds the same
- * letters, though its English splitter cuts words at them first.
- */
-const LATIN_FOLDS = new Map([
-  ["ß", "ss"],
-  ["æ", "ae"],
-  ["œ", "oe"],
-  ["ø", "o"],
-  ["ł", "l"],
-  ["đ", "d"],
-  ["ð", "d"],
-  ["ħ", "h"],
-  ["ı", "i"],
-  ["þ", "th"],
-]);
-
-const UNDECOMPOSED = new RegExp(`[${[...LATIN_FOLDS.keys()].join("")}]`, "gu");
-
-/**
- * Fold the diacritics of lowercased text's Latin letters (café → cafe, Łódź →
- * lodz, ışık and IŞIK → isik). Marks on any other script, and marks on no
- * letter at all (the keycap in 1️⃣), are left in place.
- */
-const foldLatin = (lowered: string): string =>
-  lowered
-    .normalize("NFD")
-    .replace(LATIN_ACCENTS, "$<letter>")
-    .replace(UNDECOMPOSED, (letter) => LATIN_FOLDS.get(letter) ?? letter);
-
-const foldDiacritics = (term: string): string =>
-  LATIN_TERM.test(term) ? foldLatin(term) : term;
-
 const LATIN_SEPARATOR = /[^\p{Script=Latin}0-9_'-]+/u;
 
 /**
@@ -293,7 +245,8 @@ const hasSegmenter = (
  * pipelines) indexes the same terms a composed query produces, and Latin
  * terms ("GDPR", English pages on a mixed-locale site) still match
  * case-insensitively, with their diacritics folded by
- * {@link foldDiacritics}. Returns `undefined` for scripts the default
+ * {@link foldLatinTerm}. Soft hyphens go first, so a word they break still
+ * segments whole. Returns `undefined` for scripts the default
  * tokenizer already serves ({@link resolveLocale} decides, so `sr-Latn` keeps
  * the default while `az-Cyrl` is segmented), and on runtimes without
  * `Intl.Segmenter`, where the caller falls back to {@link latinTokenizer}.
@@ -336,10 +289,10 @@ const segmentingTokenizer = (locale?: string): Tokenizer | undefined => {
           return;
         }
         flush();
-        tokens.add(foldDiacritics(term));
+        tokens.add(foldLatinTerm(term));
       };
       for (const segment of segmenter.segment(
-        raw.normalize("NFC").toLowerCase()
+        stripSoftHyphens(raw).normalize("NFC").toLowerCase()
       )) {
         if (!segment.isWordLike) {
           flush();

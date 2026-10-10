@@ -909,11 +909,50 @@ describe("orama index helpers", () => {
       "encyclopaedia",
     ]);
     // A keycap is a mark on a digit, not an accent: it still splits.
-    expect(db.tokenizer.tokenize("1️⃣Install 2️⃣Configure")).toEqual([
-      "1",
-      "install",
-      "2",
-      "configure",
+    expect(
+      db.tokenizer.tokenize("1\uFE0F\u20E3Install 2\uFE0F\u20E3Configure")
+    ).toEqual(["1", "install", "2", "configure"]);
+  });
+
+  it("folds the Latin half of a term the segmenter keeps whole", async () => {
+    // Latin and Devanagari letters are both ALetter to UAX #29, so the
+    // segmenter joins them by rule, not dictionary, on every ICU build.
+    const db = await buildOramaIndex(
+      [
+        {
+          content: "मिलते हैं caféनमस्ते पर",
+          description: "",
+          locale: "hi",
+          route: "/hi",
+          title: "X",
+        },
+      ],
+      "hi"
+    );
+    const hits = await queryOramaIndex(db, "cafeनमस्ते", 5);
+    expect(hits.map((doc) => doc.route)).toEqual(["/hi"]);
+  });
+
+  it("keeps a word a soft hyphen breaks whole, on either tokenizer", async () => {
+    const docs = [
+      {
+        content: "Die Prüfungs\u00ADordnung gilt.",
+        description: "",
+        locale: "de",
+        route: "/de",
+        title: "X",
+      },
+    ];
+    const indexes = await Promise.all([
+      buildOramaIndex(docs, "en"),
+      buildOramaIndex(docs, "ja"),
+    ]);
+    const hits = await Promise.all(
+      indexes.map((db) => queryOramaIndex(db, "prufungsordnung", 5))
+    );
+    expect(hits.map((found) => found.map((doc) => doc.route))).toEqual([
+      ["/de"],
+      ["/de"],
     ]);
   });
 

@@ -1,5 +1,7 @@
 import { escape } from "html-escaper";
 
+import { accentInsensitive } from "../../../search/fold.ts";
+
 /** A single result rendered in the search dialog. */
 export interface SearchHit {
   url: string;
@@ -96,16 +98,19 @@ export const SEARCH_LIMIT = 12;
  */
 export const RESULT_POOL = 48;
 
-const REGEXP_SPECIAL = /[$()*+.?[\\\]^{|}]/gu;
 const WORD_BREAK = /\s+/u;
 
-/** Split a query into escaped, non-empty search tokens. */
+/**
+ * Split a query into non-empty search tokens, each a regex source that
+ * matches it whatever accents the text carries: the index folds Prüfung to
+ * prufung, so a page found by `prufung` is marked and excerpted there too.
+ */
 const queryTokens = (query: string): string[] =>
   query
     .trim()
     .split(WORD_BREAK)
     .filter(Boolean)
-    .map((token) => token.replaceAll(REGEXP_SPECIAL, String.raw`\$&`));
+    .map((token) => accentInsensitive(token));
 
 /**
  * Wrap query matches in `<mark>`, HTML-escaping the source text. Matching runs
@@ -159,7 +164,10 @@ export const sanitizeExcerpt = (html: string): string =>
     })
     .join("");
 
-/** First index in `text` where any query token matches (case-insensitive). */
+/**
+ * First index in `text` where any query token matches, ignoring case and
+ * accents.
+ */
 const matchIndex = (text: string, query: string): number => {
   const tokens = queryTokens(query);
   if (tokens.length === 0) {
