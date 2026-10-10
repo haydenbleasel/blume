@@ -1,5 +1,16 @@
 # blume
 
+## 2.3.0
+
+### Minor Changes
+
+- 34b3e0f: Add SEO options for docs that live inside another site: shared JSON-LD entity ids and attribution (`seo.jsonLd`), a default social image in place of generated cards (`seo.og.image`), publication dates from git for pages without a front matter `date` (`seo.datePublished: "git"`), and hreflang alternates in the sitemap (`seo.sitemap: { alternates: true }`). Page JSON-LD now also carries the page's social image and credits its front matter `authors`, and hreflang links leave out `noindex`, hidden, and canonical-elsewhere translations.
+
+### Patch Changes
+
+- e41c71f: Search now keeps words whole whatever Latin letters they hold. Orama's default tokenizer split words at any letter beyond ASCII and a few accented vowels, so Swedish "när" was indexed as "n" and "r" and matched unrelated pages, and German "Prüfung" as "pr" and "fung". Blume now keeps every Latin letter, folding accents the way Orama already folded "café" and spelling ø, ł and ß as o, l and ss, in the default Orama search dialog, the MCP server's `search_docs`, and the assistant. A soft hyphen (`&shy;`) no longer splits the word it sits in, and a result found by folding is highlighted and excerpted at the accented word. ASCII text is tokenized exactly as before.
+- 2a0628c: The language switcher keeps the reader's place: the chosen link carries the current URL fragment.
+
 ## 2.2.2
 
 ### Patch Changes
