@@ -3,7 +3,12 @@ import { jsonSchema, tool } from "ai";
 import { normalizeRoute } from "../core/base-path.ts";
 import { queryOramaIndex } from "../search/orama-index.ts";
 import type { OramaDoc } from "../search/orama-index.ts";
-import { askIndex, readerScope, sectionExcerpt } from "./ask-context.ts";
+import {
+  askIndex,
+  excerptHeading,
+  readerScope,
+  sectionExcerpt,
+} from "./ask-context.ts";
 import type { AskData, AskPage, ReaderScope } from "./ask-context.ts";
 
 /**
@@ -37,7 +42,7 @@ const PAGE_CHARS = 20_000;
 
 /** A result block, headed the way the injected excerpts are, for citing. */
 const block = (doc: OramaDoc, body: string): string =>
-  `## ${doc.title} (${doc.route})\n${body}`;
+  `${excerptHeading(doc)}\n${body}`;
 
 /**
  * Search the docs for `query` within the reader's scope: the most relevant
@@ -66,7 +71,9 @@ export const searchDocs = async (
 
 /**
  * The route a model asked for, as the snapshot keys it: a full URL on the
- * site becomes its path, and a query string or fragment is dropped.
+ * site becomes its path, a query string or fragment is dropped, and
+ * percent-escapes are decoded (a cited route escapes whitespace and
+ * parentheses; see `excerptHeading`).
  */
 const routeOf = (data: AskData, requested: string): string => {
   let path = requested.trim();
@@ -74,6 +81,11 @@ const routeOf = (data: AskData, requested: string): string => {
     path = path.slice(data.site.replace(/\/$/u, "").length) || "/";
   }
   path = path.replace(/[?#].*$/u, "");
+  try {
+    path = decodeURI(path);
+  } catch {
+    // Malformed percent sequence — look it up as written.
+  }
   return normalizeRoute(path.startsWith("/") ? path : `/${path}`);
 };
 
@@ -106,7 +118,7 @@ export const createAskTools = (data: AskData) => {
     return {
       read_page: tool({
         description:
-          "Read one documentation page in full, by its route (the path in parentheses after a page title, such as /docs/getting-started).",
+          "Read one documentation page in full, by its route (the link target in the heading that opens a page's excerpt, such as /docs/getting-started).",
         execute: ({ route }) => Promise.resolve(readPage(data, byRoute, route)),
         inputSchema: jsonSchema<{ route: string }>({
           additionalProperties: false,
@@ -122,7 +134,7 @@ export const createAskTools = (data: AskData) => {
       }),
       search_docs: tool({
         description:
-          "Search this project's documentation. Returns the most relevant excerpt of each matching page, headed by its title and route.",
+          "Search this project's documentation. Returns the most relevant excerpt of each matching page, headed by a Markdown link to the page.",
         execute: ({ query }) => searchDocs(data, scope, query),
         inputSchema: jsonSchema<{ query: string }>({
           additionalProperties: false,

@@ -52,7 +52,7 @@ const EXCERPT_CHARS = 2000;
 const CONTEXT_BUDGET = 10_000;
 /**
  * Smallest excerpt worth injecting. A long page pushed under a tiny residual
- * budget would get a full `## Title (/route)` heading over a fragment of a few
+ * budget would get a full `## [Title](/route)` heading over a fragment of a few
  * dozen characters — a section the model is invited to cite but that grounds
  * nothing. Short pages that fit whole are still injected below this floor.
  */
@@ -233,11 +233,28 @@ const queryTerms = (query: string): string[] =>
 
 /**
  * The grounding preamble. The model is told to answer strictly from the injected
- * excerpts and to cite the pages it used as Markdown links (each excerpt is
- * headed by `## Title (/route)`), so citations render as real links in the panel.
+ * excerpts and to cite the pages it used as Markdown links, so citations render
+ * as real links in the panel. Each excerpt is headed by the very link to cite
+ * (`## [Title](/route)`), so a model that copies the heading copies a link.
  */
 const BASE_INSTRUCTION =
-  "You are a helpful documentation assistant for this project. Answer the user's question using ONLY the documentation excerpts below. Each excerpt is headed by its page as `## Page Title (/route)`. If the answer is not covered by the excerpts, say you don't know and suggest where in the docs to look — do not invent details. Always cite the pages you drew from, and write every citation as a Markdown link to that page using its route, e.g. [Page Title](/route).";
+  "You are a helpful documentation assistant for this project. Answer the user's question using ONLY the documentation excerpts below. Each excerpt opens with a heading that links to its page, `## [Page Title](/route)`. If the answer is not covered by the excerpts, say you don't know and suggest where in the docs to look — do not invent details. Always cite the pages you drew from with the link in the heading that opens their excerpt, written exactly as it is there: [Page Title](/route).";
+
+/**
+ * An excerpt's heading: the Markdown link the model cites the page with. A
+ * bracket or backslash in the title, or whitespace or a parenthesis in the
+ * route, would break the link, so those are escaped; the rest of the route
+ * stays as the reader sees it (`/ja/ポイント`).
+ */
+export const excerptHeading = (
+  doc: Pick<OramaDoc, "route" | "title">
+): string => {
+  const text = doc.title.replaceAll(/[\\[\]]/gu, String.raw`\$&`);
+  const target = doc.route.replaceAll(/[\s()]/gu, (char) =>
+    encodeURIComponent(char).replace("(", "%28").replace(")", "%29")
+  );
+  return `## [${text}](${target})`;
+};
 
 /**
  * Appended when the endpoint gives the model the docs tools (see
@@ -783,7 +800,7 @@ export const createAskContext = (
         Math.min(excerptChars, budget)
       );
       budget -= body.length;
-      sections.push(`## ${doc.title} (${doc.route})${label}\n${body}`);
+      sections.push(`${excerptHeading(doc)}${label}\n${body}`);
     };
 
     if (current) {
