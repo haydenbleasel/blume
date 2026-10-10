@@ -256,6 +256,11 @@ export interface PageRecord {
   unknownProps?: ElementUse[];
   /** Resolved "last updated" ISO date, when the feature is enabled. */
   lastModified?: string;
+  /**
+   * The git commit that added the source file, as an ISO date, when
+   * `seo.datePublished` is `"git"` and front matter carries no `date`.
+   */
+  published?: string;
   /** Absolute paths of files this page `<include>`s, transitively. Drives the
    * dev-server invalidation edge from a partial to the pages that splice it. */
   includes?: string[];
@@ -484,6 +489,11 @@ export interface RouteManifestEntry {
   aiExclude?: boolean;
   /** Resolved "last updated" ISO date, when the feature is enabled. */
   lastModified?: string;
+  /**
+   * The git commit that added the source file, as an ISO date, when
+   * `seo.datePublished` is `"git"` and front matter carries no `date`.
+   */
+  published?: string;
 }
 
 /** The generated runtime contract between core and the Astro project. */

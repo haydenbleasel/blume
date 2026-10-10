@@ -394,8 +394,11 @@ export const loadConfig = async (
   const site = config.deployment.options.site ?? options.devServerUrl;
 
   // OG images need an absolute `og:image`, so they default on once a site URL
-  // is known and off otherwise. An explicit `seo.og.enabled` always wins.
-  const ogEnabled = config.seo.og.enabled ?? Boolean(site);
+  // is known and off otherwise — and off beside a default `seo.og.image`,
+  // which every page shows instead of its card. An explicit `seo.og.enabled`
+  // always wins.
+  const ogEnabled =
+    config.seo.og.enabled ?? (Boolean(site) && !config.seo.og.image);
 
   return {
     config: {

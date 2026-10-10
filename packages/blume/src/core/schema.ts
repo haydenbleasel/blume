@@ -207,10 +207,9 @@ const changelogMetaSchema = z.strictObject({
 
 /**
  * A post author: a bare name/handle, or an object with a name plus optional
- * avatar/URL. The object is passthrough so richer author metadata (social
- * handles, roles) survives untouched — Blume doesn't render authors yet, so
- * this exists to preserve the field (common on blog/changelog pages) rather
- * than have a strict scan reject it.
+ * avatar/URL. Blume credits the name and URL in the page's JSON-LD; the object
+ * is passthrough so richer author metadata (social handles, roles) survives
+ * untouched rather than have a strict scan reject it.
  */
 const authorSchema = z.union([
   z.string(),
@@ -254,7 +253,7 @@ const pageMetaBaseSchema = z.strictObject({
     .optional(),
   /** How this page's endpoint authenticates, over the site's `api.auth`. */
   authMethod: z.enum(AUTH_METHODS).optional(),
-  /** Post author(s) for blog/changelog content; preserved, not yet rendered. */
+  /** Post author(s) for blog/changelog content, credited in JSON-LD. */
   authors: z.union([authorSchema, z.array(authorSchema)]).optional(),
   changelog: changelogMetaSchema.optional(),
   /** Publish date for feed-backed content like blog/changelog. */
@@ -1609,8 +1608,9 @@ const ogConfigSchema = z.strictObject({
   /**
    * Generate a per-page Open Graph image. Defaults to on once a deployment
    * site URL is known (set or auto-detected) and off otherwise, since
-   * `og:image` must be absolute to be useful to crawlers — resolved in
-   * `loadConfig`. An explicit value here always wins.
+   * `og:image` must be absolute to be useful to crawlers, and off when `image`
+   * sets a default every page would show instead — resolved in `loadConfig`.
+   * An explicit value here always wins.
    */
   enabled: z.boolean().optional(),
   /**
@@ -1619,6 +1619,13 @@ const ogConfigSchema = z.strictObject({
    * families are fetched from Google Fonts at build.
    */
   fonts: z.array(ogFontSchema).optional(),
+  /**
+   * Default social image for pages without their own `seo.image`, in place of
+   * the generated card: one path or URL, or one per locale (resolved like any
+   * localizable label). A root-relative path is served under the deployment
+   * base.
+   */
+  image: localizableLabelSchema.optional(),
   /**
    * Local SVG used in the generated card instead of the site logo; `false`
    * renders the card without any brand mark.
@@ -1729,6 +1736,29 @@ type SoftwareResolved = z.output<typeof softwareConfigSchema>;
 /** Discoverability features: OG images, feeds, sitemap, structured data. */
 const seoConfigFields = {
   /**
+   * Date pages without a front matter `date` by the git commit that added
+   * their source file, following exact renames. Off by default.
+   */
+  datePublished: z.union([z.literal(false), z.literal("git")]).default(false),
+  /**
+   * Structured-data entities shared with a parent site (`example.com/docs`),
+   * referenced by absolute `@id` instead of defined again (see `seo/jsonld.ts`).
+   */
+  jsonLd: z
+    .strictObject({
+      /** Credited on pages without their own `authors`. */
+      author: z.strictObject({ "@id": z.url() }).optional(),
+      /** The Organization's `@id`; `seo.organization` still adds its details. */
+      organizationId: z.url().optional(),
+      /** Every page's publisher, over the Organization. */
+      publisher: z.strictObject({ "@id": z.url() }).optional(),
+      /** Emit the WebSite node. Defaults to true unless `websiteId` is set. */
+      website: z.boolean().optional(),
+      /** The WebSite's `@id`, which every page names as `isPartOf`. */
+      websiteId: z.url().optional(),
+    })
+    .prefault({}),
+  /**
    * Meta tags written into every page's head, name to content: site
    * verification, `theme-color`, and anything else Blume has no setting for.
    * A tag Blume writes itself is refused with the setting that controls it.
@@ -1754,8 +1784,16 @@ const seoConfigFields = {
   /** Generate robots.txt (with a Sitemap reference when available). */
   robots: z.boolean().default(true),
   rss: rssConfigSchema.prefault({}),
-  /** Generate sitemap.xml (requires deployment.site). */
-  sitemap: z.boolean().default(true),
+  /**
+   * Generate sitemap.xml (requires deployment.site). `{ alternates: true }`
+   * also lists each page's translations as hreflang links.
+   */
+  sitemap: z
+    .union([
+      z.boolean(),
+      z.strictObject({ alternates: z.boolean().default(false) }),
+    ])
+    .default(true),
   /** The documented product, as a homepage `SoftwareApplication` node. */
   software: z
     .union([z.boolean(), softwareConfigSchema])

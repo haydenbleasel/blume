@@ -1100,6 +1100,12 @@ export interface OgPaletteConfig {
 /** Per-page Open Graph image generation. */
 export interface OgConfig {
   /**
+   * Default social image for pages without their own `seo.image`, in place of
+   * the generated card (which then defaults off): one path or URL, or one per
+   * locale, like any localizable label.
+   */
+  image?: string | Record<string, string>;
+  /**
    * Card subtitle. Defaults to the site description; a string overrides it,
    * `false` renders the card without one.
    */
@@ -1224,6 +1230,28 @@ export interface SoftwareConfig {
 /** Discoverability: OG images, feeds, sitemap, robots, and structured data. */
 export interface SeoConfig {
   /**
+   * Structured-data entities shared with a parent site (`example.com/docs`),
+   * referenced by absolute `@id` instead of defined again.
+   */
+  jsonLd?: {
+    /** The WebSite's `@id`, which every page names as `isPartOf`. */
+    websiteId?: string;
+    /** The Organization's `@id`; `organization` still adds its details. */
+    organizationId?: string;
+    /** Credited on pages without their own `authors`. */
+    author?: { "@id": string };
+    /** Every page's publisher, over the Organization. */
+    publisher?: { "@id": string };
+    /** Emit the WebSite node. Defaults to true unless `websiteId` is set. */
+    website?: boolean;
+  };
+  /**
+   * Date pages without a front matter `date` by the git commit that added
+   * their source file, following exact renames. Defaults to `false`.
+   */
+  datePublished?: false | "git";
+
+  /**
    * Meta tags written into every page's head, name to content: site
    * verification tokens, `theme-color`, an app banner, and anything else
    * Blume has no setting for. `og:*`, `fb:*`, and `article:*` tags render
@@ -1262,7 +1290,12 @@ export interface SeoConfig {
   /** RSS/Atom feeds. */
   rss?: RssConfig;
   /** Generate sitemap.xml (requires `deployment.site`). Defaults to `true`. */
-  sitemap?: boolean;
+  sitemap?:
+    | boolean
+    | {
+        /** List each page's translations as hreflang links. Defaults to `false`. */
+        alternates?: boolean;
+      };
   /**
    * The documented product, added to the homepage's JSON-LD as a
    * `SoftwareApplication` node. `true` takes every default (name and

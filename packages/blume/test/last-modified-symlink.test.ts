@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 
 import { join } from "pathe";
 
-import { gitLastModifiedTimes, realPath } from "../src/core/last-modified.ts";
+import { gitFileDates, realPath } from "../src/core/last-modified.ts";
 import { scanProject } from "../src/core/project-graph.ts";
 
 /**
@@ -101,7 +101,7 @@ describe("git last-modified dates through a symlinked project path", () => {
     const { link } = await linkedProject();
     const page = join(link, "docs", "index.md");
     expect(
-      gitLastModifiedTimes(link, [join(link, "docs")], [page]).get(page)
+      gitFileDates(link, [join(link, "docs")], [page]).modified.get(page)
     ).toMatch(/^\d{4}-\d{2}-\d{2}T/u);
   });
 });

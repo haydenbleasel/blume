@@ -7,7 +7,8 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "pathe";
 
 import {
-  gitLastModifiedTimes,
+  datePublishedShallowWarning,
+  gitFileDates,
   gitRepositoryRoot,
   isShallowGitRepository,
   lastModifiedShallowWarning,
@@ -65,6 +66,24 @@ const initRepo = (dir: string): string => {
   return runGit(dir, ["rev-parse", "--show-toplevel"]);
 };
 
+/** Stage everything and commit at a pinned date; commits run within the same second otherwise. */
+const commitAt = (root: string, iso: string, message: string): void => {
+  runGit(root, ["add", "-A"]);
+  execFileSync(
+    // oxlint-disable-next-line sonarjs/no-os-command-from-path
+    "git",
+    ["-C", root, "-c", "commit.gpgsign=false", "commit", "-m", message],
+    {
+      env: {
+        ...fixtureGitEnv(),
+        GIT_AUTHOR_DATE: iso,
+        GIT_COMMITTER_DATE: iso,
+      },
+      stdio: "ignore",
+    }
+  );
+};
+
 describe("resolveLastModifiedConfig", () => {
   it("disables on false", () => {
     expect(resolveLastModifiedConfig(false)).toEqual({
@@ -104,7 +123,7 @@ describe("parseGitLog", () => {
       "A\tdocs/c.mdx",
     ].join("\n");
 
-    const times = parseGitLog(output);
+    const times = parseGitLog(output).modified;
     // a.mdx appears in both commits; the newer (first-seen) date wins.
     expect(times.get("docs/a.mdx")).toBe("2026-06-20T10:00:00+00:00");
     expect(times.get("docs/b.mdx")).toBe("2026-06-20T10:00:00+00:00");
@@ -128,7 +147,7 @@ describe("parseGitLog", () => {
       "A\tdocs/old/guide.md",
     ].join("\n");
 
-    const times = parseGitLog(output);
+    const times = parseGitLog(output).modified;
     // Two renames, neither of which changed the content: the date is the
     // edit before them, read under the file's current name.
     expect(times.get("docs/guide.mdx")).toBe("2026-03-01T00:00:00+00:00");
@@ -148,15 +167,47 @@ describe("parseGitLog", () => {
       "R100\tdocs/b.md\tdocs/b.mdx",
     ].join("\n");
 
-    const times = parseGitLog(output);
+    const times = parseGitLog(output).modified;
     expect(times.get("docs/a.mdx")).toBe("2026-08-01T00:00:00+00:00");
     // An edit after the rename still dates the file.
     expect(times.get("docs/b.mdx")).toBe("2026-09-01T00:00:00+00:00");
   });
 
   it("ignores blank lines and returns an empty map for empty input", () => {
-    expect(parseGitLog("").size).toBe(0);
-    expect(parseGitLog("\n\n").size).toBe(0);
+    expect(parseGitLog("").modified.size).toBe(0);
+    expect(parseGitLog("\n\n").modified.size).toBe(0);
+  });
+
+  it("dates publication at the add, under the file's current name", () => {
+    const output = [
+      dateLine("2026-09-01T00:00:00+00:00"),
+      "",
+      "R100\tdocs/guide.md\tdocs/guide.mdx",
+      "A\tdocs/new.md",
+      "D\tdocs/old.md",
+      "R100\tdocs/cut.md\tdocs/cut.mdx",
+      dateLine("2026-05-01T00:00:00+00:00"),
+      "",
+      "A\tdocs/page.md",
+      dateLine("2026-03-01T00:00:00+00:00"),
+      "",
+      "M\tdocs/guide.md",
+      "A\tdocs/old.md",
+      "D\tdocs/page.md",
+      dateLine("2026-01-01T00:00:00+00:00"),
+      "",
+      "A\tdocs/guide.md",
+      "A\tdocs/page.md",
+    ].join("\n");
+
+    const { published } = parseGitLog(output);
+    // Renamed without edits: still the commit that first added it.
+    expect(published.get("docs/guide.mdx")).toBe("2026-01-01T00:00:00+00:00");
+    expect(published.get("docs/new.md")).toBe("2026-09-01T00:00:00+00:00");
+    // Deleted and added again: the older file at that path isn't this one.
+    expect(published.get("docs/page.md")).toBe("2026-05-01T00:00:00+00:00");
+    // A history that starts at a rename (a shallow clone) dates from it.
+    expect(published.get("docs/cut.mdx")).toBe("2026-09-01T00:00:00+00:00");
   });
 });
 
@@ -289,7 +340,7 @@ describe("gitRepositoryRoot", () => {
   });
 });
 
-describe("gitLastModifiedTimes", () => {
+describe("gitFileDates", () => {
   const dirs: string[] = [];
 
   // A plain temp dir; tests that need a repository init one and adopt git's
@@ -318,16 +369,16 @@ describe("gitLastModifiedTimes", () => {
     runGit(root, ["add", "-A"]);
     runGit(root, ["-c", "commit.gpgsign=false", "commit", "-m", "add note"]);
 
-    expect(gitLastModifiedTimes(root, [root], [tracked]).get(tracked)).toMatch(
+    expect(gitFileDates(root, [root], [tracked]).modified.get(tracked)).toMatch(
       /^\d{4}-\d{2}-\d{2}T/u
     );
-    expect(gitLastModifiedTimes(root, [], [tracked])).toEqual(new Map());
+    expect(gitFileDates(root, [], [tracked]).modified).toEqual(new Map());
     // A caller that already resolved the repository root hands it in; `null`
     // means it found none, and nothing is spawned for it.
     expect(
-      gitLastModifiedTimes(root, [root], [tracked], gitRepositoryRoot(root))
-    ).toEqual(gitLastModifiedTimes(root, [root], [tracked]));
-    expect(gitLastModifiedTimes(root, [root], [tracked], null)).toEqual(
+      gitFileDates(root, [root], [tracked], gitRepositoryRoot(root)).modified
+    ).toEqual(gitFileDates(root, [root], [tracked]).modified);
+    expect(gitFileDates(root, [root], [tracked], null).modified).toEqual(
       new Map()
     );
   });
@@ -342,11 +393,11 @@ describe("gitLastModifiedTimes", () => {
     runGit(root, ["-c", "commit.gpgsign=false", "commit", "-m", "add docs"]);
 
     const untracked = join(contentRoot, "missing.md");
-    const times = gitLastModifiedTimes(
+    const times = gitFileDates(
       root,
       [contentRoot],
       [tracked, untracked]
-    );
+    ).modified;
 
     expect(times.get(tracked)).toMatch(/^\d{4}-\d{2}-\d{2}T/u);
     // A path with no commit history is simply absent from the map.
@@ -359,38 +410,48 @@ describe("gitLastModifiedTimes", () => {
     await mkdir(contentRoot, { recursive: true });
     await writeFile(join(contentRoot, "guide.md"), "# Guide\n\nSteps.\n");
     await writeFile(join(contentRoot, "faq.md"), "# FAQ\n\nAnswers.\n");
-    const commitAt = (iso: string, message: string): void => {
-      runGit(root, ["add", "-A"]);
-      // Pinned dates: the commits run within the same second otherwise.
-      execFileSync(
-        // oxlint-disable-next-line sonarjs/no-os-command-from-path
-        "git",
-        ["-C", root, "-c", "commit.gpgsign=false", "commit", "-m", message],
-        {
-          env: {
-            ...fixtureGitEnv(),
-            GIT_AUTHOR_DATE: iso,
-            GIT_COMMITTER_DATE: iso,
-          },
-          stdio: "ignore",
-        }
-      );
-    };
-    commitAt("2026-01-01T00:00:00Z", "add docs");
+    commitAt(root, "2026-01-01T00:00:00Z", "add docs");
     // `.md` to `.mdx` as is, and `.md` to `.mdx` with an edit.
     runGit(root, ["mv", "docs/guide.md", "docs/guide.mdx"]);
     runGit(root, ["mv", "docs/faq.md", "docs/faq.mdx"]);
     await writeFile(join(contentRoot, "faq.mdx"), "# FAQ\n\nNew answers.\n");
-    commitAt("2026-09-01T00:00:00Z", "rename to mdx");
+    commitAt(root, "2026-09-01T00:00:00Z", "rename to mdx");
 
     const guide = join(contentRoot, "guide.mdx");
     const faq = join(contentRoot, "faq.mdx");
-    const times = gitLastModifiedTimes(root, [contentRoot], [guide, faq]);
+    const times = gitFileDates(root, [contentRoot], [guide, faq]).modified;
     expect(new Date(times.get(guide) ?? "").toISOString()).toBe(
       "2026-01-01T00:00:00.000Z"
     );
     expect(new Date(times.get(faq) ?? "").toISOString()).toBe(
       "2026-09-01T00:00:00.000Z"
+    );
+  });
+
+  it("dates publication by exact renames only", async () => {
+    // `git log --follow` pairs files 50% alike, so a new page added in the
+    // commit that deletes a similar one would inherit the old page's date.
+    const root = initRepo(await makeDir());
+    const contentRoot = join(root, "docs");
+    await mkdir(contentRoot, { recursive: true });
+    const boilerplate =
+      "# Page\n\nShared intro.\nShared setup.\nShared steps.\n";
+    await writeFile(join(contentRoot, "old.md"), boilerplate);
+    await writeFile(join(contentRoot, "guide.md"), "# Guide\n");
+    commitAt(root, "2020-01-01T00:00:00Z", "add docs");
+    await rm(join(contentRoot, "old.md"));
+    await writeFile(join(contentRoot, "new.md"), `${boilerplate}New.\n`);
+    runGit(root, ["mv", "docs/guide.md", "docs/guide.mdx"]);
+    commitAt(root, "2024-01-01T00:00:00Z", "replace old with new");
+
+    const created = join(contentRoot, "new.md");
+    const renamed = join(contentRoot, "guide.mdx");
+    const { published } = gitFileDates(root, [contentRoot], [created, renamed]);
+    expect(new Date(published.get(created) ?? "").toISOString()).toBe(
+      "2024-01-01T00:00:00.000Z"
+    );
+    expect(new Date(published.get(renamed) ?? "").toISOString()).toBe(
+      "2020-01-01T00:00:00.000Z"
     );
   });
 
@@ -409,7 +470,7 @@ describe("gitLastModifiedTimes", () => {
     const previous = process.env.GIT_DIR;
     process.env.GIT_DIR = join(root, "elsewhere", ".git");
     try {
-      const times = gitLastModifiedTimes(root, [contentRoot], [tracked]);
+      const times = gitFileDates(root, [contentRoot], [tracked]).modified;
       expect(times.get(tracked)).toMatch(/^\d{4}-\d{2}-\d{2}T/u);
     } finally {
       if (previous === undefined) {
@@ -430,28 +491,28 @@ describe("gitLastModifiedTimes", () => {
     runGit(root, ["-c", "commit.gpgsign=false", "commit", "-m", "add note"]);
 
     const outside = await makeDir();
-    const times = gitLastModifiedTimes(
+    const times = gitFileDates(
       root,
       [join(outside, "vault")],
       [tracked]
-    );
+    ).modified;
     expect(times.size).toBe(0);
   });
 
   it("returns an empty map outside a git repository", async () => {
     const root = await makeDir();
-    const times = gitLastModifiedTimes(
+    const times = gitFileDates(
       root,
       [join(root, "docs")],
       [join(root, "docs", "index.md")]
-    );
+    ).modified;
     expect(times.size).toBe(0);
   });
 
   it("skips the git scan entirely when there is nothing to date", async () => {
     // An empty pathspec list would otherwise log the whole repository.
     const root = await makeDir();
-    expect(gitLastModifiedTimes(root, [], []).size).toBe(0);
+    expect(gitFileDates(root, [], []).modified.size).toBe(0);
   });
 });
 
@@ -500,6 +561,53 @@ describe("shallow clone detection", () => {
     // all and the shallow hint would only mislead.
     const bare = await makeRepoDir();
     expect(isShallowGitRepository(bare)).toBe(false);
+  });
+
+  it("dates no page's publication in a shallow clone, and says so", async () => {
+    const full = await makeRepoDir();
+    await mkdir(join(full, "docs"), { recursive: true });
+    await writeFile(
+      join(full, "blume.config.ts"),
+      'export default { seo: { datePublished: "git" } };\n'
+    );
+    await writeFile(join(full, "docs/index.md"), "# Home\n");
+    await writeFile(
+      join(full, "docs/post.md"),
+      "---\ndate: 2019-05-01\n---\n# Post\n"
+    );
+    initRepo(full);
+    commitAt(full, "2020-01-02T00:00:00Z", "one");
+    await writeFile(join(full, "docs/index.md"), "# Home\n\nEdited.\n");
+    commitAt(full, "2021-01-02T00:00:00Z", "two");
+
+    const deep = await scanProject(full);
+    const published = (project: typeof deep, path: string) =>
+      project.manifest.routes.find((route) => route.path === path)?.published;
+    // Git dates the page that has no date of its own; front matter wins.
+    expect(new Date(published(deep, "/") ?? "").toISOString()).toBe(
+      "2020-01-02T00:00:00.000Z"
+    );
+    expect(published(deep, "/post")).toBeUndefined();
+    expect(
+      deep.diagnostics.some((d) => d.code === "BLUME_SHALLOW_GIT_HISTORY")
+    ).toBe(false);
+
+    const shallow = join(await makeRepoDir(), "clone");
+    runGit(dirname(shallow), [
+      "clone",
+      "--depth",
+      "1",
+      `file://${full}`,
+      shallow,
+    ]);
+    const cut = await scanProject(shallow);
+    expect(published(cut, "/")).toBeUndefined();
+    const warning = cut.diagnostics.find(
+      (d) => d.code === "BLUME_SHALLOW_GIT_HISTORY"
+    );
+    expect(warning?.message).toContain("datePublished");
+    expect(warning?.message).toContain("1 page(s)");
+    expect(datePublishedShallowWarning(0)).toHaveLength(0);
   });
 
   it("warns about undated pages only in a shallow clone", async () => {

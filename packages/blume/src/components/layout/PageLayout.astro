@@ -41,6 +41,7 @@ import { normalizeXHandle } from "../../seo/x-handle.ts";
 import Icon from "../Icon.astro";
 import { stripBase, withBase, withMountedBase } from "../islands/base-path.ts";
 import { routeSetFor } from "../../core/locale-links.ts";
+import { resolveLocalizable } from "../../core/localizable.ts";
 import {
   browserLanguageTargets,
   LOCALE_REDIRECT_SCRIPT,
@@ -265,20 +266,30 @@ const resolvedCanonical =
   (siteBase
     ? `${siteBase}${basedRoute === "/" ? "/" : encodeURI(basedRoute)}`
     : null);
-// An explicit `ogImage` wins. A root-relative path (e.g. an image dropped in
-// `public/`) is resolved against the site URL so crawlers get an absolute
-// `og:image`; an already-absolute URL passes through untouched. Otherwise fall
-// back to the generated OG card for this route.
+// An explicit `ogImage` wins, then the site's default image for this locale. A
+// root-relative path (e.g. an image dropped in `public/`) is served under the
+// deployment base and resolved against the site URL so crawlers get an
+// absolute `og:image`; an already-absolute URL passes through untouched.
+// Otherwise fall back to the generated OG card for this route.
 const absolutizeOgImage = (value: string): string =>
-  value.startsWith("/") && siteBase ? `${siteBase}${withBase(value)}` : value;
-const resolvedOgImage = ogImage
-  ? absolutizeOgImage(ogImage)
+  value.startsWith("/") ? `${siteBase ?? ""}${withBase(value)}` : value;
+const selectedOgImage =
+  ogImage ??
+  (data.config.og.image &&
+    resolveLocalizable(
+      data.config.og.image,
+      locale,
+      data.config.i18n?.defaultLocale
+    ));
+const resolvedOgImage = selectedOgImage
+  ? absolutizeOgImage(selectedOgImage)
   : ogEnabled && ogCardGenerated && siteBase
     ? `${siteBase}${encodeURI(withMountedBase(`/og/${ogSlug}.png`))}`
     : null;
 // Only the generated card has a known size and format, so its dimensions are
-// declared for crawlers; a user-supplied `ogImage` could be any image.
-const ogGenerated = !ogImage && Boolean(resolvedOgImage);
+// declared for crawlers; any other image could be any size. The size and alt
+// props describe the page's own `ogImage`, never the site default.
+const ogGenerated = !selectedOgImage && Boolean(resolvedOgImage);
 // A page with no image still gets a card on X — the compact `summary` variant
 // — rather than rendering as a bare link.
 const twitterCard = resolvedOgImage ? "summary_large_image" : "summary";
@@ -297,6 +308,8 @@ const structuredData =
       breadcrumbs: [],
       description,
       identity: data.config.identity,
+      jsonLd: data.config.jsonLd,
+      image: resolvedOgImage,
       locale,
       modified: lastModified,
       route,
@@ -386,7 +399,7 @@ const localeRedirect = localeTargets
               <meta content={pageTitle} property="og:image:alt" />
             </>
           )}
-          {!ogGenerated && ogImageSize && (
+          {ogImage && ogImageSize && (
             <>
               <meta
                 content={String(ogImageSize.width)}
@@ -398,12 +411,12 @@ const localeRedirect = localeTargets
               />
             </>
           )}
-          {!ogGenerated && ogImageAlt && (
+          {ogImage && ogImageAlt && (
             <meta content={ogImageAlt} property="og:image:alt" />
           )}
           <meta content={resolvedOgImage} name="twitter:image" />
           {ogGenerated && <meta content={pageTitle} name="twitter:image:alt" />}
-          {!ogGenerated && ogImageAlt && (
+          {ogImage && ogImageAlt && (
             <meta content={ogImageAlt} name="twitter:image:alt" />
           )}
         </>

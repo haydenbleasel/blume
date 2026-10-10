@@ -88,6 +88,7 @@ import type { Diagnostic, Navigation } from "../core/types.ts";
 import { getBlumeVersion } from "../core/version.ts";
 import { servedFiles } from "../deploy/generated-files.ts";
 import { buildRssFeeds, renderRssFeed } from "../deploy/rss.ts";
+import { hreflangAlternates } from "../deploy/sitemap.ts";
 import {
   languageIconCss,
   languageIconSlugsIn,
@@ -1204,6 +1205,8 @@ export const buildRuntimeData = (project: BlumeProject): string => {
     i18n?.defaultLocale
   );
 
+  const hreflang = hreflangAlternates(project);
+
   const navigationByLocale = i18n
     ? Object.fromEntries(
         i18n.locales.map(({ code }) => [
@@ -1273,6 +1276,7 @@ export const buildRuntimeData = (project: BlumeProject): string => {
             }
           : null,
       imageZoom: config.markdown.imageZoom,
+      jsonLd: config.seo.jsonLd,
       logo,
       mcp: config.agents.mcp.enabled
         ? {
@@ -1293,6 +1297,7 @@ export const buildRuntimeData = (project: BlumeProject): string => {
       og: {
         description: resolveOgDescription(config),
         enabled: config.seo.og.enabled ?? false,
+        image: config.seo.og.image,
         logo: ogLogo,
         palette: config.seo.og.palette,
         site: resolveOgSite(config),
@@ -1353,12 +1358,14 @@ export const buildRuntimeData = (project: BlumeProject): string => {
       entryId: route.entryId,
       fallback: route.fallback ?? false,
       hidden: route.hidden,
+      hreflang: hreflang.get(route.path) ?? [],
       id: route.id,
       indexable: route.indexable,
       lastModified: route.lastModified ?? null,
       locale: route.locale,
       monolingual: route.monolingual ?? false,
       path: route.path,
+      published: route.published ?? null,
       title: route.title,
       version: route.version,
       versionAlternates: route.versionAlternates,

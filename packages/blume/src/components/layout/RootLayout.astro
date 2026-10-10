@@ -43,6 +43,7 @@ import {
   OG_IMAGE_WIDTH,
 } from "../../og/dimensions.ts";
 import { buildStructuredData, toIso } from "../../seo/jsonld.ts";
+import type { AuthorInput } from "../../seo/jsonld.ts";
 import { normalizeXHandle } from "../../seo/x-handle.ts";
 import { withBase, withMountedBase } from "../islands/base-path.ts";
 import { routeSetFor } from "../../core/locale-links.ts";
@@ -196,6 +197,8 @@ interface Props {
   /** The page's `mode` frontmatter: what it shows around its content (see `core/page-modes.ts`). */
   pageMode?: PageMode;
   published?: string | Date | null;
+  /** The page's front matter `authors`, credited in its JSON-LD. */
+  authors?: AuthorInput | AuthorInput[];
   lastModified?: string | null;
   noindex?: boolean;
   structuredDataEnabled?: boolean;
@@ -312,6 +315,7 @@ const {
   apiRail = false,
   pageMode,
   published,
+  authors,
   lastModified,
   noindex,
   structuredDataEnabled,
@@ -534,11 +538,14 @@ const structuredData =
   structuredDataEnabled === false || noindex
     ? null
     : buildStructuredData({
+      authors,
       base: import.meta.env.BASE_URL,
       breadcrumbs: crumbs,
       description,
       homeRoute: navigation.root,
       identity: data.config.identity,
+      jsonLd: data.config.jsonLd,
+      image: ogImage,
       locale,
       modified: lastModified,
       pageType,
