@@ -50,19 +50,18 @@ seo: {
 
 ## Shared entity identifiers
 
-When docs share an origin with another site, reuse its entity identifiers:
+When docs live inside another site (`example.com/docs`), point at the entities that site already defines instead of defining them again:
 
 ```ts blume.config.ts lineNumbers
 seo: {
   jsonLd: {
     websiteId: "https://example.com/#website",
     organizationId: "https://example.com/#organization",
-    website: false,
   },
 }
 ```
 
-`websiteId` changes both the WebSite node's `@id` and the page's `isPartOf` reference. `organizationId` changes the Organization node's `@id` and publisher references; it can also reference an external organization without configuring `seo.organization`. `website: false` omits the WebSite definition while keeping the page's `isPartOf` reference. By default, Blume emits the WebSite node and uses the site URL plus `#website` and `#organization`. Identifiers must be absolute URLs.
+Every page names `websiteId` as its `isPartOf`, and Blume stops emitting its own WebSite node, whose name and URL would describe the docs instead of the site. Set `website: true` to emit it anyway under that id, or `website: false` to omit the docs' own WebSite node without sharing an id. `organizationId` becomes every page's publisher. With [`seo.organization`](#site-identity) also set, the Organization node uses that id and carries only the fields you configure: the docs' title and URL don't stand in for its name and URL. By default, Blume emits the WebSite node and uses the site URL plus `#website` and `#organization`. Identifiers must be absolute URLs, so they work without a site URL too.
 
 ## Page author and publisher
 
@@ -77,11 +76,11 @@ seo: {
 }
 ```
 
-These references apply to the WebPage or article node. The explicit publisher takes precedence over the organization's publisher reference on that node. Blume does not emit entity definitions for these references. With neither option set, attribution keeps its existing defaults.
+These references apply to the WebPage or article node, and `publisher` replaces the organization as its publisher. Blume doesn't define the entities they point at. A page's own [`authors`](/docs/content/frontmatter) front matter wins over `author`: each one is credited as a `Person`.
 
 ## Publication date from Git
 
-Use the earliest commit date of each content file, following renames:
+Date pages by the commit that added their content file:
 
 ```ts blume.config.ts lineNumbers
 seo: {
@@ -89,7 +88,7 @@ seo: {
 }
 ```
 
-This replaces the frontmatter publication date in JSON-LD. Files without history, staged content without a source path, and shallow clones emit no publication date in this mode. Use a full clone in CI to retain the original date. The default, `false`, keeps the frontmatter `date` or `changelog.date`; [`lastModified`](/docs/configuration#last-modified) remains independent.
+Front matter `date` or `changelog.date` still wins. Git dates the rest, through the same `git log` as [`lastModified`](/docs/configuration#last-modified). Renames are followed only when the content is unchanged, so a new page never inherits the history of a similar one deleted in the same commit. Pages from non-filesystem sources and uncommitted files get no date from git. A shallow clone dates no page and warns instead, since its oldest commit is where the clone was cut. Fetch full history in CI (`VERCEL_DEEP_CLONE=true` on Vercel, `fetch-depth: 0` for `actions/checkout`).
 
 The resolved [Open Graph image](/docs/discoverability/open-graph) is also included as the page node's `image`, whether it comes from frontmatter, a site default, or a generated card.
 

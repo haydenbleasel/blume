@@ -64,16 +64,33 @@ export interface StructuredDataIdentity {
   software?: SoftwareIdentity;
 }
 
+/**
+ * `seo.jsonLd`: entities the docs share with a site they live inside
+ * (`example.com/docs`), referenced by `@id` instead of defined again.
+ */
+export interface JsonLdEntities {
+  /** Credited on pages without their own `authors`. */
+  author?: { "@id": string };
+  /** Cited as every page's publisher in place of the Organization's id. */
+  publisher?: { "@id": string };
+  /** The Organization's `@id`, defined here or elsewhere. */
+  organizationId?: string;
+  /** Emit the WebSite node. Defaults to true unless `websiteId` is set. */
+  website?: boolean;
+  /** The WebSite's `@id`, which every page names as `isPartOf`. */
+  websiteId?: string;
+}
+
+/** A front matter `authors` entry: a name, or a name with a profile URL. */
+export type AuthorInput = string | { name: string; url?: string };
+
 /** Inputs for a page's JSON-LD, all known at render time in RootLayout. */
 export interface StructuredDataInput {
-  jsonLd?: {
-    websiteId?: string;
-    organizationId?: string;
-    author?: { "@id": string };
-    publisher?: { "@id": string };
-    website?: boolean;
-  };
+  jsonLd?: JsonLdEntities;
+  /** The page's absolute `og:image`, emitted as the page node's `image`. */
   image?: string | null;
+  /** The page's own byline, which wins over `jsonLd.author`. */
+  authors?: AuthorInput | AuthorInput[];
   siteName: string;
   /** Absolute site origin, or null when `deployment.site` is unset. */
   siteUrl: string | null;
@@ -170,15 +187,17 @@ const organizationNode = (
   context: {
     absolutize: (path: string) => string;
     id: string;
-    rootUrl: string;
-    siteName: string;
+    /** The site's name and root, or null when the id names an outside entity. */
+    defaults: { name: string; url: string } | null;
   }
 ): JsonLdNode => {
   const node: JsonLdNode = {
     "@id": context.id,
     "@type": "Organization",
-    name: organization.name ?? context.siteName,
-    url: organization.url ?? context.rootUrl,
+    ...definedStrings({
+      name: organization.name ?? context.defaults?.name,
+      url: organization.url ?? context.defaults?.url,
+    }),
   };
   if (organization.logo) {
     node.logo = context.absolutize(organization.logo);
@@ -269,6 +288,19 @@ const pageSchemaType = (input: StructuredDataInput, home: boolean): string => {
   return isArticleType(pageType) ? ARTICLE_TYPES[pageType] : "TechArticle";
 };
 
+/** An `authors` entry is a bare name or a name with a profile URL. */
+const isBareName = (author: AuthorInput): author is string =>
+  typeof author === "string";
+
+/** `Person` nodes for a page's front matter `authors`. */
+const authorNodes = (authors: AuthorInput | AuthorInput[]): JsonLdNode[] =>
+  [authors].flat().map((author): JsonLdNode => ({
+    "@type": "Person",
+    ...(isBareName(author)
+      ? { name: author }
+      : definedStrings({ name: author.name, url: author.url })),
+  }));
+
 /**
  * The page's own node: a homepage is a `WebPage` (it isn't an article, but it
  * still needs a machine-readable date, or search engines take whatever other
@@ -306,19 +338,22 @@ const pageNode = (
   if (modified) {
     node.dateModified = modified;
   }
-  if (context.base) {
-    node.isPartOf = {
-      "@id": input.jsonLd?.websiteId ?? `${context.base}#website`,
-    };
+  // A shared id is already absolute, so it holds without a site URL too.
+  const websiteId =
+    input.jsonLd?.websiteId ??
+    (context.base ? `${context.base}#website` : null);
+  if (websiteId) {
+    node.isPartOf = { "@id": websiteId };
   }
-  if (context.organizationId) {
-    node.publisher = { "@id": context.organizationId };
+  const publisher = input.jsonLd?.publisher?.["@id"] ?? context.organizationId;
+  if (publisher) {
+    node.publisher = { "@id": publisher };
   }
-  if (input.jsonLd?.author) {
+  const authors = input.authors ? authorNodes(input.authors) : [];
+  if (authors.length > 0) {
+    node.author = authors;
+  } else if (input.jsonLd?.author) {
     node.author = input.jsonLd.author;
-  }
-  if (input.jsonLd?.publisher) {
-    node.publisher = input.jsonLd.publisher;
   }
   if (input.image) {
     node.image = input.image;
@@ -354,6 +389,11 @@ const breadcrumbNode = (
   };
 };
 
+/**
+ * The site's `WebSite` node, which needs the site URL. A shared `websiteId`
+ * names one the parent site defines, so the docs leave it out unless
+ * `jsonLd.website` asks for it — their own name and root would contradict it.
+ */
 const addWebsiteNode = (
   graph: JsonLdNode[],
   input: StructuredDataInput,
@@ -361,7 +401,7 @@ const addWebsiteNode = (
   rootUrl: string,
   organizationId: string | null
 ): void => {
-  if (base && input.jsonLd?.website !== false) {
+  if (base && (input.jsonLd?.website ?? !input.jsonLd?.websiteId)) {
     const website: JsonLdNode = {
       "@id": input.jsonLd?.websiteId ?? `${base}#website`,
       "@type": "WebSite",
@@ -409,9 +449,12 @@ export const buildStructuredData = (input: StructuredDataInput): JsonLdNode => {
           path.startsWith("/")
             ? absolute(base, withBasePath(deployBase, path))
             : path,
+        // A shared id names an organization defined elsewhere, which the
+        // docs' title and root would contradict; only configured fields go in.
+        defaults: input.jsonLd?.organizationId
+          ? null
+          : { name: input.siteName, url: rootUrl },
         id: organizationId,
-        rootUrl,
-        siteName: input.siteName,
       })
     );
   }

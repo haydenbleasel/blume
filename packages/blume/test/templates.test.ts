@@ -630,7 +630,7 @@ describe("changelogIndexTemplate", () => {
   it("canonicalizes under the deployment base, like the catch-all", () => {
     const out = changelogIndexTemplate(changelogOpts);
     expect(out).toContain(
-      'import { withMountedBase } from "blume/components/islands/base-path.ts"'
+      'import { withBase, withMountedBase } from "blume/components/islands/base-path.ts"'
     );
     expect(out).toContain('const basedRoute = withMountedBase("/changelog");');
     expect(out).toContain("const canonical = base ? base + basedRoute : null;");
@@ -642,7 +642,8 @@ describe("changelogIndexTemplate", () => {
       'const ogPath = data.config.og.enabled ? withMountedBase("/og/changelog.png") : null;'
     );
     expect(out).toContain("ogImage={ogImage}");
-    expect(out).toContain("ogGenerated={Boolean(ogImage)}");
+    // A default `seo.og.image` stands in for the card, with no known size.
+    expect(out).toContain("ogGenerated={!defaultOgImage && Boolean(ogImage)}");
     expect(out).not.toContain("ogImage={null}");
   });
 

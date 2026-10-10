@@ -40,27 +40,41 @@ export const resolveLastModifiedConfig = (
     ? { enabled: false, source: "git" }
     : { enabled: true, source: value };
 
+/** Each file's git dates, keyed by path. */
+export interface GitDates {
+  /** The committer ISO date of the newest commit that changed the file. */
+  modified: Map<string, string>;
+  /** The committer ISO date of the commit that added the file. */
+  published: Map<string, string>;
+}
+
 /**
- * Parse `git log --format=%x00%cI --name-status -M100%` output into a map of
- * repo-root-relative path → the committer ISO date of the newest commit that
- * changed the file. Each commit emits a NUL-prefixed date line followed by a
- * status line per path it touched (`M\tpath`, `R100\told\tnew`); since git
- * logs newest-first, the first date seen for a path wins. Blank lines are
- * ignored.
+ * Parse `git log --format=%x00%cI --name-status -M100%` output into each
+ * repo-root-relative path's dates. Each commit emits a NUL-prefixed date line
+ * followed by a status line per path it touched (`M\tpath`, `R100\told\tnew`);
+ * since git logs newest-first, the first date seen for a path is when it last
+ * changed, and the add (`A\tpath`) that ends its history is when it was
+ * published. Blank lines are ignored.
  *
  * A rename (`-M100%` reports only exact ones, where the content is unchanged)
  * follows the file the way `git log --follow` does for one path: it dates
  * nothing itself, and the older commits that name the old path date the file
  * under its current name, so renaming `page.md` to `page.mdx` keeps the page's
- * date. A file whose visible history starts at a rename (a shallow clone cut
- * off the commits before it) takes the rename's date.
+ * dates. A file whose visible history starts at a rename (a shallow clone cut
+ * off the commits before it) takes the rename's date. Only exact renames are
+ * followed: `--follow`'s default 50% similarity would hand a new page the
+ * history of a similar one deleted in the same commit.
  */
-export const parseGitLog = (output: string): Map<string, string> => {
-  const times = new Map<string, string>();
+export const parseGitLog = (output: string): GitDates => {
+  const modified = new Map<string, string>();
+  const published = new Map<string, string>();
   // An older name of a file → its name now, for the commits read after the
   // rename (older ones).
   const currentNames = new Map<string, string>();
   const renamedAt = new Map<string, string>();
+  // Files whose add has been read: anything older under the same name was an
+  // earlier file at that path, deleted before this one was created.
+  const added = new Set<string>();
   let current: string | null = null;
   for (const line of output.split("\n")) {
     if (line.startsWith("\0")) {
@@ -73,21 +87,27 @@ export const parseGitLog = (output: string): Map<string, string> => {
       continue;
     }
     const name = currentNames.get(path) ?? path;
+    if (!added.has(name)) {
+      published.set(name, current);
+      if (status === "A") {
+        added.add(name);
+      }
+    }
     if (status.startsWith("R")) {
       currentNames.set(from, name);
       if (!renamedAt.has(name)) {
         renamedAt.set(name, current);
       }
-    } else if (!times.has(name)) {
-      times.set(name, current);
+    } else if (!modified.has(name)) {
+      modified.set(name, current);
     }
   }
   for (const [name, date] of renamedAt) {
-    if (!times.has(name)) {
-      times.set(name, date);
+    if (!modified.has(name)) {
+      modified.set(name, date);
     }
   }
-  return times;
+  return { modified, published };
 };
 
 /**
@@ -127,37 +147,38 @@ export const gitRepositoryRoot = (root: string): string | null => {
   }
 };
 
+const noDates = (): GitDates => ({ modified: new Map(), published: new Map() });
+
 /**
- * Resolve each source file's last-modified date from git history, keyed by
- * absolute source path. Runs a single `git log` over the given content roots
- * (each local source's own root, which may diverge from `content.root`),
- * following renames within them (see `parseGitLog`; a file moved in from
- * outside every root dates from the move), and maps repo-root-relative paths
- * back to the given absolute paths
- * (monorepo-safe via `rev-parse --show-toplevel`). Returns an empty map if git
- * is unavailable or the project isn't a repo — the feature then simply shows
+ * Resolve each source file's git dates (see `parseGitLog`), keyed by absolute
+ * source path. Runs a single `git log` over the given content roots (each
+ * local source's own root, which may diverge from `content.root`), following
+ * renames within them (a file moved in from outside every root dates from the
+ * move), and maps repo-root-relative paths back to the given absolute paths
+ * (monorepo-safe via `rev-parse --show-toplevel`). Returns empty maps if git
+ * is unavailable or the project isn't a repo — the features then simply show
  * no dates.
  */
-export const gitLastModifiedTimes = (
+export const gitFileDates = (
   root: string,
   contentRoots: string[],
   sourcePaths: string[],
   repositoryRoot?: string | null
-): Map<string, string> => {
+): GitDates => {
   // Nothing to date, or nowhere bounded to look — either way, don't pay for a
   // git scan. Both guards matter: `git log -- ` with no pathspec logs the
   // entire repository, which is what an all-staged project produces (a staged
   // source contributes no content root, yet its entries can still carry a
   // `sourcePath`).
   if (sourcePaths.length === 0 || contentRoots.length === 0) {
-    return new Map();
+    return noDates();
   }
   // The caller that bounded `contentRoots` already resolved the repo root;
   // reuse it rather than spawning `rev-parse` a second time per scan.
   const gitRoot =
     repositoryRoot === undefined ? gitRepositoryRoot(root) : repositoryRoot;
   if (gitRoot === null) {
-    return new Map();
+    return noDates();
   }
   // Git names paths by their real location, so the pathspecs and the paths
   // read back against the log are compared in that spelling too (see
@@ -185,16 +206,19 @@ export const gitLastModifiedTimes = (
       { encoding: "utf-8", env: gitEnv(), maxBuffer: 256 * 1024 * 1024 }
     );
     const byRepoPath = parseGitLog(output);
-    const result = new Map<string, string>();
+    const result = noDates();
     for (const sourcePath of sourcePaths) {
-      const iso = byRepoPath.get(relative(top, realPath(sourcePath)));
-      if (iso) {
-        result.set(sourcePath, iso);
+      const repoPath = relative(top, realPath(sourcePath));
+      for (const key of ["modified", "published"] as const) {
+        const iso = byRepoPath[key].get(repoPath);
+        if (iso) {
+          result[key].set(sourcePath, iso);
+        }
       }
     }
     return result;
   } catch {
-    return new Map();
+    return noDates();
   }
 };
 
@@ -223,6 +247,9 @@ export const isShallowGitRepository = (root: string): boolean => {
   }
 };
 
+const SHALLOW_CLONE_SUGGESTION =
+  "Fetch full history in CI: set the VERCEL_DEEP_CLONE=true environment variable on Vercel, or fetch-depth: 0 for actions/checkout.";
+
 /**
  * A warning for git-derived dates silently missing because the build ran in a
  * shallow clone — the default on Vercel and `actions/checkout`, where `git log`
@@ -243,34 +270,27 @@ export const lastModifiedShallowWarning = (
       code: "BLUME_SHALLOW_GIT_HISTORY",
       message: `lastModified is on, but this build runs in a shallow git clone, so ${undatedCount} page(s) have no git-derived date — their sitemap <lastmod> and "Last updated" stamps are omitted.`,
       severity: "warning",
-      suggestion:
-        "Fetch full history in CI: set the VERCEL_DEEP_CLONE=true environment variable on Vercel, or fetch-depth: 0 for actions/checkout.",
+      suggestion: SHALLOW_CLONE_SUGGESTION,
     },
   ];
 };
 
-/** First commit date, following renames; incomplete history yields no date. */
-export const gitPublishedTime = (
-  root: string,
-  sourcePath?: string
-): string | undefined => {
-  if (!sourcePath || isShallowGitRepository(root)) {
-    return undefined;
-  }
-  try {
-    // oxlint-disable-next-line sonarjs/no-os-command-from-path
-    const history = execFileSync(
-      "git",
-      ["-C", root, "log", "--follow", "--format=%cI", "--", sourcePath],
-      {
-        encoding: "utf-8",
-        env: gitEnv(),
-        stdio: ["ignore", "pipe", "ignore"],
-      }
-    ).trim();
-    const first = history.split("\n").at(-1);
-    return first ? new Date(first).toISOString() : undefined;
-  } catch {
-    return undefined;
-  }
-};
+/**
+ * The warning for `seo.datePublished: "git"` in a shallow clone, where the
+ * oldest commit git can see is where the clone was cut, not where each page
+ * began. Git then dates no page rather than every page wrongly. Empty when
+ * every page has a front matter date.
+ */
+export const datePublishedShallowWarning = (
+  undatedCount: number
+): Diagnostic[] =>
+  undatedCount === 0
+    ? []
+    : [
+        {
+          code: "BLUME_SHALLOW_GIT_HISTORY",
+          message: `seo.datePublished is "git", but this build runs in a shallow git clone, so ${undatedCount} page(s) without a front matter date have no datePublished.`,
+          severity: "warning",
+          suggestion: SHALLOW_CLONE_SUGGESTION,
+        },
+      ];

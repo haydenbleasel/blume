@@ -100,11 +100,15 @@ export interface BlumeRoute {
   /** True when this route renders fallback content for a missing translation. */
   fallback: boolean;
   hidden: boolean;
+  /**
+   * The translations the page head links as hreflang alternates: the
+   * indexable ones, so a `noindex` or hidden translation is left out (see
+   * `hreflangAlternates`).
+   */
+  hreflang: RouteAlternate[];
   id: string;
   /** Whether the page is part of the search index. */
   indexable: boolean;
-  /** First Git commit date when seo.datePublished is "git", else null. */
-  published?: string | null;
   /** ISO "last updated" date when the feature is on, else `null`. */
   lastModified: string | null;
   /** Resolved locale code (the default locale when not under i18n). */
@@ -115,6 +119,12 @@ export interface BlumeRoute {
    */
   monolingual: boolean;
   path: string;
+  /**
+   * The git commit that added the page's source, as an ISO date, when
+   * `seo.datePublished` is `"git"` and front matter carries no date; else
+   * `null`.
+   */
+  published: string | null;
   title: string;
   /** Resolved docs version (`""` for the current docs). */
   version: string;
@@ -269,7 +279,6 @@ export interface BlumeDataConfig {
   /** Deployment site URL, or `null` when none is configured/detected. */
   site: string | null;
   jsonLd: ResolvedConfig["seo"]["jsonLd"];
-  datePublished: ResolvedConfig["seo"]["datePublished"];
   structuredData: boolean;
   theme: ResolvedConfig["theme"];
   title: string;

@@ -71,7 +71,6 @@ import {
 import { EN_UI, resolveUIStrings } from "../core/i18n-ui.ts";
 import { resolveFallbackLocale } from "../core/i18n.ts";
 import { buildIncludeGraph } from "../core/includes.ts";
-import { gitPublishedTime } from "../core/last-modified.ts";
 import { resolveLocalizable } from "../core/localizable.ts";
 import {
   validateMcpClientIcons,
@@ -89,6 +88,7 @@ import type { Diagnostic, Navigation } from "../core/types.ts";
 import { getBlumeVersion } from "../core/version.ts";
 import { servedFiles } from "../deploy/generated-files.ts";
 import { buildRssFeeds, renderRssFeed } from "../deploy/rss.ts";
+import { hreflangAlternates } from "../deploy/sitemap.ts";
 import {
   languageIconCss,
   languageIconSlugsIn,
@@ -1205,6 +1205,8 @@ export const buildRuntimeData = (project: BlumeProject): string => {
     i18n?.defaultLocale
   );
 
+  const hreflang = hreflangAlternates(project);
+
   const navigationByLocale = i18n
     ? Object.fromEntries(
         i18n.locales.map(({ code }) => [
@@ -1235,7 +1237,6 @@ export const buildRuntimeData = (project: BlumeProject): string => {
       codeWrap: config.markdown.code.wrap,
       consent: config.consent,
       dateFormat: config.dateFormat,
-      datePublished: config.seo.datePublished,
       description: config.description,
       discovery: {
         agentReadability: config.agents.agentReadability,
@@ -1357,16 +1358,14 @@ export const buildRuntimeData = (project: BlumeProject): string => {
       entryId: route.entryId,
       fallback: route.fallback ?? false,
       hidden: route.hidden,
+      hreflang: hreflang.get(route.path) ?? [],
       id: route.id,
       indexable: route.indexable,
       lastModified: route.lastModified ?? null,
       locale: route.locale,
       monolingual: route.monolingual ?? false,
       path: route.path,
-      published:
-        config.seo.datePublished === "git"
-          ? (gitPublishedTime(context.root, route.sourcePath) ?? null)
-          : null,
+      published: route.published ?? null,
       title: route.title,
       version: route.version,
       versionAlternates: route.versionAlternates,

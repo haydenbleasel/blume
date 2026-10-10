@@ -1099,7 +1099,11 @@ export interface OgPaletteConfig {
 
 /** Per-page Open Graph image generation. */
 export interface OgConfig {
-  /** Default social image, shared or keyed by locale; page seo.image wins. */
+  /**
+   * Default social image for pages without their own `seo.image`, in place of
+   * the generated card (which then defaults off): one path or URL, or one per
+   * locale, like any localizable label.
+   */
   image?: string | Record<string, string>;
   /**
    * Card subtitle. Defaults to the site description; a string overrides it,
@@ -1225,18 +1229,26 @@ export interface SoftwareConfig {
 
 /** Discoverability: OG images, feeds, sitemap, robots, and structured data. */
 export interface SeoConfig {
-  /** Shared entity identifiers and page attribution for structured data. */
+  /**
+   * Structured-data entities shared with a parent site (`example.com/docs`),
+   * referenced by absolute `@id` instead of defined again.
+   */
   jsonLd?: {
-    /** WebSite identifier; defaults to the site URL plus #website. */
+    /** The WebSite's `@id`, which every page names as `isPartOf`. */
     websiteId?: string;
-    /** Organization identifier, also usable without an Organization body. */
+    /** The Organization's `@id`; `organization` still adds its details. */
     organizationId?: string;
+    /** Credited on pages without their own `authors`. */
     author?: { "@id": string };
+    /** Every page's publisher, over the Organization. */
     publisher?: { "@id": string };
-    /** Emit the WebSite node. Defaults to true; references are retained. */
+    /** Emit the WebSite node. Defaults to true unless `websiteId` is set. */
     website?: boolean;
   };
-  /** Use the earliest Git commit date, following renames, instead of frontmatter. */
+  /**
+   * Date pages without a front matter `date` by the git commit that added
+   * their source file, following exact renames. Defaults to `false`.
+   */
   datePublished?: false | "git";
 
   /**
@@ -1281,7 +1293,7 @@ export interface SeoConfig {
   sitemap?:
     | boolean
     | {
-        /** Emit locale alternate links. Defaults to false. */
+        /** List each page's translations as hreflang links. Defaults to `false`. */
         alternates?: boolean;
       };
   /**

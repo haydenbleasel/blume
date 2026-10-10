@@ -14,8 +14,10 @@ import { buildContentGraph } from "./graph.ts";
 import { i18nDiagnostics } from "./i18n.ts";
 import { expandIncludes, hasIncludeStatements } from "./includes.ts";
 import {
-  gitLastModifiedTimes,
+  datePublishedShallowWarning,
+  gitFileDates,
   gitRepositoryRoot,
+  isShallowGitRepository,
   lastModifiedShallowWarning,
   realPath,
   resolveLastModifiedConfig,
@@ -299,6 +301,82 @@ const gitContentRoots = (
   return sources
     .flatMap((source) => (source.contentRoot ? [source.contentRoot] : []))
     .filter((dir) => isWithin(top, realPath(dir)));
+};
+
+/** Whether a page's front matter dates its publication itself. */
+const hasPublishedDate = (page: PageRecord): boolean =>
+  Boolean(page.meta.date ?? page.meta.changelog?.date);
+
+/**
+ * Fill in each page's git dates — "last updated" under `lastModified: "git"`,
+ * published under `seo.datePublished: "git"` — from one `git log`, and warn
+ * when a shallow clone leaves pages undated. Frontmatter always wins; git
+ * applies to filesystem entries, other sources supply dates on the entry.
+ */
+const applyGitDates = (
+  pages: PageRecord[],
+  sources: readonly ContentSource[],
+  root: string,
+  config: ResolvedConfig
+): Diagnostic[] => {
+  const lastModified = resolveLastModifiedConfig(config.lastModified);
+  const gitModified = lastModified.enabled && lastModified.source === "git";
+  const gitPublished = config.seo.datePublished === "git";
+  if (!(gitModified || gitPublished)) {
+    return [];
+  }
+  const fsPaths = pages
+    .map((page) => page.sourcePath)
+    .filter((path): path is string => path !== undefined);
+  // The git pathspecs must cover where the pages actually live: each local
+  // source's own on-disk root — a filesystem source's `root`, or a staged
+  // local source's tree (an Obsidian vault) — which diverges from the global
+  // `content.root`.
+  const gitRoot = gitRepositoryRoot(root);
+  const contentRoots = gitContentRoots(sources, gitRoot);
+  const gitDates = gitFileDates(root, contentRoots, fsPaths, gitRoot);
+  // Only pages the log could have dated count toward the shallow-clone
+  // warnings — a page outside every covered root stays undated no matter how
+  // deep the clone is, and the warning's suggested fix cannot help it.
+  const datable = pages.filter(
+    (page) =>
+      page.sourcePath &&
+      contentRoots.some((dir) => isWithin(dir, page.sourcePath ?? ""))
+  );
+  const warnings: Diagnostic[] = [];
+  if (gitModified) {
+    for (const page of pages) {
+      if (!page.lastModified && page.sourcePath) {
+        page.lastModified = gitDates.modified.get(page.sourcePath);
+      }
+    }
+    // A shallow CI clone (Vercel, actions/checkout) silently drops most dates;
+    // surface that instead of letting production diverge from local builds.
+    warnings.push(
+      ...lastModifiedShallowWarning(
+        root,
+        datable.filter((page) => !page.lastModified).length
+      )
+    );
+  }
+  if (gitPublished) {
+    // A shallow clone's oldest commit is where it was cut, not where a page
+    // began, so it dates nothing rather than every page wrongly.
+    const shallow = isShallowGitRepository(root);
+    for (const page of pages) {
+      if (!(shallow || hasPublishedDate(page)) && page.sourcePath) {
+        page.published = gitDates.published.get(page.sourcePath);
+      }
+    }
+    if (shallow) {
+      warnings.push(
+        ...datePublishedShallowWarning(
+          datable.filter((page) => !hasPublishedDate(page)).length
+        )
+      );
+    }
+  }
+  return warnings;
 };
 
 /**
@@ -681,47 +759,9 @@ export const scanProject = async (
       ? allPages.filter((page) => !page.meta.draft)
       : allPages;
 
-  // Resolve "last updated" dates before the graph is built so the manifest
-  // (which shares these page objects) picks them up. Frontmatter always wins;
-  // git applies to filesystem entries, other sources supply dates on the entry.
-  const lastModified = resolveLastModifiedConfig(config.lastModified);
-  const lastModifiedWarnings: Diagnostic[] = [];
-  if (lastModified.enabled && lastModified.source === "git") {
-    const fsPaths = pages
-      .map((page) => page.sourcePath)
-      .filter((path): path is string => path !== undefined);
-    // The git pathspecs must cover where the pages actually live: each local
-    // source's own on-disk root — a filesystem source's `root`, or a staged
-    // local source's tree (an Obsidian vault) — which diverges from the global
-    // `content.root`.
-    const gitRoot = gitRepositoryRoot(context.root);
-    const contentRoots = gitContentRoots(sources, gitRoot);
-    const gitTimes = gitLastModifiedTimes(
-      context.root,
-      contentRoots,
-      fsPaths,
-      gitRoot
-    );
-    for (const page of pages) {
-      if (!page.lastModified && page.sourcePath) {
-        page.lastModified = gitTimes.get(page.sourcePath);
-      }
-    }
-    // A shallow CI clone (Vercel, actions/checkout) silently drops most dates;
-    // surface that instead of letting production diverge from local builds.
-    // Only pages the log could have dated count — a page outside every covered
-    // root stays undated no matter how deep the clone is, and the warning's
-    // suggested fix cannot help it.
-    const undated = pages.filter(
-      (page) =>
-        page.sourcePath &&
-        !page.lastModified &&
-        contentRoots.some((dir) => isWithin(dir, page.sourcePath ?? ""))
-    ).length;
-    lastModifiedWarnings.push(
-      ...lastModifiedShallowWarning(context.root, undated)
-    );
-  }
+  // Resolve "last updated" and publication dates before the graph is built so
+  // the manifest (which shares these page objects) picks them up.
+  const gitDateWarnings = applyGitDates(pages, sources, context.root, config);
 
   // Custom `.astro` pages and the generated changelog index aren't content
   // pages, so name them for navigation: a `/changelog` tab should open the
@@ -791,7 +831,7 @@ export const scanProject = async (
       ...graph.diagnostics,
       ...i18nWarnings,
       ...versionWarnings,
-      ...lastModifiedWarnings,
+      ...gitDateWarnings,
       ...svgWarnings,
       ...publicOpenApiDiagnostics(config, context.root),
       ...redirectPageDiagnostics(

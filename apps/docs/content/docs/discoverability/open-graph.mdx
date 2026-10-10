@@ -3,7 +3,7 @@ title: Open Graph images
 description: Generated 1200×630 social cards for every page — branding, card layers, fonts for non-Latin scripts, and per-page overrides.
 ---
 
-Blume can render a 1200×630 social card for every page at build time — no headless browser, thanks to [Takumi](https://takumi.kane.tw), so builds stay fast. On by default once [`deployment.site`](/docs/deployment) is set or auto-detected (the `og:image` URL has to be absolute to be useful to crawlers), and off otherwise. Set `enabled` to override that either way:
+Blume can render a 1200×630 social card for every page at build time — no headless browser, thanks to [Takumi](https://takumi.kane.tw), so builds stay fast. On by default once [`deployment.site`](/docs/deployment) is set or auto-detected (the `og:image` URL has to be absolute to be useful to crawlers), and off otherwise or when a [default image](#default-image) replaces the cards. Set `enabled` to override that either way:
 
 ```ts blume.config.ts lineNumbers
 seo: {
@@ -13,7 +13,7 @@ seo: {
 
 ## Default image
 
-Set `seo.og.image` to a shared image or a map keyed by locale:
+Set `seo.og.image` to share one image across every page instead of a generated card, or give each locale its own:
 
 ```ts blume.config.ts lineNumbers
 seo: {
@@ -24,7 +24,7 @@ seo: {
 }
 ```
 
-A page's `seo.image` wins over this default. A locale without a configured image falls back to its generated card when generation is enabled. Defaults work with generation disabled and on custom pages rendered with `PageLayout`; custom `ogImage` props take precedence. Root-relative images resolve under the deployment base. The resolved image is passed into the page's JSON-LD. Blume declares dimensions only for generated cards. Omit `image` to keep the existing image selection.
+A page's `seo.image`, or a custom page's `ogImage` prop, wins over the default. A locale missing from the map takes the default locale's image. The default covers custom pages rendered with `PageLayout` and the generated changelog index too, so Blume stops generating cards once it's set, unless `enabled` is `true`. Root-relative paths resolve under the deployment base. Blume declares image dimensions only for generated cards. Whichever image a page ends up with also goes into its [JSON-LD](/docs/discoverability/structured-data) as the page's `image`.
 
 ## Brand the generated card
 

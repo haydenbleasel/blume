@@ -14,6 +14,7 @@ import {
 import { isHiddenPage } from "../core/hidden-pages.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
 import { siteRoot } from "../core/site-url.ts";
+import type { RouteAlternate } from "../core/types.ts";
 
 /**
  * Astro's reserved error routes. A user-authored override (`pages/404.astro`,
@@ -88,6 +89,87 @@ ${urls.join("\n")}
 `;
 
 /**
+ * The content pages crawlers may index under their own URL: drafts, hidden,
+ * `noindex` (the page's or its archived version's), and error pages can't, nor
+ * can a page whose own `seo.canonical` names another URL.
+ */
+const indexablePages = (
+  project: BlumeProject
+): BlumeProject["graph"]["pages"] => {
+  const deployBase = normalizeBasePath(project.config.deployment.options.base);
+  // A non-empty version always names a configured archived entry — that is
+  // the only way detection assigns one.
+  const noindexVersions = new Set(
+    (project.config.versions?.archived ?? []).flatMap((version) =>
+      version.noindex ? [version.id] : []
+    )
+  );
+  return project.graph.pages.filter(
+    (page) =>
+      !page.meta.draft &&
+      !isHiddenPage(page, project.graph) &&
+      !page.meta.seo.noindex &&
+      !noindexVersions.has(page.version) &&
+      !ERROR_ROUTES.has(page.route) &&
+      !canonicalElsewhere(
+        page.meta.seo.canonical,
+        mountBasePath(deployBase, page.route)
+      )
+  );
+};
+
+/**
+ * The content pages the sitemap lists: the indexable ones, less archived-version
+ * pages whose canonical points at a still-existing latest equivalent —
+ * listing a URL whose canonical says "index the other page" invites the
+ * noindexed-page-in-sitemap incoherence Docusaurus is known for. A page that
+ * exists only in an archived version stays listed (self-canonical), and a
+ * page's own `seo.canonical` wins over the version's default, as it does in
+ * the page head (see `canonicalElsewhere`).
+ */
+const listedPages = (project: BlumeProject): BlumeProject["graph"]["pages"] => {
+  const latestVersions = new Set(
+    (project.config.versions?.archived ?? []).flatMap((version) =>
+      version.canonical === "latest" ? [version.id] : []
+    )
+  );
+  const currentKeys = new Set(
+    project.graph.pages.flatMap((page) =>
+      page.version === "" ? [`${page.versionKey}\u0000${page.locale}`] : []
+    )
+  );
+  return indexablePages(project).filter(
+    (page) =>
+      !(
+        latestVersions.has(page.version) &&
+        !page.meta.seo.canonical &&
+        currentKeys.has(`${page.versionKey}\u0000${page.locale}`)
+      )
+  );
+};
+
+/**
+ * Each route's hreflang set, keyed by route: its indexable translations. The
+ * page head links it, and so does the sitemap under `seo.sitemap.alternates`,
+ * so the two never disagree, and neither points crawlers at a page they're
+ * told not to index. A page that can't be indexed joins no set — except an
+ * i18n fallback copy, which links the translations it stands in for.
+ */
+export const hreflangAlternates = (
+  project: BlumeProject
+): Map<string, RouteAlternate[]> => {
+  const indexable = new Set(indexablePages(project).map((page) => page.route));
+  return new Map(
+    project.manifest.routes.map((route) => [
+      route.path,
+      route.fallback || indexable.has(route.path)
+        ? route.alternates.filter((alternate) => indexable.has(alternate.path))
+        : [],
+    ])
+  );
+};
+
+/**
  * Build the sitemap files from the route manifest plus the routes the manifest
  * can't see: custom `.astro` pages (most importantly a custom landing `/`) and
  * the generated `/changelog` index. Returns null when the sitemap is disabled
@@ -113,72 +195,14 @@ export const buildSitemapFiles = (
   // top of every one, even a route whose first segment matches it: under base
   // `/guides`, `guides/setup.md` is served at `/guides/guides/setup`.
   const deployBase = normalizeBasePath(project.config.deployment.options.base);
-
-  // Archived-version pages leave the sitemap when the version is noindexed,
-  // or when their canonical points at a still-existing latest equivalent —
-  // listing a URL whose canonical says "index the other page" invites the
-  // noindexed-page-in-sitemap incoherence Docusaurus is known for. A page
-  // that exists only in an archived version stays listed (self-canonical),
-  // and a page's own `seo.canonical` wins over the version's default, as it
-  // does in the page head (see `canonicalElsewhere`).
-  const { versions } = project.config;
-  const archivedById = new Map(
-    (versions?.archived ?? []).map((version) => [version.id, version])
-  );
-  const currentKeys = versions
-    ? new Set(
-        project.graph.pages.flatMap((page) =>
-          page.version === "" ? [`${page.versionKey}\u0000${page.locale}`] : []
-        )
-      )
-    : null;
-  const archivedExcluded = (page: (typeof project.graph.pages)[number]) => {
-    if (!page.version) {
-      return false;
-    }
-    // A non-empty version always names a configured archived entry — that is
-    // the only way detection assigns one.
-    const archived = archivedById.get(page.version);
-    return Boolean(
-      archived?.noindex ||
-      (archived?.canonical === "latest" &&
-        !page.meta.seo.canonical &&
-        currentKeys?.has(`${page.versionKey}\u0000${page.locale}`))
-    );
-  };
-
-  const eligible = project.graph.pages.filter(
-    (page) =>
-      !page.meta.draft &&
-      !isHiddenPage(page, project.graph) &&
-      !page.meta.seo.noindex &&
-      !ERROR_ROUTES.has(page.route) &&
-      !archivedExcluded(page) &&
-      !canonicalElsewhere(
-        page.meta.seo.canonical,
-        mountBasePath(deployBase, page.route)
-      )
-  );
-  const listed = new Set(eligible.map((page) => page.route));
   const alternatesEnabled =
     project.config.seo.sitemap !== true &&
     project.config.seo.sitemap.alternates;
-  const routesByPath = new Map(
-    alternatesEnabled
-      ? project.manifest.routes.map((entry) => [
-          mountBasePath(deployBase, entry.path),
-          entry,
-        ])
-      : []
-  );
+  const hreflang = alternatesEnabled ? hreflangAlternates(project) : null;
+  // A page's translations as `xhtml:link`s, plus `x-default` at the default
+  // locale's — the same set the page head links, for pages in 2+ locales.
   const alternateTags = (route: string): string => {
-    if (!alternatesEnabled) {
-      return "";
-    }
-    const alternates =
-      routesByPath
-        .get(route)
-        ?.alternates.filter((entry) => listed.has(entry.path)) ?? [];
+    const alternates = hreflang?.get(route) ?? [];
     if (alternates.length < 2) {
       return "";
     }
@@ -195,9 +219,14 @@ export const buildSitemapFiles = (
       )
       .join("");
   };
+
   const seen = new Set<string>();
   const urls: string[] = [];
-  const pushUrl = (route: string, lastModified?: string): void => {
+  const pushUrl = (
+    route: string,
+    lastModified?: string,
+    alternates = ""
+  ): void => {
     // `<loc>` must be a well-formed, XML-escaped URL: percent-encode the path,
     // then escape XML metacharacters (notably `&`) so a route like
     // `/Tips & Tricks` doesn't produce invalid XML that gets the whole sitemap
@@ -208,12 +237,15 @@ export const buildSitemapFiles = (
     }
     seen.add(loc);
     urls.push(
-      `  <url><loc>${loc}</loc>${lastmodTag(lastModified)}${alternateTags(route)}</url>`
+      `  <url><loc>${loc}</loc>${lastmodTag(lastModified)}${alternates}</url>`
     );
   };
-  for (const page of eligible) {
-    const served = mountBasePath(deployBase, page.route);
-    pushUrl(served, page.lastModified);
+  for (const page of listedPages(project)) {
+    pushUrl(
+      mountBasePath(deployBase, page.route),
+      page.lastModified,
+      alternateTags(page.route)
+    );
   }
   // Custom `.astro` pages and the generated changelog index mount outside
   // `basePath` (they're injected at their pattern — see `blumeIntegration`), so
