@@ -1619,6 +1619,7 @@ const ogConfigSchema = z.strictObject({
    * families are fetched from Google Fonts at build.
    */
   fonts: z.array(ogFontSchema).optional(),
+  image: z.union([z.string(), z.record(z.string(), z.string())]).optional(),
   /**
    * Local SVG used in the generated card instead of the site logo; `false`
    * renders the card without any brand mark.
@@ -1728,6 +1729,16 @@ type SoftwareResolved = z.output<typeof softwareConfigSchema>;
 
 /** Discoverability features: OG images, feeds, sitemap, structured data. */
 const seoConfigFields = {
+  datePublished: z.union([z.literal(false), z.literal("git")]).default(false),
+  jsonLd: z
+    .strictObject({
+      author: z.strictObject({ "@id": z.url() }).optional(),
+      organizationId: z.url().optional(),
+      publisher: z.strictObject({ "@id": z.url() }).optional(),
+      website: z.boolean().default(true),
+      websiteId: z.url().optional(),
+    })
+    .prefault({}),
   /**
    * Meta tags written into every page's head, name to content: site
    * verification, `theme-color`, and anything else Blume has no setting for.
@@ -1755,7 +1766,12 @@ const seoConfigFields = {
   robots: z.boolean().default(true),
   rss: rssConfigSchema.prefault({}),
   /** Generate sitemap.xml (requires deployment.site). */
-  sitemap: z.boolean().default(true),
+  sitemap: z
+    .union([
+      z.boolean(),
+      z.strictObject({ alternates: z.boolean().default(false) }),
+    ])
+    .default(true),
   /** The documented product, as a homepage `SoftwareApplication` node. */
   software: z
     .union([z.boolean(), softwareConfigSchema])

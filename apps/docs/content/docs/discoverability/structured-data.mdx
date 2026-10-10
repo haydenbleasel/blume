@@ -48,6 +48,51 @@ seo: {
 
 `software` adds a **SoftwareApplication** node to the homepage: the product's name and description (defaulting to the site's), `applicationCategory` (default `"DeveloperApplication"`), operating system, license, an `Offer` when `price` is set, and the registry or repository URLs in `sameAs`. Pass `software: true` to take every default. The organization, when configured, is cited as its `publisher`.
 
+## Shared entity identifiers
+
+When docs share an origin with another site, reuse its entity identifiers:
+
+```ts blume.config.ts lineNumbers
+seo: {
+  jsonLd: {
+    websiteId: "https://example.com/#website",
+    organizationId: "https://example.com/#organization",
+    website: false,
+  },
+}
+```
+
+`websiteId` changes both the WebSite node's `@id` and the page's `isPartOf` reference. `organizationId` changes the Organization node's `@id` and publisher references; it can also reference an external organization without configuring `seo.organization`. `website: false` omits the WebSite definition while keeping the page's `isPartOf` reference. By default, Blume emits the WebSite node and uses the site URL plus `#website` and `#organization`. Identifiers must be absolute URLs.
+
+## Page author and publisher
+
+Reference existing entities on every page:
+
+```ts blume.config.ts lineNumbers
+seo: {
+  jsonLd: {
+    author: { "@id": "https://example.com/#author" },
+    publisher: { "@id": "https://example.com/#publisher" },
+  },
+}
+```
+
+These references apply to the WebPage or article node. The explicit publisher takes precedence over the organization's publisher reference on that node. Blume does not emit entity definitions for these references. With neither option set, attribution keeps its existing defaults.
+
+## Publication date from Git
+
+Use the earliest commit date of each content file, following renames:
+
+```ts blume.config.ts lineNumbers
+seo: {
+  datePublished: "git",
+}
+```
+
+This replaces the frontmatter publication date in JSON-LD. Files without history, staged content without a source path, and shallow clones emit no publication date in this mode. Use a full clone in CI to retain the original date. The default, `false`, keeps the frontmatter `date` or `changelog.date`; [`lastModified`](/docs/configuration#last-modified) remains independent.
+
+The resolved [Open Graph image](/docs/discoverability/open-graph) is also included as the page node's `image`, whether it comes from frontmatter, a site default, or a generated card.
+
 ## Custom pages
 
 A custom [`.astro` page](/docs/advanced/custom-pages) rendered through `PageLayout` emits the same graph, so a marketing home page isn't the one URL without structured data. A custom page has no content file to date, so pass `lastModified` to give it a `dateModified`. Pass `structuredDataEnabled={config.structuredData}` to keep it in sync with this setting, or `structuredDataEnabled={false}` to turn it off for that page alone.

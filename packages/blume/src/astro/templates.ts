@@ -2538,6 +2538,7 @@ export function getStaticPaths() {
       fallback: route.fallback,
       indexable: route.indexable,
       lastModified: route.lastModified,
+      published: route.published,
       locale: route.locale,
       monolingual: route.monolingual,
       route: route.path,
@@ -2548,7 +2549,7 @@ export function getStaticPaths() {
   }));
 }
 
-const { entryId, collection, route, title, indexable, editUrl, lastModified, locale, alternates, fallback, monolingual, version, versionAlternates } = Astro.props;
+const { entryId, collection, route, title, indexable, editUrl, lastModified, published, locale, alternates, fallback, monolingual, version, versionAlternates } = Astro.props;
 const entry = await getEntry(collection as CollectionKey, entryId);
 if (!entry) {
   return new Response(null, { status: 404 });
@@ -2605,12 +2606,14 @@ const ogPath = data.config.og.enabled
 // always mounted under it.
 const absoluteOg = (path: string, based: (path: string) => string) =>
   base && path.startsWith("/") ? \`\${base}\${based(path)}\` : path;
-const ogImage = seo.image
-  ? absoluteOg(seo.image, withBase)
+const defaultOgImage = typeof data.config.og.image === "string" ? data.config.og.image : data.config.og.image?.[locale];
+const selectedOgImage = seo.image ?? defaultOgImage;
+const ogImage = selectedOgImage
+  ? absoluteOg(selectedOgImage, withBase)
   : ogPath && absoluteOg(ogPath, withMountedBase);
 // Blume's generated card has known dimensions the layout can declare; a user's
 // \`seo.image\` could be any size or format, so it gets none.
-const ogGenerated = !seo.image && Boolean(ogPath);
+const ogGenerated = !selectedOgImage && Boolean(ogPath);
 
 // X attribution: the site's account, plus a creator the page can claim for
 // itself (a guest post crediting its own author) over the configured default.
@@ -2874,7 +2877,7 @@ const LayoutComponent = resolveSlot(layoutOverrides.Layout, RootLayout);
   pageType={frontmatter.type}
   apiRail={remarkPluginFrontmatter?.${API_RAIL_KEY} === true}
   pageMode={frontmatter.mode}
-  published={frontmatter.date ?? frontmatter.changelog?.date ?? null}
+  published={data.config.datePublished === "git" ? published : frontmatter.date ?? frontmatter.changelog?.date ?? null}
   lastModified={lastModified}
   noindex={effectiveNoindex}
   structuredDataEnabled={data.config.structuredData}

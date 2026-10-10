@@ -15,6 +15,18 @@ seo: {
 }
 ```
 
+### Locale alternates
+
+Opt into alternate links on a multilingual site's sitemap:
+
+```ts blume.config.ts lineNumbers
+seo: {
+  sitemap: { alternates: true },
+}
+```
+
+Each translated page lists its indexable locale equivalents, including itself, as `xhtml:link` elements. When the default locale is in the group, it also supplies the `x-default` link. Excluded pages do not appear as alternates; groups with fewer than two eligible locales emit no alternate links. URLs include the deployment base. `sitemap: true` and `sitemap: {}` keep alternates disabled; `sitemap: false` disables the sitemap.
+
 Ship your own `public/sitemap.xml` to take over — Blume never overwrites a file you place in `public/`.
 
 ## Robots

@@ -71,6 +71,7 @@ import {
 import { EN_UI, resolveUIStrings } from "../core/i18n-ui.ts";
 import { resolveFallbackLocale } from "../core/i18n.ts";
 import { buildIncludeGraph } from "../core/includes.ts";
+import { gitPublishedTime } from "../core/last-modified.ts";
 import { resolveLocalizable } from "../core/localizable.ts";
 import {
   validateMcpClientIcons,
@@ -1234,6 +1235,7 @@ export const buildRuntimeData = (project: BlumeProject): string => {
       codeWrap: config.markdown.code.wrap,
       consent: config.consent,
       dateFormat: config.dateFormat,
+      datePublished: config.seo.datePublished,
       description: config.description,
       discovery: {
         agentReadability: config.agents.agentReadability,
@@ -1273,6 +1275,7 @@ export const buildRuntimeData = (project: BlumeProject): string => {
             }
           : null,
       imageZoom: config.markdown.imageZoom,
+      jsonLd: config.seo.jsonLd,
       logo,
       mcp: config.agents.mcp.enabled
         ? {
@@ -1293,6 +1296,7 @@ export const buildRuntimeData = (project: BlumeProject): string => {
       og: {
         description: resolveOgDescription(config),
         enabled: config.seo.og.enabled ?? false,
+        image: config.seo.og.image,
         logo: ogLogo,
         palette: config.seo.og.palette,
         site: resolveOgSite(config),
@@ -1359,6 +1363,10 @@ export const buildRuntimeData = (project: BlumeProject): string => {
       locale: route.locale,
       monolingual: route.monolingual ?? false,
       path: route.path,
+      published:
+        config.seo.datePublished === "git"
+          ? (gitPublishedTime(context.root, route.sourcePath) ?? null)
+          : null,
       title: route.title,
       version: route.version,
       versionAlternates: route.versionAlternates,

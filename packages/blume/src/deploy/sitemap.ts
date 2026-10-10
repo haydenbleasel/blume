@@ -79,9 +79,10 @@ export const describeSitemapFiles = (files: readonly SitemapFile[]): string =>
 const URLS_PER_FILE = 50_000;
 
 const renderUrlset = (
-  urls: string[]
+  urls: string[],
+  alternatesEnabled: boolean
 ): string => `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"${alternatesEnabled ? ' xmlns:xhtml="http://www.w3.org/1999/xhtml"' : ""}>
 ${urls.join("\n")}
 </urlset>
 `;
@@ -146,6 +147,54 @@ export const buildSitemapFiles = (
     );
   };
 
+  const eligible = project.graph.pages.filter(
+    (page) =>
+      !page.meta.draft &&
+      !isHiddenPage(page, project.graph) &&
+      !page.meta.seo.noindex &&
+      !ERROR_ROUTES.has(page.route) &&
+      !archivedExcluded(page) &&
+      !canonicalElsewhere(
+        page.meta.seo.canonical,
+        mountBasePath(deployBase, page.route)
+      )
+  );
+  const listed = new Set(eligible.map((page) => page.route));
+  const alternatesEnabled =
+    project.config.seo.sitemap !== true &&
+    project.config.seo.sitemap.alternates;
+  const routesByPath = new Map(
+    alternatesEnabled
+      ? project.manifest.routes.map((entry) => [
+          mountBasePath(deployBase, entry.path),
+          entry,
+        ])
+      : []
+  );
+  const alternateTags = (route: string): string => {
+    if (!alternatesEnabled) {
+      return "";
+    }
+    const alternates =
+      routesByPath
+        .get(route)
+        ?.alternates.filter((entry) => listed.has(entry.path)) ?? [];
+    if (alternates.length < 2) {
+      return "";
+    }
+    const defaultPage = alternates.find(
+      (entry) => entry.locale === project.config.i18n?.defaultLocale
+    );
+    const links = defaultPage
+      ? [...alternates, { ...defaultPage, locale: "x-default" }]
+      : alternates;
+    return links
+      .map(
+        (entry) =>
+          `<xhtml:link rel="alternate" hreflang="${escapeXml(entry.locale)}" href="${escapeXml(encodeURI(`${base}${mountBasePath(deployBase, entry.path)}`))}"/>`
+      )
+      .join("");
+  };
   const seen = new Set<string>();
   const urls: string[] = [];
   const pushUrl = (route: string, lastModified?: string): void => {
@@ -158,20 +207,12 @@ export const buildSitemapFiles = (
       return;
     }
     seen.add(loc);
-    urls.push(`  <url><loc>${loc}</loc>${lastmodTag(lastModified)}</url>`);
+    urls.push(
+      `  <url><loc>${loc}</loc>${lastmodTag(lastModified)}${alternateTags(route)}</url>`
+    );
   };
-  for (const page of project.graph.pages) {
+  for (const page of eligible) {
     const served = mountBasePath(deployBase, page.route);
-    if (
-      page.meta.draft ||
-      isHiddenPage(page, project.graph) ||
-      page.meta.seo.noindex ||
-      ERROR_ROUTES.has(page.route) ||
-      archivedExcluded(page) ||
-      canonicalElsewhere(page.meta.seo.canonical, served)
-    ) {
-      continue;
-    }
     pushUrl(served, page.lastModified);
   }
   // Custom `.astro` pages and the generated changelog index mount outside
@@ -192,7 +233,9 @@ export const buildSitemapFiles = (
   urls.sort();
 
   if (urls.length <= URLS_PER_FILE) {
-    return [{ name: "sitemap.xml", xml: renderUrlset(urls) }];
+    return [
+      { name: "sitemap.xml", xml: renderUrlset(urls, alternatesEnabled) },
+    ];
   }
 
   const chunks: SitemapFile[] = [];
@@ -201,7 +244,10 @@ export const buildSitemapFiles = (
     const name = `sitemap-${chunks.length + 1}.xml`;
     chunks.push({
       name,
-      xml: renderUrlset(urls.slice(start, start + URLS_PER_FILE)),
+      xml: renderUrlset(
+        urls.slice(start, start + URLS_PER_FILE),
+        alternatesEnabled
+      ),
     });
     // Chunks sit next to sitemap.xml, so their URLs layer the same deployment
     // base robots.txt uses for the index.

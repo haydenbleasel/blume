@@ -1099,6 +1099,8 @@ export interface OgPaletteConfig {
 
 /** Per-page Open Graph image generation. */
 export interface OgConfig {
+  /** Default social image, shared or keyed by locale; page seo.image wins. */
+  image?: string | Record<string, string>;
   /**
    * Card subtitle. Defaults to the site description; a string overrides it,
    * `false` renders the card without one.
@@ -1223,6 +1225,20 @@ export interface SoftwareConfig {
 
 /** Discoverability: OG images, feeds, sitemap, robots, and structured data. */
 export interface SeoConfig {
+  /** Shared entity identifiers and page attribution for structured data. */
+  jsonLd?: {
+    /** WebSite identifier; defaults to the site URL plus #website. */
+    websiteId?: string;
+    /** Organization identifier, also usable without an Organization body. */
+    organizationId?: string;
+    author?: { "@id": string };
+    publisher?: { "@id": string };
+    /** Emit the WebSite node. Defaults to true; references are retained. */
+    website?: boolean;
+  };
+  /** Use the earliest Git commit date, following renames, instead of frontmatter. */
+  datePublished?: false | "git";
+
   /**
    * Meta tags written into every page's head, name to content: site
    * verification tokens, `theme-color`, an app banner, and anything else
@@ -1262,7 +1278,12 @@ export interface SeoConfig {
   /** RSS/Atom feeds. */
   rss?: RssConfig;
   /** Generate sitemap.xml (requires `deployment.site`). Defaults to `true`. */
-  sitemap?: boolean;
+  sitemap?:
+    | boolean
+    | {
+        /** Emit locale alternate links. Defaults to false. */
+        alternates?: boolean;
+      };
   /**
    * The documented product, added to the homepage's JSON-LD as a
    * `SoftwareApplication` node. `true` takes every default (name and

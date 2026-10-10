@@ -248,3 +248,29 @@ export const lastModifiedShallowWarning = (
     },
   ];
 };
+
+/** First commit date, following renames; incomplete history yields no date. */
+export const gitPublishedTime = (
+  root: string,
+  sourcePath?: string
+): string | undefined => {
+  if (!sourcePath || isShallowGitRepository(root)) {
+    return undefined;
+  }
+  try {
+    // oxlint-disable-next-line sonarjs/no-os-command-from-path
+    const history = execFileSync(
+      "git",
+      ["-C", root, "log", "--follow", "--format=%cI", "--", sourcePath],
+      {
+        encoding: "utf-8",
+        env: gitEnv(),
+        stdio: ["ignore", "pipe", "ignore"],
+      }
+    ).trim();
+    const first = history.split("\n").at(-1);
+    return first ? new Date(first).toISOString() : undefined;
+  } catch {
+    return undefined;
+  }
+};

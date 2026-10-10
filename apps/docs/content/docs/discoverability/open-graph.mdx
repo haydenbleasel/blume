@@ -11,6 +11,21 @@ seo: {
 }
 ```
 
+## Default image
+
+Set `seo.og.image` to a shared image or a map keyed by locale:
+
+```ts blume.config.ts lineNumbers
+seo: {
+  og: {
+    image: { en: "/og/default-en.png", fr: "/og/default-fr.png" },
+    // Or image: "https://example.com/og/default.png"
+  },
+}
+```
+
+A page's `seo.image` wins over this default. A locale without a configured image falls back to its generated card when generation is enabled. Defaults work with generation disabled and on custom pages rendered with `PageLayout`; custom `ogImage` props take precedence. Root-relative images resolve under the deployment base. The resolved image is passed into the page's JSON-LD. Blume declares dimensions only for generated cards. Omit `image` to keep the existing image selection.
+
 ## Brand the generated card
 
 Set a local SVG and color palette to match the generated card to your brand. The logo can live in `public/` or at the project root. Omit any palette value to keep its default.

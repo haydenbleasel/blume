@@ -66,6 +66,14 @@ export interface StructuredDataIdentity {
 
 /** Inputs for a page's JSON-LD, all known at render time in RootLayout. */
 export interface StructuredDataInput {
+  jsonLd?: {
+    websiteId?: string;
+    organizationId?: string;
+    author?: { "@id": string };
+    publisher?: { "@id": string };
+    website?: boolean;
+  };
+  image?: string | null;
   siteName: string;
   /** Absolute site origin, or null when `deployment.site` is unset. */
   siteUrl: string | null;
@@ -299,10 +307,21 @@ const pageNode = (
     node.dateModified = modified;
   }
   if (context.base) {
-    node.isPartOf = { "@id": `${context.base}#website` };
+    node.isPartOf = {
+      "@id": input.jsonLd?.websiteId ?? `${context.base}#website`,
+    };
   }
   if (context.organizationId) {
     node.publisher = { "@id": context.organizationId };
+  }
+  if (input.jsonLd?.author) {
+    node.author = input.jsonLd.author;
+  }
+  if (input.jsonLd?.publisher) {
+    node.publisher = input.jsonLd.publisher;
+  }
+  if (input.image) {
+    node.image = input.image;
   }
   return node;
 };
@@ -335,6 +354,27 @@ const breadcrumbNode = (
   };
 };
 
+const addWebsiteNode = (
+  graph: JsonLdNode[],
+  input: StructuredDataInput,
+  base: string | null,
+  rootUrl: string,
+  organizationId: string | null
+): void => {
+  if (base && input.jsonLd?.website !== false) {
+    const website: JsonLdNode = {
+      "@id": input.jsonLd?.websiteId ?? `${base}#website`,
+      "@type": "WebSite",
+      name: input.siteName,
+      url: rootUrl,
+    };
+    if (organizationId) {
+      website.publisher = { "@id": organizationId };
+    }
+    graph.push(website);
+  }
+};
+
 /**
  * Build a schema.org JSON-LD `@graph` for a page: site identity (the WebSite,
  * plus the configured Organization everywhere and the SoftwareApplication on
@@ -355,20 +395,11 @@ export const buildStructuredData = (input: StructuredDataInput): JsonLdNode => {
   // the same rule as the WebSite node they attach to.
   const organization = base ? input.identity?.organization : undefined;
   const software = base ? input.identity?.software : undefined;
-  const organizationId = organization ? `${base}#organization` : null;
+  const organizationId =
+    input.jsonLd?.organizationId ??
+    (organization ? `${base}#organization` : null);
 
-  if (base) {
-    const website: JsonLdNode = {
-      "@id": `${base}#website`,
-      "@type": "WebSite",
-      name: input.siteName,
-      url: rootUrl,
-    };
-    if (organizationId) {
-      website.publisher = { "@id": organizationId };
-    }
-    graph.push(website);
-  }
+  addWebsiteNode(graph, input, base, rootUrl, organizationId);
   if (organization && organizationId) {
     graph.push(
       organizationNode(organization, {

@@ -103,6 +103,8 @@ export interface BlumeRoute {
   id: string;
   /** Whether the page is part of the search index. */
   indexable: boolean;
+  /** First Git commit date when seo.datePublished is "git", else null. */
+  published?: string | null;
   /** ISO "last updated" date when the feature is on, else `null`. */
   lastModified: string | null;
   /** Resolved locale code (the default locale when not under i18n). */
@@ -229,6 +231,7 @@ export interface BlumeDataConfig {
    * kept out of this snapshot, which pages serialize into HTML.
    */
   og: {
+    image?: string | Record<string, string>;
     /**
      * Site-wide card subtitle: `seo.og.description` (`false` omits it) over
      * the site description. A page with its own description shows that
@@ -265,6 +268,8 @@ export interface BlumeDataConfig {
   };
   /** Deployment site URL, or `null` when none is configured/detected. */
   site: string | null;
+  jsonLd: ResolvedConfig["seo"]["jsonLd"];
+  datePublished: ResolvedConfig["seo"]["datePublished"];
   structuredData: boolean;
   theme: ResolvedConfig["theme"];
   title: string;
