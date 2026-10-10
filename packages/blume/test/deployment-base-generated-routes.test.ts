@@ -137,7 +137,7 @@ describe("generated pages render their routes under the base", () => {
       "const absolute = (path: string) => base + withMountedBase(path);"
     );
     // An authored `seo.image` keeps a hand-written base; the card is mounted.
-    expect(out).toContain("? absoluteOg(seo.image, withBase)");
+    expect(out).toContain("? absoluteOg(selectedOgImage, withBase)");
     expect(out).toContain(": ogPath && absoluteOg(ogPath, withMountedBase);");
   });
 });
