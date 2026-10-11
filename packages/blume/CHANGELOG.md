@@ -1,5 +1,15 @@
 # blume
 
+## 2.2.3
+
+### Patch Changes
+
+- 528f95e: The assistant now reads a page's links to other pages (`[Install](./install)`, `[Setup](../setup.md)`, `[Setup](/guides/setup.md)`) as the routes they mean, as the `.md` mirrors, `llms-full.txt`, and MCP `get_page` already did, so the links it cites in an answer land on the page they mean. A link on a translated page to a page that isn't translated yet points at the page the assistant can read. Pages from a remote or CMS source, such as `mdxRemote()`, now get that rewrite on every agent surface too. Before, the assistant read such links as written and could cite `../setup.md`, a link that led nowhere from the answer, and a remote page's links stayed as written on the agent surfaces, though the rendered page and `blume validate` resolved them. A relative link in a raw HTML `<a href>` now points on the agent surfaces where it goes on the rendered page, resolved against the page's URL as the browser resolves it, rather than the way a Markdown link resolves.
+- 87cb8c4: The assistant cites pages as links more reliably on smaller models. Each documentation excerpt it reads, and each `search_docs` and `read_page` result, is now headed by the Markdown link to cite (`## [Page Title](/route)`), and the model is asked to copy that link. A page whose route has a space, a parenthesis, or a percent sign is cited with those characters percent-encoded (`%20`, `%28`, `%29`, `%25`), so its link works too. Before, the heading was `## Page Title (/route)`, and a model that copied it wrote `[Page Title (/route)]`, `[[Page Title (/route)]]`, or `[/route]`, which showed in the answer as raw text instead of a link.
+- e41c71f: Search now keeps words whole whatever Latin letters they hold. Orama's default tokenizer split words at any letter beyond ASCII and a few accented vowels, so Swedish "när" was indexed as "n" and "r" and matched unrelated pages, and German "Prüfung" as "pr" and "fung". Blume now keeps every Latin letter, folding accents the way Orama already folded "café" and spelling ø, ł and ß as o, l and ss, in the default Orama search dialog, the MCP server's `search_docs`, and the assistant. A soft hyphen (`&shy;`) no longer splits the word it sits in, and a result found by folding is highlighted and excerpted at the accented word. ASCII text is tokenized exactly as before.
+- 2a0628c: The language switcher keeps the reader's place: the chosen link carries the current URL fragment.
+- 34b3e0f: Add SEO options for docs that live inside another site: shared JSON-LD entity ids and attribution (`seo.jsonLd`), a default social image in place of generated cards (`seo.og.image`), publication dates from git for pages without a front matter `date` (`seo.datePublished: "git"`), and hreflang alternates in the sitemap (`seo.sitemap: { alternates: true }`). Page JSON-LD now also carries the page's social image and credits its front matter `authors`, and hreflang links leave out `noindex`, hidden, and canonical-elsewhere translations.
+
 ## 2.2.2
 
 ### Patch Changes
