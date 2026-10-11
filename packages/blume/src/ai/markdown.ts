@@ -7,7 +7,7 @@ import { discoverPages, discoverPagesSync } from "../core/custom-pages.ts";
 import matter from "../core/frontmatter.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
 import { readExpandedEntryText } from "../core/sources/read.ts";
-import type { RouteManifestEntry } from "../core/types.ts";
+import type { PageRecord, RouteManifestEntry } from "../core/types.ts";
 import { advertisedConfig, servesMcp } from "./agent-surface.ts";
 import { buildChangelogIndexMarkdown } from "./changelog-markdown.ts";
 import { downlevelComponents } from "./component-markdown.ts";
@@ -64,8 +64,10 @@ export const buildRawMarkdown = async (
   const components = projectComponentSerializers(project);
   const rewriteLinks = relativeLinkRewriter(project);
 
-  const readRoute = async (route: RouteManifestEntry): Promise<string> => {
-    const page = pageById.get(route.id);
+  const readRoute = async (
+    route: RouteManifestEntry,
+    page: PageRecord | undefined
+  ): Promise<string> => {
     if (page) {
       return await readExpandedEntryText(project, page);
     }
@@ -74,7 +76,8 @@ export const buildRawMarkdown = async (
 
   const entries = await Promise.all(
     project.manifest.routes.map(async (route) => {
-      let text = await readRoute(route);
+      const page = pageById.get(route.id);
+      let text = await readRoute(route, page);
       if (route.sourcePath) {
         text = rewriteRelativeAssets({
           deployBase: project.config.deployment.options.base,
@@ -87,7 +90,7 @@ export const buildRawMarkdown = async (
       // agent fetched resolves it to, and `/install` gains the base and the
       // page's locale the rendered link has — remote content included.
       text = rewriteLinks(text, {
-        entryId: pageById.get(route.id)?.entryId,
+        entryId: page?.entryId,
         route: route.path,
         sourcePath: route.sourcePath,
       });

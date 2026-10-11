@@ -250,6 +250,36 @@ export const resolveRelativeHref = (
 };
 
 /**
+ * Where a relative page link in a raw HTML `<a href>` written on `route`
+ * lands, with the authored `?query#hash` kept, or `undefined` when `href`
+ * isn't a relative page link (see {@link resolveRelativeHref}). The Markdown
+ * pipeline leaves a raw element as written, so the browser resolves it
+ * against the page's slashless URL, as `blume validate` reads it: its parent
+ * directory, even on an index page, and a `.md` target is that path's
+ * Markdown copy rather than a file link.
+ */
+export const resolveRawRelativeHref = (
+  href: string,
+  route: string,
+  hasRoute: (route: string) => boolean
+): string | undefined => {
+  if (href === "" || NOT_RELATIVE.test(href)) {
+    return undefined;
+  }
+  const suffixAt = href.search(/[?#]/u);
+  const path = suffixAt === -1 ? href : href.slice(0, suffixAt);
+  const resolved = resolveRelative(route, path, false);
+  if (
+    FILE_EXT.test(path) &&
+    !DOC_EXT.test(path) &&
+    !hasRoute(decodePercent(resolved))
+  ) {
+    return undefined;
+  }
+  return `${resolved}${suffixAt === -1 ? "" : href.slice(suffixAt)}`;
+};
+
+/**
  * Where a root-relative link to a content file (`/guide/new.md`, the way
  * VitePress, Docsify, and TypeDoc write one) lands: the route of the source
  * file it names under the content root, with the authored `?query#hash`

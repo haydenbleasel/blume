@@ -186,10 +186,14 @@ describe("relative page links on the agent surfaces", () => {
   });
 
   it("rewrites them in the assistant's grounding, without the deployment base", async () => {
-    // The chat panel mounts the links it renders under `deployment.base`.
+    // The chat panel mounts the links it renders under `deployment.base`. A
+    // root link to a content file lands on its page there too, read with the
+    // base or without it; other root links stay as written.
     const project = await scanFixture({
       ...FILES,
-      "docs/guides/rooted.md": "# Rooted\n\nSee [Install](/guides/install).\n",
+      "docs/guides/cards.mdx": '# Cards\n\n<Card href="./install" />\n',
+      "docs/guides/rooted.md":
+        "# Rooted\n\nSee [Install](/guides/install), [Setup](/guides/setup.md#run) and [it again](/sub/guides/setup.md).\n",
     });
     const { documents } = await buildAskData(project);
     const content = (route: string) =>
@@ -198,14 +202,20 @@ describe("relative page links on the agent surfaces", () => {
       "See [Install](/guides/install)."
     );
     expect(content("/guides/rooted")).toContain(
-      "See [Install](/guides/install)."
+      "See [Install](/guides/install), [Setup](/guides/configure#run) and [it again](/guides/configure)."
+    );
+    // The link is rewritten before the card downlevels, so the label the
+    // card takes from its `href` is the route too, as in llms-full.txt.
+    expect(content("/guides/cards")).toContain(
+      "**[/guides/install](/guides/install)**"
     );
     expect(documents.some((doc) => doc.content.includes("/sub/"))).toBe(false);
   });
 
-  it("rewrites only relative links in the assistant's grounding", async () => {
-    // Relative links become the routes the snapshot holds (basePath and all,
-    // but no deployment base); root links aren't rewritten here.
+  it("points them at the pages the assistant's snapshot holds", async () => {
+    // Routes carry basePath but no deployment base. An untranslated sibling
+    // is the default tree's page, which the snapshot holds, however the link
+    // names it; its French fallback copy isn't in the snapshot.
     const project = await scanFixture({
       "blume.config.ts": `export default {
   basePath: "/docs",
@@ -213,22 +223,63 @@ describe("relative page links on the agent surfaces", () => {
   i18n: { defaultLocale: "en", locales: [{ code: "en", label: "English" }, { code: "fr", label: "Français" }] },
 };`,
       "docs/fr/guides/leaf.md":
-        "# Feuille\n\nVoir [Install](./install.md) et [encore](/guides/install).\n",
+        "# Feuille\n\nVoir [Install](./install), [le fichier](./install.md#run) et [Setup](./setup).\n",
+      "docs/fr/guides/setup.md": "# Configurer\n",
       "docs/guides/install.md": "# Install\n",
-      "docs/guides/leaf.md":
-        "# Leaf\n\nSee [Install](./install) and [it again](/guides/install).\n",
+      "docs/guides/leaf.md": "# Leaf\n\nSee [Install](./install).\n",
+      "docs/guides/setup.md": "# Setup\n",
     });
     const { documents } = await buildAskData(project);
     const content = (route: string) =>
       documents.find((doc) => doc.route === route)?.content;
     expect(content("/docs/guides/leaf")).toContain(
-      "See [Install](/docs/guides/install) and [it again](/guides/install)."
+      "See [Install](/docs/guides/install)."
     );
-    // An untranslated sibling is the default tree's page, which the
-    // snapshot holds; its French fallback copy isn't in it.
     expect(content("/docs/fr/guides/leaf")).toContain(
-      "Voir [Install](/docs/guides/install) et [encore](/guides/install)."
+      "Voir [Install](/docs/guides/install), [le fichier](/docs/guides/install#run) et [Setup](/docs/fr/guides/setup)."
     );
+    expect(content("/docs/guides/install")).toBeDefined();
+    expect(content("/docs/fr/guides/setup")).toBeDefined();
+  });
+
+  it("reads a raw `<a href>` the way the browser does", async () => {
+    // The rendered page ships it as written, so it resolves against the
+    // page's slashless URL: an index page's parent folder, and a `.md`
+    // target is a Markdown copy rather than a file link.
+    const project = await scanFixture({
+      ...FILES,
+      "docs/guides/index.md":
+        '# Guides\n\n<a href="./install">Install</a>, not <a href="./diagram.png">the diagram</a>, <a href="#top">the top</a> or <a href="https://example.com/x">elsewhere</a>.\n',
+      "docs/guides/leaf.md": '# Leaf\n\n<a href="./setup.md#run">Copy</a>\n',
+    });
+    const raw = await buildRawMarkdown(project);
+    expect(raw["/guides"]?.mdx).toContain(
+      '<a href="/sub/install">Install</a>, not <a href="./diagram.png">the diagram</a>, <a href="#top">the top</a> or <a href="https://example.com/x">elsewhere</a>.'
+    );
+    expect(raw["/guides/leaf"]?.mdx).toContain(
+      '<a href="/sub/guides/setup.md#run">Copy</a>'
+    );
+    const { documents } = await buildAskData(project);
+    const content = (route: string) =>
+      documents.find((doc) => doc.route === route)?.content;
+    expect(content("/guides")).toContain('<a href="/install">Install</a>');
+    expect(content("/guides/leaf")).toContain(
+      '<a href="/guides/setup.md#run">Copy</a>'
+    );
+  });
+
+  it("resolves each page's links from its own file when two share a route", async () => {
+    // `BLUME_DUPLICATE_ROUTE` is reported, but a dev regeneration still
+    // builds the snapshot, one document per page.
+    const project = await scanFixture({
+      "docs/guides/install.md": "# Install\n",
+      "docs/guides/setup.md": "# Setup\n\n[Leaf](./install)\n",
+      "docs/guides/setup/index.md": "# Setup\n\n[Index](./install)\n",
+    });
+    const { documents } = await buildAskData(project);
+    const contents = documents.map((doc) => doc.content);
+    expect(contents).toContain("# Setup\n\n[Leaf](/guides/install)");
+    expect(contents).toContain("# Setup\n\n[Index](/guides/setup/install)");
   });
 
   it("resolves a staged page's links by its path under the staging dir", async () => {

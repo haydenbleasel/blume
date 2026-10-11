@@ -11,6 +11,8 @@ import type {
   DownlevelWalk,
   MdastNode as DownlevelNode,
 } from "../ai/component-markdown.ts";
+import { relativeLinkRewriter } from "../ai/relative-links.ts";
+import type { RelativeLinkRewriter } from "../ai/relative-links.ts";
 import { projectComponentSerializers } from "../ai/serializers.ts";
 import { applyAudienceVisibility } from "../ai/visibility.ts";
 import type { VisibilityAudience } from "../ai/visibility.ts";
@@ -399,17 +401,20 @@ interface BuildOptions {
 
 /**
  * Read a page's body and reduce it per the extraction options. The
- * `"markdown"` body is agent-facing, so its components are downleveled in the
- * source with the serializers every agent surface uses (front matter in scope
- * for prop expressions). The plain body is parsed as written and walked, with
- * the same serializers applied per component on the way, so the index reads a
- * `<Card>` or `<TypeTable>` as the text it shows.
+ * `"markdown"` body, the one `rewriteLinks` comes with, is agent-facing: its
+ * page links are rewritten, then its components downleveled in the source
+ * with the serializers every agent surface uses (front matter in scope for
+ * prop expressions), in the order llms-full.txt takes. The plain body is
+ * parsed as written and walked, with the same serializers applied per
+ * component on the way, so the index reads a `<Card>` or `<TypeTable>` as
+ * the text it shows.
  */
 const pageBody = async (
   project: BlumeProject,
   page: PageRecord | undefined,
-  options: Pick<BuildOptions, "audience" | "content"> | undefined,
-  components: Record<string, ComponentMarkdown>
+  options: Pick<BuildOptions, "audience"> | undefined,
+  components: Record<string, ComponentMarkdown>,
+  rewriteLinks: RelativeLinkRewriter | undefined
 ): Promise<string> => {
   if (!page) {
     return "";
@@ -419,8 +424,12 @@ const pageBody = async (
     parsed.content,
     options?.audience ?? "web"
   );
-  if (options?.content === "markdown") {
-    return downlevelComponents(visible.trim(), components, parsed.data);
+  if (rewriteLinks) {
+    return downlevelComponents(
+      rewriteLinks(visible, page).trim(),
+      components,
+      parsed.data
+    );
   }
   return toPlainText(visible, page.format, {
     downlevel: {
@@ -460,7 +469,9 @@ const rankingFields = (
  * same serializers the `.md` mirror, llms-full.txt and MCP `get_page` use: a
  * page whose body is a `<CardGroup>` of `<Card>`s is prose to a reader and bare
  * JSX to anything reading the source, and section landing pages are exactly
- * that shape.
+ * that shape. Its page links point at the pages they mean, as they do there
+ * too, as the routes the assistant's snapshot keys those pages by (see
+ * `relativeLinkRewriter`'s `assistant`): the model cites the links it reads.
  *
  * `audience` resolves `<Visibility>` blocks before extraction: `"web"`
  * (default) keeps web-only content and drops agents-only blocks — the site
@@ -518,6 +529,12 @@ export const buildSearchDocuments = async (
   // Built once — `downlevelComponents` rebuilds its registry per call
   // otherwise.
   const components = projectComponentSerializers(project);
+  // The `"markdown"` body is the assistant's: the model cites the links it
+  // reads, so a page link points at the page the snapshot holds.
+  const rewriteLinks =
+    options?.content === "markdown"
+      ? relativeLinkRewriter(project, { assistant: true })
+      : undefined;
 
   // A page in no sidebar group falls under the "Docs" section, in its own
   // language: the label is a UI string, resolved once per locale.
@@ -542,7 +559,13 @@ export const buildSearchDocuments = async (
   return await Promise.all(
     indexable.map(async (route) => {
       const page = pageById.get(route.id);
-      const body = await pageBody(project, page, options, components);
+      const body = await pageBody(
+        project,
+        page,
+        options,
+        components,
+        rewriteLinks
+      );
       const tags = page?.meta?.search?.tags;
       const crumb = crumbs.get(route.path);
       const facets = page ? pageFacets(page, project.config) : undefined;

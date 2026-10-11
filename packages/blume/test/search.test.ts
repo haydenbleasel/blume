@@ -60,10 +60,13 @@ const BODY = [
 ].join("\n");
 
 // SAFETY: `buildSearchDocuments` reads only a page's id, sourcePath, format,
-// and the meta fields a test sets; the remaining PageRecord fields are unused.
+// route and navPath (for the `"markdown"` extraction's link rewrite), and the
+// meta fields a test sets; the remaining PageRecord fields are unused.
 const page = (over: Partial<PageRecord> & Pick<PageRecord, "id">): PageRecord =>
   ({
     format: over.id.endsWith(".mdx") ? "mdx" : "md",
+    navPath: over.id,
+    route: `/${over.id.replace(/\.mdx?$/u, "")}`,
     sourcePath: join(root, over.id),
     ...over,
   }) as PageRecord;
@@ -92,11 +95,13 @@ const projectWith = (
   config: z.input<typeof blumeConfigSchema> = {},
   sources: ContentSource[] = NO_SOURCES
 ): BlumeProject =>
-  // SAFETY: `buildSearchDocuments` reads only `config`, `graph.pages`,
+  // SAFETY: `buildSearchDocuments` reads only `config`, `context.root` (for
+  // the `"markdown"` extraction's link rewrite), `graph.pages`,
   // `manifest.routes`, and `sources` (for the API reference serializers)
   // from the project.
   ({
     config: blumeConfigSchema.parse(config),
+    context: { root },
     graph: { pages },
     manifest: { routes },
     sources,
