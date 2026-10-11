@@ -1817,6 +1817,9 @@ describe("excerptHeading", () => {
     expect(
       excerptHeading({ route: "/guides/setup (beta) now", title: "Setup" })
     ).toBe("## [Setup](/guides/setup%20%28beta%29%20now)");
+    expect(excerptHeading({ route: "/pricing/100%", title: "Pricing" })).toBe(
+      "## [Pricing](/pricing/100%25)"
+    );
   });
 });
 

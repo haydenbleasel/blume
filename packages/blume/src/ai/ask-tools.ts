@@ -72,8 +72,8 @@ export const searchDocs = async (
 /**
  * The route a model asked for, as the snapshot keys it: a full URL on the
  * site becomes its path, a query string or fragment is dropped, and
- * percent-escapes are decoded (a cited route escapes whitespace and
- * parentheses; see `excerptHeading`).
+ * percent-escapes are decoded (a cited route escapes whitespace,
+ * parentheses, and `%`; see `excerptHeading`).
  */
 const routeOf = (data: AskData, requested: string): string => {
   let path = requested.trim();

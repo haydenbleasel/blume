@@ -8,6 +8,7 @@ import {
 } from "../search/fold.ts";
 import { buildOramaIndex, queryOramaIndex } from "../search/orama-index.ts";
 import type { OramaDoc } from "../search/orama-index.ts";
+import { linkText } from "./link-text.ts";
 
 /** A chat message as posted by the assistant island (`{ role, content }`). */
 export interface AskMessage {
@@ -240,20 +241,27 @@ const queryTerms = (query: string): string[] =>
 const BASE_INSTRUCTION =
   "You are a helpful documentation assistant for this project. Answer the user's question using ONLY the documentation excerpts below. Each excerpt opens with a heading that links to its page, `## [Page Title](/route)`. If the answer is not covered by the excerpts, say you don't know and suggest where in the docs to look — do not invent details. Always cite the pages you drew from with the link in the heading that opens their excerpt, written exactly as it is there: [Page Title](/route).";
 
+/** `encodeURIComponent` leaves parentheses as they are, so they're mapped here. */
+const PARENTHESES = new Map([
+  ["(", "%28"],
+  [")", "%29"],
+]);
+
 /**
  * An excerpt's heading: the Markdown link the model cites the page with. A
  * bracket or backslash in the title, or whitespace or a parenthesis in the
- * route, would break the link, so those are escaped; the rest of the route
- * stays as the reader sees it (`/ja/ポイント`).
+ * route, would break the link, and a `%` in the route would read back as an
+ * escape (`read_page` decodes them), so those are escaped; the rest of the
+ * route stays as the reader sees it (`/ja/ポイント`).
  */
 export const excerptHeading = (
   doc: Pick<OramaDoc, "route" | "title">
 ): string => {
-  const text = doc.title.replaceAll(/[\\[\]]/gu, String.raw`\$&`);
-  const target = doc.route.replaceAll(/[\s()]/gu, (char) =>
-    encodeURIComponent(char).replace("(", "%28").replace(")", "%29")
+  const target = doc.route.replaceAll(
+    /[%\s()]/gu,
+    (char) => PARENTHESES.get(char) ?? encodeURIComponent(char)
   );
-  return `## [${text}](${target})`;
+  return `## [${linkText(doc.title)}](${target})`;
 };
 
 /**

@@ -14,6 +14,7 @@ import type { NavNode, PageRecord } from "../core/types.ts";
 import { resolveReferences } from "../openapi/references.ts";
 import { docsPhrase } from "./ai-catalog.ts";
 import { API_PAGES_PATH } from "./api/paths.ts";
+import { linkText } from "./link-text.ts";
 import { asciiSlugify } from "./mcp/discovery.ts";
 import {
   SKILL_DESCRIPTION_MAX,
@@ -53,10 +54,6 @@ export const siteSkillName = (project: BlumeProject): string => {
     fromTitle || asciiSlugify(site ? new URL(site).hostname : "") || "docs";
   return name.slice(0, NAME_MAX).replace(/-+$/u, "");
 };
-
-/** A title as Markdown link text (brackets escaped, as in llms.txt). */
-const linkText = (title: string): string =>
-  title.replaceAll(/[\\[\]]/gu, String.raw`\$&`);
 
 /**
  * Current-version, default-locale pages worth listing: not API operations,

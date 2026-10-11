@@ -143,6 +143,11 @@ describe(readPage, () => {
     expect(
       readPage(DATA, new Map([[beta.route, beta]]), "/docs/setup%20%28beta%29")
     ).toStartWith("## [Setup](/docs/setup%20%28beta%29)");
+    // A `%` in the route itself is escaped too, so it doesn't decode away.
+    const literal = { ...beta, route: "/docs/50%20off", title: "Sale" };
+    expect(
+      readPage(DATA, new Map([[literal.route, literal]]), "/docs/50%2520off")
+    ).toStartWith("## [Sale](/docs/50%2520off)");
   });
 
   it("cuts a long page and names a missing one", () => {

@@ -13,6 +13,7 @@ import { AI_CATALOG_PATH, hasAiCatalog } from "./ai-catalog.ts";
 import { API_CATALOG_PATH, hasApiCatalog } from "./api-catalog.ts";
 import { API_PAGES_PATH, OPENAPI_PATH } from "./api/paths.ts";
 import { downlevelComponents } from "./component-markdown.ts";
+import { linkText } from "./link-text.ts";
 import { relativeLinkRewriter } from "./relative-links.ts";
 import { projectComponentSerializers } from "./serializers.ts";
 import {
@@ -32,13 +33,6 @@ const pageUrl = (route: string, site?: string, base = ""): string => {
   const path = mountBasePath(base, route);
   return encodeURI(site ? absoluteUrl(site, path) : path);
 };
-
-/**
- * A title as Markdown link text. An unescaped bracket in it — `[Beta] Webhooks`
- * — closes or nests the text early, and the line stops being a link.
- */
-const linkText = (title: string): string =>
-  title.replaceAll(/[\\[\]]/gu, String.raw`\$&`);
 
 /** Inputs only the build has: the published skills, collected once per build. */
 export interface LlmsIndexOptions {
