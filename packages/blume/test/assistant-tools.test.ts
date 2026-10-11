@@ -98,6 +98,27 @@ describe(readerScope, () => {
     );
   });
 
+  it("finds the reader's page from the path the browser encodes", () => {
+    // The panel sends `location.pathname`, which percent-encodes a route
+    // with non-ASCII letters or spaces.
+    const swedish = {
+      content: "# Översikt",
+      description: "",
+      locale: "sv",
+      route: "/sv/översikt",
+      title: "Översikt",
+    };
+    const data: AskData = { ...DATA, documents: [swedish] };
+    const routes = new Map([[swedish.route, swedish]]);
+    expect(
+      readerScope(data, routes, { path: "/sv/%C3%B6versikt/" }).current
+    ).toBe(swedish);
+    // A malformed escape is looked up as written, so it finds nothing.
+    expect(readerScope(data, routes, { path: "/sv/%C3" }).current).toBe(
+      undefined
+    );
+  });
+
   it("takes the locale a path outside the docs names", () => {
     expect(localeFrom(I18N, "/de")).toBe("de");
     expect(localeFrom(I18N, "/DE/preise/")).toBe("de");

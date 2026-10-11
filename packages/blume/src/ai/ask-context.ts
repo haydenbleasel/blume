@@ -1,4 +1,4 @@
-import { normalizeRoute } from "../core/base-path.ts";
+import { decodedPath, normalizeRoute } from "../core/base-path.ts";
 import { nextFenceState } from "../core/code-fences.ts";
 import type { FenceState } from "../core/code-fences.ts";
 import {
@@ -8,7 +8,7 @@ import {
 } from "../search/fold.ts";
 import { buildOramaIndex, queryOramaIndex } from "../search/orama-index.ts";
 import type { OramaDoc } from "../search/orama-index.ts";
-import { linkText } from "./link-text.ts";
+import { linkText, routeTarget } from "./link-text.ts";
 
 /** A chat message as posted by the assistant island (`{ role, content }`). */
 export interface AskMessage {
@@ -241,12 +241,6 @@ const queryTerms = (query: string): string[] =>
 const BASE_INSTRUCTION =
   "You are a helpful documentation assistant for this project. Answer the user's question using ONLY the documentation excerpts below. Each excerpt opens with a heading that links to its page, `## [Page Title](/route)`. If the answer is not covered by the excerpts, say you don't know and suggest where in the docs to look — do not invent details. Always cite the pages you drew from with the link in the heading that opens their excerpt, written exactly as it is there: [Page Title](/route).";
 
-/** `encodeURIComponent` leaves parentheses as they are, so they're mapped here. */
-const PARENTHESES = new Map([
-  ["(", "%28"],
-  [")", "%29"],
-]);
-
 /**
  * An excerpt's heading: the Markdown link the model cites the page with. A
  * bracket or backslash in the title, or whitespace or a parenthesis in the
@@ -257,10 +251,7 @@ const PARENTHESES = new Map([
 export const excerptHeading = (
   doc: Pick<OramaDoc, "route" | "title">
 ): string => {
-  const target = doc.route.replaceAll(
-    /[%\s()]/gu,
-    (char) => PARENTHESES.get(char) ?? encodeURIComponent(char)
-  );
+  const target = routeTarget(doc.route);
   return `## [${linkText(doc.title)}](${target})`;
 };
 
@@ -697,12 +688,12 @@ export const readerScope = (
   byRoute: ReadonlyMap<string, OramaDoc>,
   page?: AskPage
 ): ReaderScope => {
-  const current = page?.path
-    ? byRoute.get(normalizeRoute(page.path))
-    : undefined;
+  // The chat panel sends the browser's pathname, percent-encoded.
+  const path = page?.path ? decodedPath(page.path) : undefined;
+  const current = path ? byRoute.get(normalizeRoute(path)) : undefined;
   const locale = current
     ? current.locale
-    : (page?.path && pathLocale(data, page.path)) || data.defaultLocale;
+    : (path && pathLocale(data, path)) || data.defaultLocale;
   return {
     current,
     filters: {

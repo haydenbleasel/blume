@@ -248,6 +248,23 @@ describe("rewriteRelativeAssets — other files beside the page", () => {
     expect(rewrite(source)).toBe(source);
   });
 
+  it("skips comments and a .md page's indented code, given the format", () => {
+    const refs =
+      '![p](./photo.png) [s](./spec.pdf) <a href="./spec.pdf">s</a> <Card img="./photo.png" />';
+    const md = `Text\n\n    ${refs}\n\n<!-- ${refs} -->\n`;
+    expect(rewrite(md, { format: "md" })).toBe(md);
+    const mdx = `{/* ${refs} */}\n`;
+    expect(rewrite(mdx, { format: "mdx" })).toBe(mdx);
+    // Without a format, or in MDX, which has no indented code, they're links.
+    const photo = `${CONTENT_ASSETS_PREFIX}/docs/photo.png`;
+    expect(rewrite(`<!-- ![p](./photo.png) -->`)).toBe(
+      `<!-- ![p](${photo}) -->`
+    );
+    expect(rewrite(`Text\n\n    ${refs}`, { format: "mdx" })).toBe(
+      `Text\n\n    ![p](${photo}) [s](${served}) <a href="${served}">s</a> <Card img="${photo}" />`
+    );
+  });
+
   it("leaves a page that links only to routes and anchors as it is", () => {
     const source = [
       "[Guide](/guide) and [usage](#usage), or [top]( /).",

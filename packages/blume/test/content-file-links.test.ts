@@ -180,7 +180,10 @@ describe("files beside the page through the content pipeline", () => {
         "",
         '<video src="./gone.mp4"></video>',
         "",
+        "    [Sample](./sample.pdf) is code.",
+        "",
       ].join("\n"),
+      "docs/guides/sample.pdf": "pdf",
       "docs/guides/spec.pdf": "pdf",
     });
     const scanned = await scanProject(root, { mode: "build" });

@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 
 import { join } from "pathe";
 
+import { buildAskData } from "../src/ai/ask-data.ts";
 import { downlevelComponents } from "../src/ai/component-markdown.ts";
 import { buildLlmsFiles } from "../src/ai/llms.ts";
 import { buildRawMarkdown } from "../src/ai/markdown.ts";
@@ -76,6 +77,16 @@ describe("operation links on the agent surfaces", () => {
     expect(full).not.toContain("](/reference/pets/");
     // A title's brackets are escaped, so the link still parses.
     expect(index).toContain(String.raw`- [\[Beta\] Webhooks](/sub/beta)`);
+  }, 30_000);
+
+  it("are routes in the assistant's snapshot, which the panel mounts", async () => {
+    const project = await scanFixture("/sub");
+    const { documents } = await buildAskData(project);
+    const overview = documents.find((doc) =>
+      doc.content.includes("`GET /pets`")
+    );
+    expect(overview?.content).toContain("- [`GET /pets`](/reference/pets/");
+    expect(overview?.content).not.toContain("/sub/");
   }, 30_000);
 
   it("leave a root-served site's links as routed", () => {

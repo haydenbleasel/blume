@@ -81,6 +81,7 @@ export const buildRawMarkdown = async (
       if (route.sourcePath) {
         text = rewriteRelativeAssets({
           deployBase: project.config.deployment.options.base,
+          format: page?.format,
           projectRoot: project.context.root,
           source: text,
           sourcePath: route.sourcePath,
@@ -91,6 +92,7 @@ export const buildRawMarkdown = async (
       // page's locale the rendered link has — remote content included.
       text = rewriteLinks(text, {
         entryId: page?.entryId,
+        format: page?.format,
         route: route.path,
         sourcePath: route.sourcePath,
       });

@@ -219,7 +219,8 @@ describe("collectStaged", () => {
   content: { sources: [{ kind: "obsidian", options: { vault: "vault" }, requiredSecrets: [], runtimeDeps: [] }] },
 };
 `,
-      "vault/Guide.md": "# Guide\n\n![chart](./chart.png)\n",
+      "vault/Guide.md":
+        "# Guide\n\n![chart](./chart.png)\n\n    ![shown](./chart.png)\n",
       "vault/chart.png": "png-bytes",
     });
     const project = await scanProject(root);
@@ -228,6 +229,10 @@ describe("collectStaged", () => {
     // not exist — the reference must point at the served original instead.
     expect(staged.get("obsidian/Guide.md")).toContain(
       "![chart](/blume-assets/content/vault/chart.png)"
+    );
+    // Indented code renders as written.
+    expect(staged.get("obsidian/Guide.md")).toContain(
+      "    ![shown](./chart.png)"
     );
   });
 });

@@ -1,6 +1,6 @@
 import { jsonSchema, tool } from "ai";
 
-import { normalizeRoute } from "../core/base-path.ts";
+import { decodedPath, normalizeRoute } from "../core/base-path.ts";
 import { queryOramaIndex } from "../search/orama-index.ts";
 import type { OramaDoc } from "../search/orama-index.ts";
 import {
@@ -80,12 +80,7 @@ const routeOf = (data: AskData, requested: string): string => {
   if (data.site && path.startsWith(data.site)) {
     path = path.slice(data.site.replace(/\/$/u, "").length) || "/";
   }
-  path = path.replace(/[?#].*$/u, "");
-  try {
-    path = decodeURI(path);
-  } catch {
-    // Malformed percent sequence — look it up as written.
-  }
+  path = decodedPath(path.replace(/[?#].*$/u, ""));
   return normalizeRoute(path.startsWith("/") ? path : `/${path}`);
 };
 
