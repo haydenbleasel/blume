@@ -49,6 +49,17 @@ export const fr: UIStringsOverride = {
     you: "Vous",
   },
   banner: { dismiss: "Fermer l'annonce" },
+  blog: {
+    allPosts: "Tous les articles",
+    description: "Actualités, nouveautés et récits de l'équipe.",
+    empty: "Aucun article pour le moment.",
+    newer: "Article plus récent",
+    older: "Article plus ancien",
+    readingTime: "{minutes} min de lecture",
+    tagged: "Articles avec l'étiquette « {tag} »",
+    tags: "Étiquettes",
+    title: "Blog",
+  },
   changelog: {
     description: "Nouveautés du produit et notes de version.",
     empty: "Aucune entrée dans le journal des modifications pour le moment.",

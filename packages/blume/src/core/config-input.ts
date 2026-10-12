@@ -168,6 +168,25 @@ export interface FooterConfig {
 }
 
 /**
+ * How a dated section — blog posts or changelog entries — sits in the sidebar.
+ */
+export interface DatedSidebarConfig {
+  /**
+   * Fold the entries into collapsible groups by `"year"` or `"month"`, newest
+   * first, with the open entry's group expanded; `false` lists them flat,
+   * newest first. Defaults to `"year"` for the blog and `false` for the
+   * changelog.
+   */
+  groupBy?: "year" | "month" | false;
+  /**
+   * The sidebar's width on the section's pages, a CSS length in `ch`, `em`,
+   * `px`, or `rem` (`"20rem"`), for titles too long for the default
+   * `17.5rem`.
+   */
+  width?: string;
+}
+
+/**
  * The generated `/changelog` index's heading and description. Each is a
  * string, or a map of locale code to text; the index renders in the default
  * locale. Unset, they're the `changelog` UI strings (`Changelog` in English),
@@ -176,6 +195,23 @@ export interface FooterConfig {
 export interface ChangelogConfig {
   /** The index's description, below its heading and in its meta description. */
   description?: LocalizableLabel;
+  /** How the entries sit in the sidebar. Ungrouped by default. */
+  sidebar?: DatedSidebarConfig;
+  /** The index's heading, page title, and OG card title. */
+  title?: LocalizableLabel;
+}
+
+/**
+ * The blog: `type: blog` posts. Blume generates a `/blog` index of them and a
+ * page per tag. The index's heading and description are each a string, or a
+ * map of locale code to text; unset, they're the `blog` UI strings (`Blog` in
+ * English), which `i18n.ui` translates.
+ */
+export interface BlogConfig {
+  /** The index's description, below its heading and in its meta description. */
+  description?: LocalizableLabel;
+  /** How posts sit in the sidebar. Grouped by year by default. */
+  sidebar?: DatedSidebarConfig;
   /** The index's heading, page title, and OG card title. */
   title?: LocalizableLabel;
 }
@@ -266,7 +302,8 @@ export interface ContentTypeConfig {
    * page of the type — absent ones included — so a required schema enforces
    * the key type-wide (mark it `.optional()` to validate only when present),
    * and validated values land on the page record's `custom` field. Built-in
-   * frontmatter fields cannot be redeclared.
+   * frontmatter fields cannot be redeclared, except `tags` and `cover`: a
+   * declaration of either keeps the key, and Blume reads none of it.
    */
   frontmatter?: Record<string, StandardSchema>;
 }
@@ -1075,6 +1112,11 @@ export interface AgentsConfig {
 
 /** RSS/Atom feed generation. */
 export interface RssConfig {
+  /**
+   * Put each item's full page in the feed as HTML (`content:encoded`), not
+   * only its summary. Defaults to `false`.
+   */
+  content?: boolean;
   /** Generate feeds. Defaults to `true`. */
   enabled?: boolean;
   /** Max items per feed, newest first. Defaults to `50`. */
@@ -1504,8 +1546,9 @@ export interface FrontmatterConfig {
    * so a required schema enforces the key site-wide; mark it `.optional()`
    * to validate only when present. Validated values are preserved on each
    * page record's `custom` field. Built-in frontmatter fields cannot be
-   * redeclared. To scope a key to one content type instead, declare it under
-   * `content.types.<type>.frontmatter`.
+   * redeclared, except `tags` and `cover`: a declaration of either keeps the
+   * key, and Blume reads none of it. To scope a key to one content type
+   * instead, declare it under `content.types.<type>.frontmatter`.
    */
   extend?: Record<string, StandardSchema>;
 }
@@ -1591,6 +1634,12 @@ export interface BlumeConfig {
    * compose: with both set, a page lands at `{deployment.base}/{basePath}/page`.
    */
   basePath?: string;
+  /**
+   * The blog: the generated `/blog` index's title and description, each a
+   * string or a per-locale map (unset, the `blog` UI strings), and how posts
+   * sit in the sidebar.
+   */
+  blog?: BlogConfig;
   /**
    * The generated `/changelog` index's title and description, each a string
    * or a per-locale map. Unset, they're the `changelog` UI strings.

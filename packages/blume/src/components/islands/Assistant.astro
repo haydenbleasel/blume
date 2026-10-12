@@ -88,14 +88,14 @@ const icons = {
      while the panel is open so the shrunken content still has room to breathe.
      Scoped to grids that actually have a TOC column: a "bare" layout (the
      changelog index) is single-column, and forcing the sidebar tracks onto it
-     would squeeze its only item — <main> — into the 17.5rem track. */
+     would squeeze its only item — <main> — into the sidebar track. */
   @media (min-width: 1280px) {
     body[data-blume-assistant="open"] [data-blume-toc] {
       display: none;
     }
 
     body[data-blume-assistant="open"] [data-blume-doc-grid]:has([data-blume-toc]) {
-      grid-template-columns: 17.5rem minmax(0, 1fr);
+      grid-template-columns: var(--blume-sidebar-width, 17.5rem) minmax(0, 1fr);
     }
   }
 </style>

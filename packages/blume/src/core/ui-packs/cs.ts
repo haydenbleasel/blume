@@ -46,6 +46,17 @@ export const cs: UIStringsOverride = {
     you: "Vy",
   },
   banner: { dismiss: "Zavřít oznámení" },
+  blog: {
+    allPosts: "Všechny příspěvky",
+    description: "Novinky, aktualizace a příběhy od týmu.",
+    empty: "Zatím tu nejsou žádné příspěvky.",
+    newer: "Novější příspěvek",
+    older: "Starší příspěvek",
+    readingTime: "{minutes} min čtení",
+    tagged: "Příspěvky se štítkem „{tag}“",
+    tags: "Štítky",
+    title: "Blog",
+  },
   changelog: {
     description: "Novinky produktu a poznámky k vydání.",
     empty: "V seznamu změn zatím nejsou žádné záznamy.",

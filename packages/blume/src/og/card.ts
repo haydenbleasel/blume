@@ -13,7 +13,7 @@ import type { FontSubset, GoogleFontFamily, Node } from "takumi-js/helpers";
 
 import { svgDimensions } from "../core/svg-dimensions.ts";
 import { ACCENTS, isAccentPreset } from "../theme/palette.ts";
-import { isLocalOgFont, throughCardCache } from "./cache.ts";
+import { isLocalOgFont, throughCardCache, withoutStoring } from "./cache.ts";
 import type { OgCache } from "./cache.ts";
 import { OG_IMAGE_HEIGHT, OG_IMAGE_WIDTH } from "./dimensions.ts";
 
@@ -125,7 +125,42 @@ export interface OgCardOptions {
   fallbacks?: OgGoogleFont[];
   /** Per-role families from the loaded fonts (title vs body text). */
   families?: OgFontFamilies;
+  /**
+   * A blog post's card: its authors and date under the headline, and its
+   * cover beside it — a local image file's absolute path, or a URL.
+   */
+  article?: OgArticle;
 }
+
+/** What a blog post's card adds to a page's. */
+export interface OgArticle {
+  authors?: string[];
+  /** The cover image: an absolute file path, or an `http(s)` or `data:` URL. */
+  cover?: string;
+  /** The publish date, already formatted for the card's language. */
+  date?: string;
+}
+
+/** The cover column's width; the card is as tall as it always is. */
+const COVER_WIDTH = 400;
+
+/**
+ * A cover's source for Takumi: a URL as it is (Takumi fetches it), a local
+ * file's bytes. A file that can't be read leaves the card without a cover
+ * rather than failing the build.
+ */
+const coverSource = async (
+  cover: string
+): Promise<string | Uint8Array | null> => {
+  if (/^(?:https?:\/\/|data:)/iu.test(cover)) {
+    return cover;
+  }
+  try {
+    return new Uint8Array(await readFile(cover));
+  } catch {
+    return null;
+  }
+};
 
 const WIDTH = OG_IMAGE_WIDTH;
 const HEIGHT = OG_IMAGE_HEIGHT;
@@ -437,10 +472,63 @@ const cssFamilyName = (family: string): string =>
 const familyStyle = (family?: string): { fontFamily?: string } =>
   family ? { fontFamily: cssFamilyName(family) } : {};
 
+/** What a blog post's card changes about the layout. */
+interface ArticleLayout {
+  /** The authors and date under the headline, or an empty node. */
+  byline: Node;
+  /** The cover column — none when the post has no cover that loads. */
+  cover: Node[];
+  /** The description's length limit, shorter beside a cover. */
+  descriptionMax: number;
+  /** How much narrower the text column is: the cover's width. */
+  narrowing: number;
+  /** How much smaller the headline is beside a cover. */
+  titleShrink: number;
+}
+
+/**
+ * A blog post's card layout: a cover takes a column at the right edge, so the
+ * text column narrows by as much and its headline and description shrink to
+ * fit; the authors and date sit under the description. Without an article
+ * the card is laid out as it always was.
+ */
+const articleLayout = async (
+  article: OgArticle | undefined,
+  style: { color: string; fontFamily?: string }
+): Promise<ArticleLayout> => {
+  const source = article?.cover ? await coverSource(article.cover) : null;
+  const narrowing = source ? COVER_WIDTH : 0;
+  const byline = [article?.authors?.join(", "), article?.date]
+    .filter(Boolean)
+    .join(" · ");
+  return {
+    byline: byline
+      ? text(truncate(byline, 80), {
+          ...style,
+          fontSize: 26,
+          fontWeight: 500,
+          marginTop: 28,
+          maxWidth: 1010 - narrowing,
+        })
+      : container({}),
+    cover: source
+      ? [
+          image({
+            height: HEIGHT,
+            src: source,
+            style: { objectFit: "cover" },
+            width: COVER_WIDTH,
+          }),
+        ]
+      : [],
+    descriptionMax: source ? 100 : 140,
+    narrowing,
+    titleShrink: source ? 8 : 0,
+  };
+};
+
 /** Render a 1200x630 Open Graph card to a PNG buffer. */
-export const renderOgImage = async (
-  options: OgCardOptions
-): Promise<Uint8Array> => {
+const renderCard = async (options: OgCardOptions): Promise<Uint8Array> => {
   const { accent, background, border, faint, foreground, muted } =
     resolvePalette(options);
   const brand = options.brand?.trim();
@@ -473,31 +561,38 @@ export const renderOgImage = async (
     style: { alignItems: "center", display: "flex" },
   });
 
+  const article = await articleLayout(options.article, {
+    color: foreground,
+    ...bodyFamily,
+  });
+  const { narrowing } = article;
+
   const body = container({
     children: [
       text(truncate(options.title, 64), {
         color: foreground,
-        fontSize: titleSize(options.title),
+        fontSize: titleSize(options.title) - article.titleShrink,
         fontWeight: 600,
         // Matches the theme's heading tracking (entry.ts h1-h6 rule), tuned
         // for Inter since the display default dropped Inter Tight.
         letterSpacing: "-0.05em",
         lineHeight: 1.05,
-        maxWidth: 1010,
+        maxWidth: 1010 - narrowing,
         textWrap: "balance",
         ...titleFamily,
       }),
       description
-        ? text(truncate(description, 140), {
+        ? text(truncate(description, article.descriptionMax), {
             color: muted,
             fontSize: 30,
             lineHeight: 1.4,
             marginTop: 28,
-            maxWidth: 900,
+            maxWidth: 900 - narrowing,
             textWrap: "balance",
             ...bodyFamily,
           })
         : container({}),
+      article.byline,
     ],
     style: { display: "flex", flexDirection: "column" },
   });
@@ -531,16 +626,24 @@ export const renderOgImage = async (
         })
       : container({});
 
-  const node = container({
+  const content = container({
     children: [header, body, footer],
     style: {
-      backgroundColor: background,
-      color: foreground,
       display: "flex",
       flexDirection: "column",
       height: HEIGHT,
       justifyContent: "space-between",
       padding: 72,
+      width: WIDTH - narrowing,
+    },
+  });
+  const node = container({
+    children: [content, ...article.cover],
+    style: {
+      backgroundColor: background,
+      color: foreground,
+      display: "flex",
+      height: HEIGHT,
       width: WIDTH,
     },
   });
@@ -566,6 +669,26 @@ export const renderOgImage = async (
     images: resolveImages(options.images),
     width: WIDTH,
   });
+};
+
+/**
+ * Render a 1200x630 Open Graph card to a PNG buffer. A blog post's cover that
+ * can't be decoded (a corrupt file, a format the renderer doesn't read, a URL
+ * that fails to load) leaves the card without it rather than failing the
+ * build.
+ */
+export const renderOgImage = async (
+  options: OgCardOptions
+): Promise<Uint8Array> => {
+  try {
+    return await renderCard(options);
+  } catch (error) {
+    if (!options.article?.cover) {
+      throw error;
+    }
+    const { cover: _cover, ...article } = options.article;
+    return withoutStoring(await renderCard({ ...options, article }));
+  }
 };
 
 /**
