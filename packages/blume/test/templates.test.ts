@@ -2612,7 +2612,7 @@ describe("static endpoint templates", () => {
       'const cache: OgCache | undefined = {"dir":"/p/node_modules/.cache/blume/og","version":"1.2.3"};'
     );
     expect(endpoint).toContain(
-      'import type { OgCache, OgFont, OgFontFamilies, OgGoogleFont } from "blume/og";'
+      'import type {\n  OgArticle,\n  OgCache,\n  OgFont,\n  OgFontFamilies,\n  OgGoogleFont,\n} from "blume/og";'
     );
   });
 
@@ -2621,7 +2621,7 @@ describe("static endpoint templates", () => {
     expect(endpoint).toContain("const pageDescriptions = false;");
     // The gate is applied when paths are collected, so GET stays uniform.
     expect(endpoint).toContain(
-      "props: { title, description: pageDescriptions ? description : null }"
+      "description: pageDescriptions ? description : null,"
     );
     expect(ogEndpointTemplate([], { pageDescriptions: true })).toContain(
       "const pageDescriptions = true;"

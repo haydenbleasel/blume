@@ -47,6 +47,17 @@ export const vi: UIStringsOverride = {
     you: "Bạn",
   },
   banner: { dismiss: "Đóng thông báo" },
+  blog: {
+    allPosts: "Tất cả bài viết",
+    description: "Tin tức, cập nhật và câu chuyện từ đội ngũ.",
+    empty: "Chưa có bài viết nào.",
+    newer: "Bài viết mới hơn",
+    older: "Bài viết cũ hơn",
+    readingTime: "{minutes} phút đọc",
+    tagged: "Bài viết có thẻ “{tag}”",
+    tags: "Thẻ",
+    title: "Blog",
+  },
   changelog: {
     description: "Cập nhật sản phẩm và ghi chú phát hành.",
     empty: "Chưa có mục nào trong nhật ký thay đổi.",

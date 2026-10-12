@@ -403,12 +403,12 @@ const docusaurus: CompareTool = {
     },
     {
       answer:
-        "Posts become Blume blog pages with an RSS feed at the same `/blog/rss.xml`. The agent moves dates from filenames into frontmatter and adds redirects for the old dated URLs. Blume doesn't generate the blog's index, tag, author, or archive pages, so you build the index page yourself.",
+        "Posts become Blume blog pages with an RSS feed at the same `/blog/rss.xml`. The agent moves dates from filenames into frontmatter and adds redirects for the old dated URLs. Blume generates the blog's index, grouped by year, and a page per tag, but no author pages, archive, or list of all tags.",
       question: "What happens to my blog?",
     },
     {
       answer:
-        "Swizzled theme components, React pages under `src/pages`, footer columns, the blog's generated index, tag, author, and archive pages, and a few frontmatter keys. The agent reports each one so you can rebuild it with a layout slot or a custom page, or leave it out.",
+        "Swizzled theme components, React pages under `src/pages`, footer columns, the blog's author and archive pages and its list of tags, and a few frontmatter keys. The agent reports each one so you can rebuild it with a layout slot or a custom page, or leave it out.",
       question: "What doesn't the migration carry over?",
     },
   ],
@@ -552,7 +552,7 @@ const starlight: CompareTool = {
     },
     {
       answer:
-        "Designed splash and hero pages (the agent gives a splash page `mode: center` and turns its hero into plain content), `head` entries other than meta tags and analytics scripts, social links on platforms the footer doesn't cover, starlight-blog's generated index, tag, and author pages, and plugins without a Blume equivalent. The agent reports each one.",
+        "Designed splash and hero pages (the agent gives a splash page `mode: center` and turns its hero into plain content), `head` entries other than meta tags and analytics scripts, social links on platforms the footer doesn't cover, starlight-blog's author pages, and plugins without a Blume equivalent. The agent reports each one.",
       question: "What doesn't the migration carry over?",
     },
   ],
@@ -708,7 +708,7 @@ const nextra: CompareTool = {
       title: "You want to own the React app.",
     },
     {
-      body: "Nextra ships a blog theme with a post index, tags, and RSS. Blume gives posts RSS and structured data, but you build the index page yourself.",
+      body: "Nextra's blog theme builds the whole site as a blog, with its own layout. Blume's blog sits beside your docs, in their layout.",
       title: "You want a ready-made blog theme.",
     },
   ],
@@ -1132,7 +1132,7 @@ const mkdocs: CompareTool = {
     },
     {
       answer:
-        "Output from mkdocstrings, mkdocs-click, and notebooks, macro functions and Jinja logic, template overrides and hooks with no layout slot, code annotations, tag index pages, and the blog's archive and category pages. The agent reports each one so you can decide what to do with it.",
+        "Output from mkdocstrings, mkdocs-click, and notebooks, macro functions and Jinja logic, template overrides and hooks with no layout slot, code annotations, tag index pages for doc pages, and the blog's archive pages. The agent reports each one so you can decide what to do with it.",
       question: "What doesn't the migration carry over?",
     },
   ],
@@ -1146,7 +1146,7 @@ const mkdocs: CompareTool = {
       title: "You'd rather keep your setup.",
     },
     {
-      body: "Material renders code annotations and generates tag pages and blog archive and category pages. Blume has none of these, so the agent reports each one.",
+      body: "Material renders code annotations and generates tag pages for your docs and archive pages for your blog. Blume has neither (its tag pages list blog posts), so the agent reports each one.",
       title: "You lean on Material's extras.",
     },
   ],
@@ -1747,7 +1747,7 @@ const vuepress: CompareTool = {
       title: "You want a plugin for everything.",
     },
     {
-      body: "The official blog and feed plugins, and vuepress-theme-hope's blog, give you article lists, categories, tags, and RSS, Atom, and JSON feeds. Blume gives posts RSS, but you build the index page yourself.",
+      body: "The official blog and feed plugins, and vuepress-theme-hope's blog, give you article lists, categories, tags, and RSS, Atom, and JSON feeds. Blume generates a post index, tag pages, and an RSS feed, but no categories, pagination, or Atom and JSON feeds.",
       title: "You run a blog beside your docs.",
     },
   ],

@@ -23,6 +23,7 @@ import { extractElementUses } from "../mdx-elements.ts";
 import { titleWord } from "../navigation.ts";
 import { formerRouteName, stripOrderingPrefix } from "../ordering-prefix.ts";
 import { escapePinnedIds } from "../pinned-ids.ts";
+import { postText } from "../post-text.ts";
 import { relatedPageLinks } from "../related.ts";
 import { pageMetaSchema } from "../schema.ts";
 import type {
@@ -1559,6 +1560,129 @@ const maskCode = (
     : text;
 };
 
+// A comment as MDX reads one: an unescaped brace (`\{` is text) around
+// nothing but comments — a block one ends at its first `*/`, a line one at
+// its line's end.
+const COMMENT_BODY = String.raw`\{\s*(?:(?:\/\*(?:(?!\*\/)[\s\S])*\*\/|\/\/[^\n]*\n)\s*)+\}`;
+const MDX_COMMENT = new RegExp(
+  String.raw`(?<=(?:^|[^\\])(?:\\\\)*)${COMMENT_BODY}`,
+  "gu"
+);
+// The comments after one on its line, spaces apart: a run, read as one.
+const MORE_COMMENTS = new RegExp(String.raw`(?:[ \t]*${COMMENT_BODY})*`, "uy");
+// A line's container markers (`> `, `- `, `1. `), and nothing else yet.
+const CONTAINER_LEAD = String.raw`(?:[ \t]*(?:>|[-+*](?=[ \t])|\d{1,9}[.)](?=[ \t])))*[ \t]*`;
+const LINE_LEAD = new RegExp(`^${CONTAINER_LEAD}$`, "u");
+// What a line left by a comment that ended it would make a block of: a rule
+// or a setext underline, and — the comment touching it — a bare heading or
+// list marker (`#{/* c */}` is text to MDX, `# {/* c */}` a heading).
+const BARE_BLOCK = new RegExp(
+  String.raw`^${CONTAINER_LEAD}(?:(?:[-*_][ \t]*){3,}|=+)$`,
+  "u"
+);
+const BARE_MARKER = new RegExp(
+  String.raw`^${CONTAINER_LEAD}(?:#{1,6}|[-+*]|\d{1,9}[.)])$`,
+  "u"
+);
+// A heading the cut would end in a closing sequence (`# a # {/* c */}`).
+const CLOSED_HEADING = new RegExp(
+  String.raw`^${CONTAINER_LEAD}#{1,6}(?:[ \t].*)?[ \t]#+$`,
+  "u"
+);
+// Container markers ending in a list item's: one with nothing after is empty.
+const LIST_LEAD = /(?:[-+*]|\d{1,9}[.)])[ \t]*$/u;
+// A line the cut would leave a link definition or a task item's bare box,
+// which MDX read as text and as an item's content.
+const DEFINITION_OR_TASK = new RegExp(
+  String.raw`^ {0,3}\[[^\]\n]+\]:|^${CONTAINER_LEAD}(?:[-+*]|\d{1,9}[.)])[ \t]+\[[ xX]\]$`,
+  "u"
+);
+/**
+ * What stands in for a run of comments alone on its line, `lead` the line's
+ * container markers and `before` the text up to it: a blank line, or at the
+ * line's start an empty HTML block, which ends a list as MDX's did without
+ * loosening it. As a list item's only content, one too: `-` alone couldn't
+ * interrupt a paragraph, and a paragraph would take the next line in.
+ */
+const blockStandIn = (lead: string, before: string): string => {
+  if (LIST_LEAD.test(lead)) {
+    // The spaces after its marker set where its content starts.
+    const gap = /[ \t]*$/u.exec(lead)?.[0] ?? "";
+    return `${gap.length > 0 && gap.length <= 4 ? gap : " "}<!---->`;
+  }
+  const previous = before.slice(
+    before.lastIndexOf("\n", before.length - 2) + 1,
+    -1
+  );
+  return lead === "" && previous.trim() !== "" ? "<!---->" : "";
+};
+
+/**
+ * What stands in for a run of comments ending a line, `line` what's left of
+ * it and `lead` the text that preceded the run.
+ */
+const lineEndStandIn = (line: string, lead: string): string => {
+  if (
+    BARE_BLOCK.test(line) ||
+    CLOSED_HEADING.test(line) ||
+    (/\S$/u.test(lead) && BARE_MARKER.test(line))
+  ) {
+    return "&zwnj;";
+  }
+  if (DEFINITION_OR_TASK.test(line)) {
+    return " &zwnj;";
+  }
+  // Its braces, punctuation, let a delimiter before it open.
+  return /[*_~]$/u.test(lead) ? "<!---->" : "";
+};
+
+/**
+ * An MDX body without its comments ({@link MDX_COMMENT}), read as MDX reads
+ * them, so the Markdown left parses as the page did: one in code stays; a run
+ * alone on its line is a block of its own, so an empty HTML comment (or a
+ * blank line) takes its place and the paragraph, list or table before it
+ * ends; one that ends
+ * a line takes the spaces before it (no hard break) but not those after (a
+ * hard break). Elsewhere an empty HTML comment takes each one's place, as
+ * punctuation like its braces, so what it parted (`*a*` and `*b*`, two code
+ * spans, `[a]` and `(url)`) stays apart. A line holding one is a paragraph's
+ * to MDX, so where the cut would leave a heading, list, rule or underline to
+ * start, a zero-width non-joiner keeps it text.
+ */
+export const withoutJsxComments = (body: string): string => {
+  let out = "";
+  let at = 0;
+  for (const match of maskCode(body.split("\n")).matchAll(MDX_COMMENT)) {
+    if (match.index < at) {
+      continue;
+    }
+    out += body.slice(at, match.index);
+    MORE_COMMENTS.lastIndex = match.index + match[0].length;
+    at = MORE_COMMENTS.lastIndex + (MORE_COMMENTS.exec(body)?.[0].length ?? 0);
+    const lineEnd = body.indexOf("\n", at);
+    const rest = body.slice(at, lineEnd === -1 ? body.length : lineEnd);
+    const lead = out.slice(out.lastIndexOf("\n") + 1);
+    if (rest.trim() === "") {
+      out = out.replace(/[ \t]+$/u, "");
+      if (LINE_LEAD.test(lead)) {
+        at += rest.length;
+        out += blockStandIn(lead, out);
+      } else {
+        out += lineEndStandIn(out.slice(out.lastIndexOf("\n") + 1), lead);
+      }
+    } else if (LINE_LEAD.test(lead)) {
+      // A paragraph's line, its leading spaces dropped (or they'd make code).
+      at += rest.length - rest.trimStart().length;
+      out += /^\p{L}/u.test(rest.trimStart()) ? "" : "&zwnj;";
+    } else {
+      out += body
+        .slice(match.index, at)
+        .replaceAll(new RegExp(COMMENT_BODY, "gu"), "<!---->");
+    }
+  }
+  return out + body.slice(at);
+};
+
 /**
  * Every media element's string `src` in the masked `text` (see
  * `ELEMENT_SRC`), with its 1-based position. Like a raw `<a href>`, the
@@ -2529,6 +2653,7 @@ export const normalizeEntry = (
   const elements =
     format === "mdx" ? entryLinks(entry, extractElementUses) : [];
   const unknownProps = elements.filter((use) => use.kind === "prop");
+  const contentType = meta.type ?? ctx.defaultType;
 
   const base = {
     anchors,
@@ -2536,7 +2661,7 @@ export const normalizeEntry = (
     collection: staged ? "staged" : undefined,
     componentsUsed:
       format === "mdx" ? extractComponentTags(bodyText) : undefined,
-    contentType: meta.type ?? ctx.defaultType,
+    contentType,
     custom: parsed.custom,
     description: meta.description,
     editUrl: entry.editUrl,
@@ -2558,6 +2683,7 @@ export const normalizeEntry = (
     meta,
     monolingual: ctx.source.monolingual,
     navPath,
+    post: contentType === "blog" ? postText(bodyText, format) : undefined,
     segments,
     source: { name: ctx.source.name, ref: entry.ref },
     sourcePath: entry.sourcePath,

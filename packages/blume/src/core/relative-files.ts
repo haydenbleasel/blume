@@ -43,6 +43,14 @@ const decodeTarget = (target: string): string => {
   }
 };
 
+/** The path a target names, decoded, its query and hash aside. */
+export const targetPath = (target: string): string =>
+  decodeTarget(target.split(/[?#]/u)[0] ?? "");
+
+/** Whether `target` names a file with an image extension, query and hash aside. */
+export const hasImageExtension = (target: string): boolean =>
+  IMAGE_EXTENSIONS.has(extname(targetPath(target)).toLowerCase());
+
 /**
  * Whether a target is *shaped* like a colocated image reference: a relative
  * filesystem path with an image extension. Exported so link validation can

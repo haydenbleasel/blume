@@ -141,6 +141,21 @@ The `/changelog` tab opens the index, with no `href` needed, and owns the `chang
 
 Setting `sidebar.hidden` on the entries doesn't do this: it unlists them everywhere, the index and the feed included.
 
+## Group the sidebar
+
+A long history makes a long sidebar group. Fold the entries into collapsible years (or months), newest first, with the open entry's group expanded:
+
+```ts blume.config.ts
+changelog: {
+  sidebar: {
+    groupBy: "year", // "year", "month", or false (default)
+    width: "20rem", // wider than the default 17.5rem, on entries only
+  },
+},
+```
+
+An entry's title wraps to a second line instead of being cut off, grouped or not. Both apply to the sidebar Blume generates from your files, not to an [explicit sidebar](/docs/content/navigation#explicit-sidebar), where only `width` applies. `width` takes a CSS length in `ch`, `em`, `px`, or `rem`. The [blog](/docs/advanced/blog#the-sidebar) takes the same options, grouped by year by default.
+
 ## The RSS feed
 
 Blume also builds a changelog feed at **`/changelog/rss.xml`**, sorted newest-first by `date`. Feeds need an absolute site URL, so set [`deployment.site`](/docs/deployment); Blume then injects a `<link rel="alternate">` tag on every page so readers discover it automatically.

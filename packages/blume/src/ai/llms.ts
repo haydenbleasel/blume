@@ -1,4 +1,5 @@
 import { normalizeBasePath } from "../core/base-path.ts";
+import { nonBlank } from "../core/blog.ts";
 import { rewriteRelativeAssets } from "../core/content-assets.ts";
 import matter from "../core/frontmatter.ts";
 import { isHiddenPage } from "../core/hidden-pages.ts";
@@ -153,6 +154,10 @@ const indexedNavigations = (
   return [...current, ...archived];
 };
 
+/** A root node listed with the loose pages: a page, or a year of entries. */
+const isLoose = (node: NavNode): boolean =>
+  node.kind === "page" || Boolean(node.period);
+
 /**
  * Build the compact `llms.txt` index: title and summary, then the sidebar tree
  * rendered as sections — group labels become headings, pages become link lists —
@@ -174,8 +179,9 @@ export const buildLlmsIndex = (
   const line = (page: PageRecord): string => {
     seen.add(page.route);
     // The page's meta description, so a page summarized only in
-    // `seo.description` (a generated reference page) still gets one.
-    const description = metaDescription(page);
+    // `seo.description` (a generated reference page) still gets one, and a
+    // blog post without either its first paragraph.
+    const description = nonBlank(metaDescription(page)) ?? page.post?.excerpt;
     const summary = description ? `: ${description}` : "";
     return `- [${linkText(page.title)}](${pageUrl(page.route, site, base)})${summary}`;
   };
@@ -193,6 +199,17 @@ export const buildLlmsIndex = (
         const page = byRoute.get(node.route);
         if (page && !seen.has(page.route)) {
           list.push(line(page));
+        }
+        continue;
+      }
+      // A year group of dated entries is no section: its posts list under
+      // the heading of the section around it, newest first.
+      if (node.period) {
+        for (const child of node.children) {
+          const page = child.kind === "page" && byRoute.get(child.route);
+          if (page && !seen.has(page.route)) {
+            list.push(line(page));
+          }
         }
         continue;
       }
@@ -216,8 +233,8 @@ export const buildLlmsIndex = (
   // Loose pages at a tree's root get a "Docs" section of their own, so every
   // link sits under an h2 as llms.txt consumers expect.
   const renderNav = (nav: Navigation, depth: number): string[] => {
-    const loose = nav.sidebar.filter((node) => node.kind === "page");
-    const groups = nav.sidebar.filter((node) => node.kind === "group");
+    const loose = nav.sidebar.filter(isLoose);
+    const groups = nav.sidebar.filter((node) => !isLoose(node));
     const looseBlocks = renderLevel(loose, depth + 1);
     return [
       ...(looseBlocks.length > 0

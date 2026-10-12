@@ -111,6 +111,8 @@ export interface StructuredDataInput {
   base?: string;
   /** Content type — `blog` and `changelog` map to richer article types. */
   pageType?: string;
+  /** A blog post's tags, emitted as the article's `keywords`. */
+  keywords?: string[];
   /** Publish date (string or YAML Date); emitted as ISO `datePublished`. */
   published?: DateInput;
   /** Last-modified date; emitted as ISO `dateModified`. */
@@ -304,6 +306,20 @@ const authorNodes = (authors: AuthorInput | AuthorInput[]): JsonLdNode[] =>
       : definedStrings({ name: author.name, url: author.url })),
   }));
 
+/** The page node's `image`, and a blog post's tags as its `keywords`. */
+const withMedia = (
+  node: JsonLdNode,
+  input: Pick<StructuredDataInput, "image" | "keywords">
+): JsonLdNode => {
+  if (input.image) {
+    node.image = input.image;
+  }
+  if (input.keywords && input.keywords.length > 0) {
+    node.keywords = input.keywords;
+  }
+  return node;
+};
+
 /**
  * The page's own node: a homepage is a `WebPage` (it isn't an article, but it
  * still needs a machine-readable date, or search engines take whatever other
@@ -358,10 +374,7 @@ const pageNode = (
   } else if (input.jsonLd?.author) {
     node.author = input.jsonLd.author;
   }
-  if (input.image) {
-    node.image = input.image;
-  }
-  return node;
+  return withMedia(node, input);
 };
 
 /**
