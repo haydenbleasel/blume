@@ -218,15 +218,7 @@ A list replaces the generated queries for that entry; entries you don't name kee
 
 ## WebMCP
 
-[WebMCP](https://webmachinelearning.github.io/webmcp/) is an emerging browser API that lets a page register tools directly with an agentic browser — no separate server connection needed. Every Blume page registers the docs' read-only surface on the page's model context: `search_docs` (site search), `get_page` (a page's [raw Markdown](/docs/discoverability/markdown)), and `list_pages` (the [`llms.txt`](/docs/discoverability/llms-txt) index). The script is tiny, loads no search machinery until a tool is actually called, and silently no-ops in every browser without the API — which today is all of them outside [Chrome's early preview](https://developer.chrome.com/blog/webmcp-epp). It registers on whichever surface the in-flux spec exposes (`navigator.modelContext` or `document.modelContext`), via `provideContext` or per-tool `registerTool`.
-
-It's on by default; set `webmcp: false` to opt out:
-
-```ts blume.config.ts lineNumbers
-agents: {
-  webmcp: false,
-}
-```
+Every page also registers your docs' tools with agentic browsers through [WebMCP](/docs/discoverability/webmcp): search, page Markdown, the page index, agent skills, and navigation, all in the page with no server. It's on by default; set `webmcp: false` to opt out.
 
 ## Your site's skill
 

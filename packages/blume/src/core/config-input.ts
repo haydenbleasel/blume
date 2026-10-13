@@ -1065,7 +1065,8 @@ export interface AgentsConfig {
    */
   webBotAuth?: WebBotAuthConfig;
   /**
-   * WebMCP: register in-page tools (search, page Markdown, the docs index)
+   * WebMCP: register in-page tools (search, page Markdown, the docs index,
+   * agent skills, navigation)
    * on the browser's model context, so agentic browsers can drive the docs
    * without a separate MCP connection. The script is tiny and no-ops in
    * browsers without the API. Defaults to `true`; set `false` to opt out.

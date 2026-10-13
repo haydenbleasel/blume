@@ -29,6 +29,7 @@ describe("WebMCP search_docs text", () => {
       llms: false,
       loadSearch: () => Promise.resolve(search),
       search: true,
+      skills: false,
     });
     const result = await tool?.execute({ query: "array" });
     expect(result?.content[0]?.text).toBe(`${title} — /types\n${excerpt}`);

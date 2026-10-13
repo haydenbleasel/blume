@@ -1,0 +1,42 @@
+---
+title: WebMCP
+description: The in-page tools every Blume page registers with agentic browsers through WebMCP — search, page Markdown, the page index, agent skills, and navigation — with no server to run.
+---
+
+[WebMCP](https://webmachinelearning.github.io/webmcp/) is a proposed web standard that lets a page register typed tools directly with the browser, so an agent driving the browser can call them instead of guessing its way through the page's buttons and links. Every Blume page registers your docs' tools on the browser's model context. It runs entirely in the page, so there's no server to host and nothing to deploy beyond the static site, and it's on by default. Set `webmcp: false` to turn it off:
+
+```ts blume.config.ts lineNumbers
+agents: {
+  webmcp: false,
+}
+```
+
+## Tools
+
+| Tool | Arguments | Returns | Registered when |
+| --- | --- | --- | --- |
+| `search_docs` | `query` | Matching pages with their title, URL, and a short excerpt | [Search](/docs/configuration/search) is enabled |
+| `get_page` | `route` | The page as [Markdown](/docs/discoverability/markdown) | Always |
+| `list_pages` | — | The [`llms.txt`](/docs/discoverability/llms-txt) index of every page, organized by section | `llmsTxt` is on |
+| `read_skill` | `name` (optional) | A published [agent skill](/docs/discoverability/agent-discovery#your-sites-skill)'s `SKILL.md`, or the list of skills when `name` is omitted | The site serves a [skills index](/docs/discoverability/agent-discovery#skills-discovery) |
+| `navigate_page` | `route` | Moves the current tab to that page | Always |
+
+Each tool reads what the build already publishes, so the answers match what any other agent gets from the site:
+
+- **`search_docs`** runs the same search as the search box, through whichever [provider](/docs/configuration/search) you configured. Highlighting markup is stripped from the results, and the search code loads only the first time the tool is called, so pages pay nothing for it up front.
+- **`get_page`** takes a root-relative route such as `/quickstart` and fetches its `.md` mirror. The deployment base is added for you, and a URL that `search_docs` returned works as-is.
+- **`list_pages`** returns `llms.txt`, so an agent can see the shape of the docs before it picks a page.
+- **`read_skill`** reads `/.well-known/agent-skills/index.json`. Without a `name`, it lists each skill with its description. With one, it returns that skill's `SKILL.md`. A skill with supporting files is published as a `.tar.gz`, so for those the tool returns the archive's URL to download instead.
+- **`navigate_page`** opens a page in the reader's tab, optionally at a `#heading`. It's the only tool that changes anything, and it's marked as such (`readOnlyHint: false`). It only accepts routes on your own site, and refuses full URLs and protocol-relative paths like `//example.com`.
+
+The tools validate their own arguments, because WebMCP doesn't guarantee the browser checks them against the schema. A missing or malformed argument, or a page that doesn't exist, comes back as a tool error the agent can read.
+
+## Browser support
+
+WebMCP is still a draft, and browsers expose it in different shapes as it changes. Blume registers on whichever one the page has: `navigator.modelContext` or `document.modelContext`, through `provideContext` or per-tool `registerTool`. Where neither exists, which is still most browsers, the script does nothing. Readers see no difference, and there's no error in the console.
+
+To try it in Chrome, enable `chrome://flags/#enable-webmcp-testing`, relaunch, and open any page of your site. Chrome DevTools can inspect the tools a page registers and how it reads their schemas.
+
+## WebMCP or the MCP server
+
+The two serve different agents. WebMCP is for an agent that's already in the browser, with your docs open in a tab, and it works on any static deployment. The [MCP server](/docs/discoverability/mcp) is for coding agents that connect from outside a browser, such as Claude Code or Cursor. It needs server output, and it's opt-in. Turning on one doesn't affect the other.
