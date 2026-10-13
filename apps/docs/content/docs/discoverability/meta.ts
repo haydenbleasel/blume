@@ -12,7 +12,6 @@ export default defineMeta({
     "markdown",
     "json-api",
     "mcp",
-    "webmcp",
     "agent-discovery",
   ],
   title: "Discoverability",
