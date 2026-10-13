@@ -272,7 +272,8 @@ export const buildWebMcpTools = (options: WebMcpToolOptions): WebMcpTool[] => {
     /** A skill's `SKILL.md`, or null when it can't be fetched. */
     const loadSkillMd = async (url: string): Promise<string | null> => {
       try {
-        const response = await fetchFn(url);
+        const index = new URL(indexUrl, window.location.href);
+        const response = await fetchFn(new URL(url, index).href);
         return response.ok ? await response.text() : null;
       } catch {
         return null;
