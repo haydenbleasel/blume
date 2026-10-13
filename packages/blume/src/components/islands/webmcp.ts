@@ -7,7 +7,8 @@ import { joinBase, mountBase, prefixBase } from "./base-path.ts";
  * WebMCP (W3C Web Machine Learning CG): in-page tools an agentic browser can
  * call, registered on the page's model context. Blume exposes the same
  * read-only surface its hosted MCP server has — search, page Markdown, the
- * docs index — so an agent driving the browser needs no separate connection.
+ * docs index — plus the site's agent skills and same-origin navigation, so
+ * an agent driving the browser needs no separate connection.
  * The module is inert everywhere else: registration is attempted only when
  * the page exposes a model context.
  */
@@ -80,19 +81,31 @@ const isCallable = <T extends (...args: never[]) => void>(
   value: T | undefined
 ): value is T => typeof value === "function";
 
+const PROBE_ORIGIN = "http://blume.invalid";
+
 /**
- * A same-origin route: root-relative, and not `//host` or `/\host`, which
- * browsers resolve to another origin.
+ * A root-relative route that stays on this origin. Resolved with the URL
+ * parser itself rather than matched by pattern: browsers strip tabs and
+ * newlines and read `\` as `/`, so `/\t/host` or `/\\host` becomes `//host`.
  */
-const isLocalRoute = (route: string): boolean => /^\/(?![/\\])/u.test(route);
+const isLocalRoute = (route: string): boolean =>
+  route.startsWith("/") &&
+  URL.parse(route, PROBE_ORIGIN)?.origin === PROBE_ORIGIN;
 
 /** One entry of the Agent Skills discovery index (`index.json`). */
 interface SkillsIndexEntry {
   description?: string;
-  name?: string;
+  name: string;
   type?: string;
   url?: string;
 }
+
+/** An index entry with at least a name; anything else is skipped. */
+const isSkillEntry = (value: unknown): value is SkillsIndexEntry =>
+  typeof value === "object" &&
+  value !== null &&
+  "name" in value &&
+  typeof value.name === "string";
 
 const TAG = /<[^>]*>?/gu;
 
@@ -189,7 +202,7 @@ export const buildWebMcpTools = (options: WebMcpToolOptions): WebMcpTool[] => {
       "Fetch a page of this site as plain Markdown. Pass the page's root-relative route, e.g. `/quickstart`.",
     async execute(input) {
       const route = isString(input.route) ? input.route : "";
-      if (!route.startsWith("/")) {
+      if (!isLocalRoute(route)) {
         return text("Pass a root-relative route, e.g. `/quickstart`.", true);
       }
       const trimmed = route.length > 1 ? route.replace(/\/+$/u, "") : route;
@@ -251,7 +264,7 @@ export const buildWebMcpTools = (options: WebMcpToolOptions): WebMcpTool[] => {
         // SAFETY: only `skills` is read, and it's checked to be an array
         // before use; entry fields are each read defensively.
         const { skills } = (await response.json()) as { skills?: unknown };
-        return Array.isArray(skills) ? skills : [];
+        return Array.isArray(skills) ? skills.filter(isSkillEntry) : [];
       } catch {
         return [];
       }

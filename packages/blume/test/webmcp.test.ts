@@ -159,6 +159,12 @@ describe("buildWebMcpTools", () => {
     expect(page.content[0]?.text).toContain("/base/quickstart.md");
     await getPage.execute({ route: "/" });
     expect(fetched).toEqual(["/base/quickstart.md", "/base/index.md"]);
+    // Under a root base, `//host` would pass through unprefixed and fetch
+    // another origin's Markdown; it must not be fetched at all.
+    const rootPage = tool(toolsWith({ base: "/", fetchFn }), "get_page");
+    const offSite = await rootPage.execute({ route: "/\t/evil.test/x" });
+    expect(offSite.isError).toBe(true);
+    expect(fetched).toHaveLength(2);
 
     const relative = await getPage.execute({ route: "quickstart" });
     expect(relative.isError).toBe(true);
@@ -230,6 +236,8 @@ describe("buildWebMcpTools", () => {
         },
         { name: "broken", type: "skill-md", url: "/base/missing.md" },
         { name: "offline", type: "skill-md", url: "/base/offline.md" },
+        null,
+        { description: "No name." },
       ],
     });
     const files = new Map([
@@ -314,11 +322,18 @@ describe("buildWebMcpTools", () => {
     const result = await go.execute({ route: "/quickstart#install" });
     expect(result.isError).toBeUndefined();
     const refused = await Promise.all(
-      ["//evil.test", "/\\evil.test", "https://evil.test", 42].map((route) =>
-        go.execute({ route })
-      )
+      [
+        "//evil.test",
+        "/\\evil.test",
+        "/\t/evil.test",
+        "/\n\\evil.test",
+        "https://evil.test",
+        42,
+      ].map((route) => go.execute({ route }))
     );
     expect(refused.map((entry) => entry.isError)).toEqual([
+      true,
+      true,
       true,
       true,
       true,
