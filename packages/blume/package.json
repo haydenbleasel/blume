@@ -90,7 +90,15 @@
     "./og": "./src/og/index.ts",
     "./markdown": "./src/markdown/index.ts",
     "./components": "./src/components/index.ts",
+    "./components/*.ts": {
+      "types": "./dist/types/components/*.d.ts",
+      "default": "./src/components/*.ts"
+    },
     "./components/*": "./src/components/*",
+    "./core/*.ts": {
+      "types": "./dist/types/core/*.d.ts",
+      "default": "./src/core/*.ts"
+    },
     "./core/*": "./src/core/*",
     "./openapi/*": "./src/openapi/*",
     "./sources": {
