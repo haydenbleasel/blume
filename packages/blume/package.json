@@ -116,7 +116,7 @@
     "@astrojs/mdx": "^8.0.2",
     "@astrojs/node": "^11.1.6",
     "@astrojs/react": "^7.0.0",
-    "@astrojs/vercel": "^11.0.11",
+    "@astrojs/vercel": "^11.0.14",
     "@clack/prompts": "^1.8.0",
     "@iconify-json/lucide": "^1.2.140",
     "@iconify/types": "^2.0.0",
