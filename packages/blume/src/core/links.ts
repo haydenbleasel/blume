@@ -197,6 +197,15 @@ export interface RelativeLinkBase {
 /** A root-relative path, a bare `#fragment` or `?query`, or any scheme. */
 const NOT_RELATIVE = /^(?:[#?/]|[a-z][a-z0-9+.-]*:)/iu;
 
+/**
+ * Whether a browser reads `path` as another site's: it drops tabs and line
+ * breaks from a URL, and takes `//host` and `/\host` as a host. A relative
+ * link resolved there (`\host/x` on the root page, `../\host/x`) stays on
+ * this site as written, so it's left as written.
+ */
+export const isOffSitePath = (path: string): boolean =>
+  /^\/[\\/]/u.test(path.replaceAll(/[\t\n\r]/gu, ""));
+
 /** The same file under the other Markdown extension: `x.md` ↔ `x.mdx`. */
 const otherDocExtension = (path: string): string =>
   /x$/iu.test(path) ? path.slice(0, -1) : `${path}x`;
@@ -246,7 +255,8 @@ export const resolveRelativeHref = (
   const fileRoute = DOC_EXT.test(path)
     ? (resolveFile?.(file) ?? resolveFile?.(otherDocExtension(file)))
     : undefined;
-  return `${fileRoute ?? toRoute(resolveRelative(from.route, path, from.isIndex))}${suffix}`;
+  const route = `${fileRoute ?? toRoute(resolveRelative(from.route, path, from.isIndex))}${suffix}`;
+  return isOffSitePath(route) ? undefined : route;
 };
 
 /**
@@ -270,9 +280,10 @@ export const resolveRawRelativeHref = (
   const path = suffixAt === -1 ? href : href.slice(0, suffixAt);
   const resolved = resolveRelative(route, path, false);
   if (
-    FILE_EXT.test(path) &&
-    !DOC_EXT.test(path) &&
-    !hasRoute(decodePercent(resolved))
+    isOffSitePath(resolved) ||
+    (FILE_EXT.test(path) &&
+      !DOC_EXT.test(path) &&
+      !hasRoute(decodePercent(resolved)))
   ) {
     return undefined;
   }
@@ -662,11 +673,13 @@ export interface FileRouteIndex {
    */
   bySource: Map<string, string>;
   /**
-   * A default-locale page's locale-stripped path (`navPath`) → its route. A
-   * page in a locale folder that links a sibling not translated yet
-   * (`fr/guides/setup.mdx` missing) means the default tree's file
-   * (`guides/setup.mdx`), whose route — its own `slug` included — then moves
-   * into the reader's locale onto the fallback copy.
+   * A default-locale page's locale-stripped path (`navPath`), within its docs
+   * version, → its route. A page in a locale folder that links a sibling not
+   * translated yet (`fr/guides/setup.mdx` missing) means the default tree's
+   * file (`guides/setup.mdx`) of its own version, whose route — its own `slug`
+   * included — then moves into the reader's locale onto the fallback copy.
+   * Keyed by {@link defaultTreeKey}: an archived version's `navPath` drops its
+   * version folder, so it alone would name the current page's file too.
    */
   byDefaultNavPath: Map<string, string>;
   /**
@@ -681,7 +694,13 @@ export interface FileRouteIndex {
 export interface FileLinkBase {
   navPath: string;
   sourcePath: string;
+  /** The page's docs version: `""` for the current docs. */
+  version: string;
 }
+
+/** A default-tree file by its docs version and locale-stripped path. */
+const defaultTreeKey = (version: string, navPath: string): string =>
+  `${version}\0${normalize(navPath)}`;
 
 export const buildFileRouteIndex = (
   pages: readonly PageRecord[],
@@ -706,7 +725,10 @@ export const buildFileRouteIndex = (
       bySource.set(sourcePath, page.route);
     }
     if (isDefault) {
-      byDefaultNavPath.set(normalize(page.navPath), page.route);
+      byDefaultNavPath.set(
+        defaultTreeKey(page.version, page.navPath),
+        page.route
+      );
     }
   }
   return { byDefaultNavPath, byEntryId, bySource };
@@ -715,7 +737,7 @@ export const buildFileRouteIndex = (
 /**
  * The route a file link written on `from` lands on: the linked file's own
  * route, or — when a locale folder doesn't have that file yet — the default
- * tree's file at the same place.
+ * tree's file at the same place, in the same docs version.
  */
 export const routeOfLinkedFile = (
   index: FileRouteIndex,
@@ -723,7 +745,9 @@ export const routeOfLinkedFile = (
   path: string
 ): string | undefined =>
   index.bySource.get(resolve(dirname(from.sourcePath), path)) ??
-  index.byDefaultNavPath.get(normalize(join(dirname(from.navPath), path)));
+  index.byDefaultNavPath.get(
+    defaultTreeKey(from.version, join(dirname(from.navPath), path))
+  );
 
 /**
  * The route a file link written on a staged page lands on: the linked
@@ -750,11 +774,11 @@ const relativeTarget = (
   ctx: LinkContext
 ): string => {
   const base = { isIndex: isIndexPage(page), route: page.route };
-  const { entryId, navPath, sourcePath } = page;
+  const { entryId, navPath, sourcePath, version } = page;
   let resolveFile: ((path: string) => string | undefined) | undefined;
   if (sourcePath) {
     resolveFile = (path) =>
-      routeOfLinkedFile(ctx.fileRoutes, { navPath, sourcePath }, path);
+      routeOfLinkedFile(ctx.fileRoutes, { navPath, sourcePath, version }, path);
   } else if (entryId) {
     resolveFile = (path) => routeOfLinkedEntry(ctx.fileRoutes, entryId, path);
   }

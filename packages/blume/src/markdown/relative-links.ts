@@ -42,6 +42,7 @@ interface RelativeLinksContext {
 interface RouteData {
   config: {
     i18n?: { defaultLocale: string; locales: { code: string }[] } | null;
+    versions?: { archived: { id: string }[] } | null;
   };
   routes: {
     collection: string;
@@ -62,6 +63,8 @@ interface RouteIndex {
   localeTokens: string[];
   /** The locale folders beside the default tree (every locale but the default). */
   localeFolders: string[];
+  /** The archived versions' folders, which hold their own locale folders. */
+  versionFolders: string[];
 }
 
 /** A content file, located: its page, and how to find the files beside it. */
@@ -114,6 +117,8 @@ const indexRoutes = (data: RouteData): RouteIndex => {
     localeTokens: data.config.i18n ? ["$", ...locales] : [],
     paths: new Set(data.routes.map((route) => route.path)),
     routes,
+    versionFolders:
+      data.config.versions?.archived.map((version) => version.id) ?? [],
   };
 };
 
@@ -122,15 +127,22 @@ const indexRoutes = (data: RouteData): RouteIndex => {
  * links a sibling not translated yet (`fr/guides/setup.mdx` missing) means
  * the default tree's file (`guides/setup.mdx`), whose route — its own `slug`
  * included — moves into the reader's locale afterwards, onto the fallback
- * copy (see `LocaleLinks.astro`).
+ * copy (see `LocaleLinks.astro`). An archived version keeps its locale
+ * folders inside its own (`v1.0/fr/guides/setup.mdx`), so its default tree is
+ * that version's (`v1.0/guides/setup.mdx`).
  */
 const defaultTreePath = (
   entryId: string,
-  localeFolders: readonly string[]
+  index: Pick<RouteIndex, "localeFolders" | "versionFolders">
 ): string | undefined => {
-  const slash = entryId.indexOf("/");
-  return slash !== -1 && localeFolders.includes(entryId.slice(0, slash))
-    ? entryId.slice(slash + 1)
+  const [first = "", second = "", ...rest] = entryId.split("/");
+  if (index.localeFolders.includes(first) && second !== "") {
+    return [second, ...rest].join("/");
+  }
+  return index.versionFolders.includes(first) &&
+    index.localeFolders.includes(second) &&
+    rest.length > 0
+    ? [first, ...rest].join("/")
     : undefined;
 };
 
@@ -210,7 +222,7 @@ export const relativeLinksPlugin = (
         route,
         routeOf: (path) => {
           const target = relative(base, resolve(dirname(file), path));
-          const inDefaultTree = defaultTreePath(target, index.localeFolders);
+          const inDefaultTree = defaultTreePath(target, index);
           return (
             index.routes.get(entryKey(collection, target)) ??
             (inDefaultTree === undefined

@@ -4,9 +4,12 @@ import { tmpdir } from "node:os";
 
 import { join } from "pathe";
 
+import { decodedPath } from "../src/core/base-path.ts";
 import { extractLinks } from "../src/core/content.ts";
 import {
   isIndexFileName,
+  isOffSitePath,
+  resolveRawRelativeHref,
   resolveRelativeHref,
   resolveRootFileHref,
   validateLinks,
@@ -92,7 +95,98 @@ const makeGraph = (pages: PageRecord[]): ContentGraph =>
 const validate = (pages: PageRecord[]) =>
   validateLinks(makeGraph(pages), { publicDir: null });
 
+/** The targets `extractLinks` reads from a `.md` body. */
+const mdTargets = (body: string): string[] =>
+  extractLinks(body, 0, "md").map((found) => found.target);
+
 describe(extractLinks, () => {
+  it("skips a .md page's indented code, not a list item's indented text", () => {
+    const body = [
+      "A paragraph.",
+      "",
+      "    [in code](/code)",
+      "",
+      "- An item",
+      "",
+      "    [in the item](/item)",
+      "",
+    ].join("\n");
+    const targets = (format?: "md" | "mdx") =>
+      extractLinks(body, 0, format).map((found) => found.target);
+    expect(targets("md")).toStrictEqual(["/item"]);
+    // MDX has no indented code, and a caller that names no format reads
+    // every line, as before.
+    expect(targets("mdx")).toStrictEqual(["/code", "/item"]);
+    expect(targets()).toStrictEqual(["/code", "/item"]);
+  });
+
+  it("finds indented code after a list marker or in a body opening with a rule", () => {
+    // Five spaces after a list marker start a code block in the item, and a
+    // page body that opens with a `---` rule has no front matter.
+    expect(mdTargets("-     [in code](/code)\n")).toStrictEqual([]);
+    expect(mdTargets("1.     [in code](/code)\n")).toStrictEqual([]);
+    expect(mdTargets("1)     [in code](/code)\n")).toStrictEqual([]);
+    expect(
+      mdTargets("---\n\n    [in code](/code)\n\n---\n\n[after](/after)\n")
+    ).toStrictEqual(["/after"]);
+  });
+
+  it("finds indented code holding any link form extractLinks reads", () => {
+    for (const line of [
+      "\t[tab](/code)",
+      '    <a href="/code">a</a>',
+      "    <HTTPS://example.com/x>",
+      "    <https://example.com/x>",
+      '    <img src="/code.png">',
+      '    <Card img="/cover.png" />',
+    ]) {
+      expect(mdTargets(`A paragraph.\n\n${line}\n`)).toStrictEqual([]);
+    }
+    // A footnote's indented paragraph is the footnote's, not code (GFM).
+    expect(
+      mdTargets("Text[^1]\n\n[^1]: First.\n\n    [in the note](/note)\n")
+    ).toStrictEqual(["/note"]);
+  });
+
+  it("finds indented code with no blank line before it, quoted, or CRLF", () => {
+    // Indented code may follow a heading directly, sit in a block quote, and
+    // a file may end its lines with CRLF.
+    expect(mdTargets("# Heading\n    [in code](/code)\n")).toStrictEqual([]);
+    expect(
+      mdTargets("> Quoted.\n>\n>     [in code](/code)\n> [quoted](/quoted)\n")
+    ).toStrictEqual(["/quoted"]);
+    expect(
+      mdTargets(
+        "# Heading\r\n\r\n    [in code](/code)\r\n\r\n[after](/after)\r\n"
+      )
+    ).toStrictEqual(["/after"]);
+    // A lone `\r` ends a line for the parser, not for the line scan, so
+    // code is placed by offset.
+    expect(
+      mdTargets(
+        "    [in code](/code)\n\na\r\n\r    [also code](/also)\r\n[after](/after)\n"
+      )
+    ).toStrictEqual(["/after"]);
+  });
+
+  it("masks every line of an indented code block", () => {
+    expect(
+      mdTargets(
+        "# T\n\n    $ run\n    [x](/code)\n    [y](/code)\n\nafter [z](/after)\n"
+      )
+    ).toStrictEqual(["/after"]);
+  });
+
+  it("finds a definition in indented code in a container", () => {
+    for (const line of [
+      ">     [ref]: /code",
+      "-     [ref]: /code",
+      "1.     [ref]: /code",
+    ]) {
+      expect(mdTargets(`${line}\n`)).toStrictEqual([]);
+    }
+  });
+
   it("records the line and column of each link target", () => {
     const body = [
       "# Title",
@@ -477,6 +571,39 @@ describe(validateLinks, () => {
           english,
         ]),
         { extraRoutes: ["/fr/nav"], i18n, publicDir: null }
+      );
+      expect(diagnostics).toHaveLength(0);
+    });
+
+    it("reads an untranslated sibling from the page's own docs version", async () => {
+      // An archived page's `navPath` drops its version folder, so the
+      // current page shares it; only the archived one has `#archived`.
+      const diagnostics = await validateLinks(
+        makeGraph([
+          makePage({
+            id: "v1.0/fr/guides/leaf.mdx",
+            links: [link("./setup.mdx#archived")],
+            locale: "fr",
+            navPath: "guides/leaf.mdx",
+            route: "/fr/v1.0/guides/leaf",
+            version: "v1.0",
+          }),
+          makePage({
+            headings: [heading("Current", "current")],
+            id: "guides/setup.mdx",
+            locale: "en",
+            route: "/guides/setup",
+          }),
+          makePage({
+            headings: [heading("Archived", "archived")],
+            id: "v1.0/guides/setup.mdx",
+            locale: "en",
+            navPath: "guides/setup.mdx",
+            route: "/v1.0/guides/setup",
+            version: "v1.0",
+          }),
+        ]),
+        { i18n, publicDir: null }
       );
       expect(diagnostics).toHaveLength(0);
     });
@@ -1192,6 +1319,27 @@ describe("validateLinks — partial-origin links", () => {
   });
 });
 
+describe(isOffSitePath, () => {
+  it("reads only a leading `//` or `/\\`, once tabs and line breaks drop", () => {
+    for (const path of [String.raw`/\host`, "//host", "/\t/host", "/\r/host"]) {
+      expect(isOffSitePath(path)).toBe(true);
+    }
+    for (const path of ["/a//b", String.raw`/a/\b`, "/host"]) {
+      expect(isOffSitePath(path)).toBe(false);
+    }
+  });
+});
+
+describe(decodedPath, () => {
+  it("decodes what a browser encodes, but keeps an encoded slash", () => {
+    expect(decodedPath("/sv/%C3%B6versikt")).toBe("/sv/översikt");
+    // `%2F` stays inside its segment, as a browser and a host read it.
+    expect(decodedPath("/a%2Fb%20c")).toBe("/a%2Fb c");
+    // A malformed escape stays as written.
+    expect(decodedPath("/a%E")).toBe("/a%E");
+  });
+});
+
 describe(resolveRelativeHref, () => {
   const leaf = { isIndex: false, route: "/guides/setup" };
   const index = { isIndex: true, route: "/guides" };
@@ -1209,6 +1357,42 @@ describe(resolveRelativeHref, () => {
     ]) {
       expect(resolveRelativeHref(href, leaf)).toBeUndefined();
     }
+  });
+
+  it("leaves a link alone that would resolve to another site's path", () => {
+    // A browser reads `/\\host` as `//host`: another site, where the link
+    // as written stays on this one.
+    expect(
+      resolveRelativeHref(String.raw`\evil.example/x`, {
+        isIndex: true,
+        route: "/",
+      })
+    ).toBeUndefined();
+    expect(
+      resolveRelativeHref(String.raw`../\evil.example/x`, leaf)
+    ).toBeUndefined();
+    expect(
+      resolveRawRelativeHref(
+        String.raw`../\evil/x`,
+        "/guides/setup",
+        () => false
+      )
+    ).toBeUndefined();
+    // A browser drops tabs and line breaks first, so `/\t/host` is `//host`.
+    expect(
+      resolveRelativeHref("\t/evil/x", { isIndex: true, route: "/" })
+    ).toBeUndefined();
+    expect(
+      resolveRawRelativeHref("\n/evil/x", "/setup", () => false)
+    ).toBeUndefined();
+    // A backslash further in stays on the site, so it's resolved as before,
+    // even right after a slash.
+    expect(resolveRelativeHref(String.raw`./a/\b`, leaf)).toBe(
+      String.raw`/guides/a/\b`
+    );
+    expect(resolveRelativeHref(String.raw`./a\b`, leaf)).toBe(
+      String.raw`/guides/a\b`
+    );
   });
 
   it("resolves a leaf page's links against its parent directory", () => {

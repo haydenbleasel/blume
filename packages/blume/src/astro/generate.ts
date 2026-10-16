@@ -708,6 +708,7 @@ export const collectStaged = (project: BlumeProject): Map<string, string> => {
       const text = page.sourcePath
         ? rewriteRelativeAssets({
             deployBase: project.config.deployment.options.base,
+            format: page.format,
             projectRoot: project.context.root,
             source: page.body.text,
             sourcePath: page.sourcePath,

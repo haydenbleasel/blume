@@ -343,6 +343,7 @@ const buildFull = async (project: BlumeProject): Promise<string> => {
       if (page.sourcePath) {
         raw = rewriteRelativeAssets({
           deployBase: config.deployment.options.base,
+          format: page.format,
           projectRoot: project.context.root,
           source: raw,
           sourcePath: page.sourcePath,

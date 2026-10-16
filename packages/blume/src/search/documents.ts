@@ -527,8 +527,10 @@ export const buildSearchDocuments = async (
   });
 
   // Built once — `downlevelComponents` rebuilds its registry per call
-  // otherwise.
-  const components = projectComponentSerializers(project);
+  // otherwise. The `"markdown"` body is the assistant's (see below).
+  const components = projectComponentSerializers(project, {
+    assistant: options?.content === "markdown",
+  });
   // The `"markdown"` body is the assistant's: the model cites the links it
   // reads, so a page link points at the page the snapshot holds.
   const rewriteLinks =

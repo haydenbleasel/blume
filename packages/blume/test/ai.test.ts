@@ -1820,6 +1820,10 @@ describe("excerptHeading", () => {
     expect(excerptHeading({ route: "/pricing/100%", title: "Pricing" })).toBe(
       "## [Pricing](/pricing/100%25)"
     );
+    // A folded YAML title (`title: >`) ends with a line break.
+    expect(
+      excerptHeading({ route: "/guides", title: "A long\n  guide title\n" })
+    ).toBe("## [A long guide title](/guides)");
   });
 });
 

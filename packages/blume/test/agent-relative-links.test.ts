@@ -153,6 +153,40 @@ describe("relative page links on the agent surfaces", () => {
     );
   });
 
+  it("leaves a .md page's indented code and comments as written", async () => {
+    const project = await scanFixture({
+      ...FILES,
+      "docs/guides/indented.md": [
+        "# Indented",
+        "",
+        "A sample:",
+        "",
+        "    [sample](./install) [spec](./spec.pdf) ![pic](./pic.png)",
+        "",
+        "<!-- [spec](./spec.pdf) ![pic](./pic.png) -->",
+        "",
+        "- An item",
+        "",
+        "    [in the item](./install) [spec](./spec.pdf)",
+        "",
+      ].join("\n"),
+      "docs/guides/pic.png": "png",
+      "docs/guides/spec.pdf": "pdf",
+    });
+    const raw = await buildRawMarkdown(project);
+    const { full } = await buildLlmsFiles(project);
+    const served = "/sub/blume-assets/content/docs/guides";
+    for (const text of [raw["/guides/indented"]?.mdx ?? "", full]) {
+      expect(text).toContain(
+        "    [sample](./install) [spec](./spec.pdf) ![pic](./pic.png)\n"
+      );
+      expect(text).toContain("<!-- [spec](./spec.pdf) ![pic](./pic.png) -->");
+      expect(text).toContain(
+        `    [in the item](/sub/guides/install) [spec](${served}/spec.pdf)`
+      );
+    }
+  });
+
   it("reads a sibling a locale hasn't translated from the default tree", async () => {
     const project = await scanFixture({
       "blume.config.ts":
@@ -162,7 +196,86 @@ describe("relative page links on the agent surfaces", () => {
       "docs/guides/setup.mdx": "---\nslug: getting-started\n---\n# Setup\n",
     });
     const raw = await buildRawMarkdown(project);
-    expect(raw["/fr/guides"]?.mdx).toContain("See [Setup](/getting-started).");
+    // The route — its own `slug` included — then moves into the reader's
+    // locale, onto the fallback copy, as the rendered page moves it.
+    expect(raw["/fr/guides"]?.mdx).toContain(
+      "See [Setup](/fr/getting-started)."
+    );
+  });
+
+  it("reads an untranslated sibling from the reader's own docs version", async () => {
+    // An archived version's `navPath` drops its version folder, so it names
+    // the same default-tree file as the current page.
+    const project = await scanFixture({
+      "blume.config.ts":
+        'export default { i18n: { defaultLocale: "en", locales: [{ code: "en", label: "English" }, { code: "fr", label: "Français" }] }, versions: { archived: [{ id: "v1.0" }], current: { label: "v2.0" } } };',
+      "docs/fr/guides/leaf.md": "# Feuille\n\nVoir [Setup](./setup.md).\n",
+      "docs/guides/leaf.md": "# Leaf\n",
+      "docs/guides/setup.md": "# Setup\n",
+      "docs/v1.0/fr/guides/leaf.md":
+        "# Feuille 1.0\n\nVoir [Setup](./setup.md).\n",
+      "docs/v1.0/guides/leaf.md": "# Leaf 1.0\n",
+      "docs/v1.0/guides/setup.md": "# Setup 1.0\n",
+    });
+    const raw = await buildRawMarkdown(project);
+    expect(raw["/fr/guides/leaf"]?.mdx).toContain(
+      "Voir [Setup](/fr/guides/setup)."
+    );
+    expect(raw["/fr/v1.0/guides/leaf"]?.mdx).toContain(
+      "Voir [Setup](/fr/v1.0/guides/setup)."
+    );
+  });
+
+  it("percent-encodes a route a link destination can't hold as written", async () => {
+    // `my page.md` publishes at `/guides/my page`, and a space or a
+    // parenthesis would end or split the link.
+    const project = await scanFixture({
+      ...FILES,
+      "docs/guides/leaf.md":
+        "# Leaf\n\nSee [mine](./my%20page.md), [again](<./my page.md#a b>) and [notes](./notes%20(old).md).\n",
+      "docs/guides/my page.md": "# Mine\n",
+      "docs/guides/notes (old).md": "# Notes\n",
+    });
+    const raw = await buildRawMarkdown(project);
+    expect(raw["/guides/leaf"]?.mdx).toContain(
+      "See [mine](/sub/guides/my%20page), [again](</sub/guides/my%20page#a%20b>) and [notes](/sub/guides/notes%20%28old%29)."
+    );
+  });
+
+  it("serves a root link to a content file under the deployment base", async () => {
+    const project = await scanFixture({
+      ...FILES,
+      "docs/guides/leaf.md":
+        "# Leaf\n\nSee [Setup](/guides/setup.md#run) and [again](/sub/guides/setup.md).\n",
+    });
+    const raw = await buildRawMarkdown(project);
+    expect(raw["/guides/leaf"]?.mdx).toContain(
+      "See [Setup](/sub/guides/configure#run) and [again](/sub/guides/configure)."
+    );
+  });
+
+  it("moves a root link to a content file into the page's locale", async () => {
+    // As the rendered page moves it; the assistant reads the French page,
+    // or the default one where a fallback copy stands in.
+    const project = await scanFixture({
+      "blume.config.ts":
+        'export default { i18n: { defaultLocale: "en", locales: [{ code: "en", label: "English" }, { code: "fr", label: "Français" }] } };',
+      "docs/fr/guides/leaf.md":
+        "# Feuille\n\nVoir [Setup](/guides/setup.md) et [Install](/guides/install.md).\n",
+      "docs/fr/guides/setup.md": "# Configurer\n",
+      "docs/guides/install.md": "# Install\n",
+      "docs/guides/setup.md": "# Setup\n",
+    });
+    const raw = await buildRawMarkdown(project);
+    expect(raw["/fr/guides/leaf"]?.mdx).toContain(
+      "Voir [Setup](/fr/guides/setup) et [Install](/fr/guides/install)."
+    );
+    const { documents } = await buildAskData(project);
+    expect(
+      documents.find((doc) => doc.route === "/fr/guides/leaf")?.content
+    ).toContain(
+      "Voir [Setup](/fr/guides/setup) et [Install](/guides/install)."
+    );
   });
 
   it("lands a root-relative link to a content file on its page", async () => {
@@ -188,7 +301,7 @@ describe("relative page links on the agent surfaces", () => {
   it("rewrites them in the assistant's grounding, without the deployment base", async () => {
     // The chat panel mounts the links it renders under `deployment.base`. A
     // root link to a content file lands on its page there too, read with the
-    // base or without it; other root links stay as written.
+    // base or without it, and a root page link keeps its route.
     const project = await scanFixture({
       ...FILES,
       "docs/guides/cards.mdx": '# Cards\n\n<Card href="./install" />\n',
@@ -210,6 +323,30 @@ describe("relative page links on the agent surfaces", () => {
       "**[/guides/install](/guides/install)**"
     );
     expect(documents.some((doc) => doc.content.includes("/sub/"))).toBe(false);
+  });
+
+  it("takes the base off before a query or fragment in the assistant's snapshot", async () => {
+    const project = await scanFixture({
+      ...FILES,
+      "docs/guides/leaf.md":
+        "# Leaf\n\nSee [home](/sub#top) and [search](/sub?q=x).\n",
+    });
+    const { documents } = await buildAskData(project);
+    expect(
+      documents.find((doc) => doc.route === "/guides/leaf")?.content
+    ).toContain("See [home](/#top) and [search](/?q=x).");
+  });
+
+  it("leaves a link alone that the base stands between this site and another", async () => {
+    // Without the base, `/sub//host/x` reads as another site's link.
+    const project = await scanFixture({
+      ...FILES,
+      "docs/guides/leaf.md": "# Leaf\n\nSee [it](/sub//evil.example/x).\n",
+    });
+    const { documents } = await buildAskData(project);
+    expect(
+      documents.find((doc) => doc.route === "/guides/leaf")?.content
+    ).toContain("See [it](/sub//evil.example/x).");
   });
 
   it("points them at the pages the assistant's snapshot holds", async () => {
@@ -240,6 +377,78 @@ describe("relative page links on the agent surfaces", () => {
     );
     expect(content("/docs/guides/install")).toBeDefined();
     expect(content("/docs/fr/guides/setup")).toBeDefined();
+  });
+
+  it("gives the assistant's root page links the basePath and the page's locale", async () => {
+    // As the rendered page gives them, without the deployment base the chat
+    // panel adds; a link that already carries it is read as including it. A
+    // French fallback copy is the page the snapshot holds instead, and
+    // images stay as written.
+    const project = await scanFixture({
+      "blume.config.ts": `export default {
+  basePath: "/docs",
+  deployment: { base: "/sub" },
+  i18n: { defaultLocale: "en", locales: [{ code: "en", label: "English" }, { code: "fr", label: "Français" }] },
+};`,
+      "docs/fr/guides/leaf.md":
+        "# Feuille\n\nVoir [Install](/guides/install) et [Setup](/guides/setup#run).\n",
+      "docs/fr/guides/setup.md": "# Configurer\n",
+      "docs/guides/install.md": "# Install\n",
+      "docs/guides/leaf.md":
+        "# Leaf\n\nSee [Install](/guides/install), [based](/sub/docs/guides/install) and ![logo](/logo.png).\n",
+      "docs/guides/setup.md": "# Setup\n",
+    });
+    const { documents } = await buildAskData(project);
+    const content = (route: string) =>
+      documents.find((doc) => doc.route === route)?.content;
+    expect(content("/docs/guides/leaf")).toContain(
+      "See [Install](/docs/guides/install), [based](/docs/guides/install) and ![logo](/logo.png)."
+    );
+    expect(content("/docs/fr/guides/leaf")).toContain(
+      "Voir [Install](/docs/guides/install) et [Setup](/docs/fr/guides/setup#run)."
+    );
+    // The mirrors serve them where a reader fetches them.
+    const raw = await buildRawMarkdown(project);
+    expect(raw["/docs/guides/leaf"]?.mdx).toContain(
+      "See [Install](/sub/docs/guides/install), [based](/sub/docs/guides/install) and ![logo](/sub/logo.png)."
+    );
+  });
+
+  it("maps a percent-encoded fallback link onto the page the snapshot holds", async () => {
+    // The fallback copies are keyed by their raw routes (`/fr/guides/my page`).
+    const project = await scanFixture({
+      "blume.config.ts":
+        'export default { i18n: { defaultLocale: "en", locales: [{ code: "en", label: "English" }, { code: "fr", label: "Français" }] } };',
+      "docs/fr/guides/leaf.md":
+        "# Feuille\n\nVoir [la page](/guides/my%20page), [encore](./my%20page) et [é](/guides/%C3%A9t%C3%A9), [requête](/guides/my%20page?q=1).\n",
+      "docs/guides/my page.md": "# Mine\n",
+      "docs/guides/été.md": "# Été\n",
+    });
+    const { documents } = await buildAskData(project);
+    expect(
+      documents.find((doc) => doc.route === "/fr/guides/leaf")?.content
+    ).toContain(
+      "Voir [la page](/guides/my%20page), [encore](/guides/my%20page) et [é](/guides/été), [requête](/guides/my%20page?q=1)."
+    );
+  });
+
+  it("maps a fallback copy's root link from a default-locale page", async () => {
+    // With no base and no locale prefix, the link needs no other change.
+    const project = await scanFixture({
+      "blume.config.ts":
+        'export default { i18n: { defaultLocale: "en", locales: [{ code: "en", label: "English" }, { code: "fr", label: "Français" }] } };',
+      "docs/guides/leaf.md": "# Leaf\n\nSee [Setup](/fr/guides/setup).\n",
+      "docs/guides/setup.md": "# Setup\n",
+    });
+    const { documents } = await buildAskData(project);
+    expect(
+      documents.find((doc) => doc.route === "/guides/leaf")?.content
+    ).toContain("See [Setup](/guides/setup).");
+    // A reader of the mirror is served the copy.
+    const raw = await buildRawMarkdown(project);
+    expect(raw["/guides/leaf"]?.mdx).toContain(
+      "See [Setup](/fr/guides/setup)."
+    );
   });
 
   it("reads a raw `<a href>` the way the browser does", async () => {
@@ -343,6 +552,62 @@ describe("relative page links on the agent surfaces", () => {
     ).toContain(
       "Back to [the wiki](/wiki), on to [Install](/wiki/tools/install)."
     );
+  });
+
+  it("percent-encodes a quote in a route spliced into an attribute", async () => {
+    // `don't.md` publishes at `/guides/don't`, which would end a
+    // single-quoted `href`, as a `slug` with `"` would end a double-quoted
+    // one (Windows allows no `"` in a file name).
+    const project = await scanFixture({
+      ...FILES,
+      "docs/guides/cards.mdx": [
+        "# Cards",
+        "",
+        "<Card href='./don%27t.md' title=\"Don't\" />",
+        '<Card href="./hi.md" title="Hi" />',
+        "",
+      ].join("\n"),
+      "docs/guides/don't.md": "# Don't\n",
+      "docs/guides/hi.md": "---\nslug: 'guides/say\"hi'\n---\n# Hi\n",
+    });
+    const raw = await buildRawMarkdown(project);
+    expect(raw["/guides/cards"]?.mdx).toContain(
+      "<Card href='/sub/guides/don%27t' title=\"Don't\" />"
+    );
+    expect(raw["/guides/cards"]?.mdx).toContain(
+      '<Card href="/sub/guides/say%22hi" title="Hi" />'
+    );
+  });
+
+  it("percent-encodes angle brackets in a staged page's route", async () => {
+    // A remote source's file can carry a name no filesystem allows.
+    const entries = [
+      entry("wiki/index.md", "Wiki", "See [the tag](./a%3Cb%3E.md)."),
+      entry("wiki/a<b>.md", "Tag", "# Tag"),
+    ];
+    const project = await scanFixture({
+      "blume.config.ts": `export default {
+  content: {
+    sources: [
+      { kind: "filesystem", options: { root: "docs" }, requiredSecrets: [], runtimeDeps: [] },
+      {
+        kind: "custom",
+        options: {
+          load: () => Promise.resolve({ diagnostics: [], entries: ${JSON.stringify(entries)} }),
+          name: "remote",
+          staged: true,
+        },
+        requiredSecrets: [],
+        runtimeDeps: [],
+      },
+    ],
+  },
+};
+`,
+      "docs/index.md": "# Home\n",
+    });
+    const raw = await buildRawMarkdown(project);
+    expect(raw["/wiki"]?.mdx).toContain("See [the tag](/wiki/a%3Cb%3E).");
   });
 
   it("leaves a page with neither a source file nor an entry id as written", async () => {

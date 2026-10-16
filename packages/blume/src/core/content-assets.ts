@@ -3,15 +3,13 @@ import { readFile } from "node:fs/promises";
 import { dirname, extname, relative } from "pathe";
 
 import { normalizeBasePath } from "./base-path.ts";
-import { nextFenceState } from "./code-fences.ts";
-import type { FenceState } from "./code-fences.ts";
 import { resolveRelativeFile, resolveRelativeImage } from "./relative-files.ts";
 import { hashText } from "./sources/cache.ts";
 import {
   isLinkElementUrl,
   rewriteCardImages,
   rewriteElementUrls,
-  rewriteImageTargets,
+  rewriteImageEmbeds,
   rewriteLinkTargets,
 } from "./sources/normalize.ts";
 import { readExpandedEntryText } from "./sources/read.ts";
@@ -81,18 +79,21 @@ const RELATIVE_ELEMENT_URL = /(?:href|src)=["'](?![/#])/u;
  * Rewrite a page's relative image references, and its links and element
  * URLs naming other files beside it, to their served
  * `/blume-assets/content/…` URLs (under `deployment.base` when set). Fenced
- * code blocks and inline code are skipped; only references whose file actually
- * exists next to the source are touched. `register` observes each rewritten
- * asset so a caller can accumulate the files the endpoint must serve.
+ * code blocks and inline code are skipped, and given the page's `format`, its
+ * comments and a `.md` page's indented code blocks; only references whose file
+ * actually exists next to the source are touched. `register` observes each
+ * rewritten asset so a caller can accumulate the files the endpoint must serve.
  */
 export const rewriteRelativeAssets = (options: {
   source: string;
   sourcePath: string;
   projectRoot: string;
   deployBase?: string;
+  format?: "md" | "mdx";
   register?: (param: string, absPath: string) => void;
 }): string => {
-  const { source, sourcePath, projectRoot, deployBase, register } = options;
+  const { source, sourcePath, projectRoot, deployBase, format, register } =
+    options;
   const sourceDir = dirname(sourcePath);
   const served = (abs: string): string => {
     const param = contentAssetParam(projectRoot, abs);
@@ -108,26 +109,22 @@ export const rewriteRelativeAssets = (options: {
     return file === null ? null : `${served(file.path)}${file.suffix}`;
   };
 
-  let fence: FenceState = null;
-  const lines = source.split("\n").map((line) => {
-    const next = nextFenceState(line, fence);
-    const inFence = fence !== null || next !== null;
-    fence = next;
-    // Inline code is skipped too: a `` `![x](./y.png)` `` span is syntax
-    // being shown, not an image.
-    return inFence ? line : rewriteImageTargets(line, toUrl);
-  });
+  // Inline code is skipped too: a `` `![x](./y.png)` `` span is syntax being
+  // shown, not an image.
+  const withImages = rewriteImageEmbeds(source, toUrl, format);
   // A `<Card img>` is an image embed too: its file is served and its value
   // pointed there, which the HTML render reads back (see
   // `markdown/content-assets.ts`), as are links and element URLs naming any
   // other file beside the page.
-  const withCards = rewriteCardImages(lines.join("\n"), toUrl);
+  const withCards = rewriteCardImages(withImages, toUrl, format);
   const withLinks = RELATIVE_DESTINATION.test(withCards)
-    ? rewriteLinkTargets(withCards, toFileUrl)
+    ? rewriteLinkTargets(withCards, toFileUrl, format)
     : withCards;
   return RELATIVE_ELEMENT_URL.test(withLinks)
-    ? rewriteElementUrls(withLinks, (url) =>
-        isLinkElementUrl(url) ? toFileUrl(url.value) : null
+    ? rewriteElementUrls(
+        withLinks,
+        (url) => (isLinkElementUrl(url) ? toFileUrl(url.value) : null),
+        format
       )
     : withLinks;
 };
@@ -164,6 +161,7 @@ export const collectContentAssets = async (project: {
         return;
       }
       rewriteRelativeAssets({
+        format: page?.format,
         projectRoot: project.context.root,
         register: (param, abs) => {
           files[param] = abs;

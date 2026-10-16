@@ -14,11 +14,15 @@ import type { ComponentMarkdown } from "./component-markdown.ts";
  * no releases at all.
  *
  * The list is the same one the mirror publishes, so both routes to a changelog
- * index — generated or authored — reach agents identically.
+ * index — generated or authored — reach agents identically. For the
+ * assistant's snapshot its links are routes, like the rest of its excerpts.
  */
-export const changelogComponentSerializers = (project: BlumeProject) =>
+export const changelogComponentSerializers = (
+  project: BlumeProject,
+  options: { assistant?: boolean } = {}
+) =>
   ({
     // An empty changelog replaces the tag with nothing, so the page's own prose
     // is all an agent reads. Returning `null` would leave the tag as written.
-    Changelog: () => changelogIndexBlocks(project).join("\n\n"),
+    Changelog: () => changelogIndexBlocks(project, options).join("\n\n"),
   }) satisfies Record<string, ComponentMarkdown>;

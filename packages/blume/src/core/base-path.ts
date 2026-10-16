@@ -40,6 +40,20 @@ export const normalizePath = (path: string): string => {
 };
 
 /**
+ * A path as pages are keyed, percent-escapes decoded — the browser encodes a
+ * page's pathname (`/sv/%C3%B6versikt`), and a cited route escapes a few
+ * characters — but not the ones `decodeURI` keeps (`%2F` stays inside its
+ * segment). A malformed escape stays as written.
+ */
+export const decodedPath = (path: string): string => {
+  try {
+    return decodeURI(path);
+  } catch {
+    return path;
+  }
+};
+
+/**
  * Canonicalize a route-ish string (a configured route, a page path, an agent-
  * supplied route) to `/` or `/seg[/seg…]`: trimmed, exactly one leading slash,
  * no trailing slash. The shared spelling of what openapi/references,

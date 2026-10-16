@@ -382,6 +382,50 @@ describe("relative page links", () => {
     // Neither tree has it: route-relative, as before.
     expect(html).toContain('href="/fr/guides/gone"');
   });
+
+  it("reads an archived page's untranslated sibling from its version's tree", async () => {
+    // An archived version keeps its locale folders inside its own folder.
+    publishData(
+      JSON.stringify({
+        config: {
+          i18n: {
+            defaultLocale: "en",
+            locales: [{ code: "en" }, { code: "fr" }],
+          },
+          versions: { archived: [{ id: "v1.0" }] },
+        },
+        routes: [
+          { entryId: "guides/setup.mdx", locale: "en", path: "/configure" },
+          {
+            entryId: "v1.0/guides/setup.mdx",
+            locale: "en",
+            path: "/v1.0/configure",
+          },
+          {
+            entryId: "v1.0/fr/guides/leaf.md",
+            locale: "fr",
+            path: "/fr/v1.0/guides/leaf",
+          },
+          { entryId: "v1.0/leaf.md", locale: "en", path: "/v1.0/leaf" },
+          {
+            entryId: "v1.0/guides/other.md",
+            locale: "en",
+            path: "/v1.0/guides/other",
+          },
+        ].map((route) => ({ collection: "docs", fallback: false, ...route })),
+      })
+    );
+    const html = await render(
+      "[Setup](./setup.mdx)",
+      `${ROOT}/v1.0/fr/guides/leaf.md`
+    );
+    expect(html).toContain('href="/v1.0/configure"');
+    // An archived page outside a locale folder has no other tree: a missing
+    // sibling stays route-relative, not the version's top-level file.
+    expect(
+      await render("[Leaf](./leaf.md)", `${ROOT}/v1.0/guides/other.md`)
+    ).toContain('href="/v1.0/guides/leaf"');
+  });
 });
 
 describe("root-relative links to content files", () => {
