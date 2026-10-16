@@ -93,7 +93,7 @@ Read the whole config, including the modules it imports. VuePress sites often ke
 | `@vuepress/plugin-register-components` | see "Vue in Markdown" |
 | `container` (`vuepress-plugin-container`) / **v2** `@vuepress/plugin-markdown-container` | containers the site registers. Read each entry's `type`, `before`, `after`, and `defaultTitle`, then map it as in vitepress.md's last "Markdown extensions" row (report) |
 | **v2** `@vuepress/plugin-redirect` | its `config` map → `redirects`. `redirectFrom` frontmatter → one `redirects` entry per old path, pointing at that page. A page with `redirectTo` → delete it and add a redirect |
-| `@vuepress/plugin-blog`, `vuepress-plugin-blog` | `type: blog` pages plus a hand-written index (see `docs/advanced/blog.mdx`). Tag, category, and pagination pages → drop (report) |
+| `@vuepress/plugin-blog`, `vuepress-plugin-blog` | `type: blog` pages: Blume generates the index and a page per tag (see `docs/advanced/blog.mdx`). Redirect its tag and category pages (at each classifier's `path` in v1, its `itemPath` in v2, often `/tag/<tag>/`) to the matching `/blog/tags/<tag>`, and pagination pages to `/blog` (SKILL.md "Blogs") |
 | Mermaid, math, tabs, flowchart, and include plugins | see "Markdown extensions" |
 
 **Styles:** v1's `.vuepress/styles/palette.styl` `$accentColor` (or **v2** `--vp-c-accent` in `.vuepress/styles/index.scss`) → `theme.accent`. Move other rules worth keeping from `index.styl` / `index.scss` to a root `theme.css`, written against Blume's tokens (report).
@@ -192,7 +192,7 @@ Blume's schema is strict: every key below must be mapped or removed.
 | `sidebarDepth` | remove |
 | `prev` / `next` | same as VitePress |
 | `search: false` (v1) | remove (report): it hid the search box on that page, which stayed searchable |
-| `tags` (v1, extra search terms) | `search.keywords` |
+| `tags` (v1, extra search terms) | `search.keywords`; on a blog post (`type: blog`), `tags`, which get tag pages |
 | **v2** `date` | keep on `type: blog` pages, otherwise remove |
 | **v2** `redirectFrom` / `redirectTo` | `redirects` (see the redirect plugin row) |
 | `navbar`, `pageClass`, `editLink`, **v2** `editLinkPattern`, `lastUpdated`, `contributors`, `externalLinkIcon`, `permalinkPattern`, `routeMeta` | drop (report) |
@@ -206,7 +206,7 @@ Blume's schema is strict: every key below must be mapped or removed.
   - **Sidebar** `"structure"` builds the tree from files, which Blume does by default. `order` → `sidebar.order`, `index: false` → `sidebar.hidden: true`, and `shortTitle` → `sidebar.label`. Hope sorts positive `order`s first, then unordered pages by title, then negative `order`s (`-1` last), while Blume sorts a negative order first: renumber, or list the folder's order in its `meta.ts` `pages`. A folder `README.md`'s `dir` → that folder's `meta.ts`: `text` → `title`, `icon`, `order`, `collapsible` (on by default) → `display: "group"`, and `expanded: true` → `collapsed: false`. `dir.index: false` (the folder left out of the generated sidebar) → `sidebar.hidden: true` on each of its pages.
   - **Icons** (frontmatter, navbar, sidebar) are FontAwesome or Iconify names → Lucide (SKILL.md "Icons are Lucide").
   - **Markdown** (the theme's `markdown` options, or `plugins.mdEnhance`): `^sup^`, `~sub~`, task lists, and footnotes work as written. `==mark==` → `<mark>…</mark>`. `::: center` / `::: right` → drop the alignment. `!!spoiler!!` → drop. `<VPCard>` → `<Card>`. A ` ```component Name ` fence (YAML or JSON props) → that component with the props as attributes. `<Catalog />` → `directory: "card"` in that folder's `meta.ts`. `<!-- more -->` → delete. Charts (Chart.js, ECharts, Markmap, PlantUML, flowchart), playgrounds, `::: demo`, and slides → no equivalent: a mermaid diagram, an image, or a link (report).
-  - **Frontmatter:** `author` and `date` → `authors` and `date` on `type: blog` pages, otherwise drop. `category` and `tag` → drop (report: Blume has no tag pages), or `search.keywords`. `article`, `star`, `sticky`, `cover`, `isOriginal`, `pageInfo`, `breadcrumb`, `toc`, `comment`, `copy`, `footer`, `copyright`, `containerClass`, and any other hope-only key (`license`, `pageview`, `backToTop`, `sitemap`, `feed`, …) → drop. The project home's `highlights` → more cards. `bgImage` and the hero style keys → drop (report).
+  - **Frontmatter:** `author` and `date` → `authors` and `date` on `type: blog` pages, otherwise drop. `tag` and `category` → `tags` on `type: blog` pages, which get tag pages, otherwise drop (report) or `search.keywords`. `cover` → `cover` on `type: blog` pages, otherwise drop. `excerpt` → `description` on `type: blog` pages, and a `<!-- more -->` marker → delete. `article`, `star`, `sticky`, `isOriginal`, `pageInfo`, `breadcrumb`, `toc`, `comment`, `copy`, `footer`, `copyright`, `containerClass`, and any other hope-only key (`license`, `pageview`, `backToTop`, `sitemap`, `feed`, …) → drop. The project home's `highlights` → more cards. `bgImage` and the hero style keys → drop (report).
 
 ## Icons
 

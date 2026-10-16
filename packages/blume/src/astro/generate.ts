@@ -22,7 +22,11 @@ import { buildApiSpec } from "../ai/api/spec.ts";
 import { buildAskData } from "../ai/ask-data.ts";
 import { resolveAskBackend } from "../ai/ask.ts";
 import { buildHomeLinkHeader } from "../ai/link-headers.ts";
-import { buildRawMarkdown, markdownRoutePaths } from "../ai/markdown.ts";
+import {
+  buildRawMarkdown,
+  markdownRoutePaths,
+  buildFeedMarkdown,
+} from "../ai/markdown.ts";
 import type { RawMarkdownEntry } from "../ai/markdown.ts";
 import { buildMcpData } from "../ai/mcp/data.ts";
 import type { McpData } from "../ai/mcp/data.ts";
@@ -34,6 +38,13 @@ import {
   navVariants,
 } from "../components/layout/nav-utils.ts";
 import { normalizeBasePath, withBasePath } from "../core/base-path.ts";
+import { blogCoverSources, blogPosts } from "../core/blog-posts.ts";
+import {
+  blogTagRoute,
+  blogTags,
+  indexedPosts,
+  withBlogIndexText,
+} from "../core/blog.ts";
 import { withChangelogIndexText } from "../core/changelog-index.ts";
 import {
   missingExampleDiagnostics,
@@ -69,6 +80,7 @@ import {
   repoUrl as githubRepoUrl,
 } from "../core/github.ts";
 import { EN_UI, resolveUIStrings } from "../core/i18n-ui.ts";
+import type { UIStrings } from "../core/i18n-ui.ts";
 import { resolveFallbackLocale } from "../core/i18n.ts";
 import { buildIncludeGraph } from "../core/includes.ts";
 import { resolveLocalizable } from "../core/localizable.ts";
@@ -79,6 +91,7 @@ import {
 } from "../core/nav-diagnostics.ts";
 import { packageRoot } from "../core/package-root.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
+import { redirectCovers } from "../core/redirect-patterns.ts";
 import type { ResolvedConfig } from "../core/schema.ts";
 import { resolveDocsCollection } from "../core/sources/resolve.ts";
 import { svgDimensions } from "../core/svg-dimensions.ts";
@@ -125,6 +138,7 @@ import {
 import { buildThemeCss } from "../theme/palette.ts";
 import { rebaseSourceDirectives } from "../theme/sources.ts";
 import { twoslashCss } from "../theme/twoslash.ts";
+import { blogPageFiles } from "./blog-pages.ts";
 import { planComponentSlots } from "./component-slots.ts";
 import {
   EXAMPLE_SCAN_GLOB,
@@ -137,6 +151,8 @@ import { discoverIslands } from "./islands.ts";
 import {
   customOgRoutes,
   discoverPages,
+  generatedBlogTagRoutes,
+  hasGeneratedBlog,
   hasGeneratedChangelog,
   navTargetRoutes,
   routeIsTaken,
@@ -1123,6 +1139,43 @@ const resolveAssistant = (
   };
 };
 
+/**
+ * The `blume:data` blog snapshot: every post — less where its cover sits on
+ * this machine, which only the OG endpoint reads — and the index's tags.
+ */
+const blogData = (project: BlumeProject): BlumeData["blog"] => {
+  const posts = blogPosts(project);
+  return {
+    posts: posts.map(({ cover, ...post }) => ({
+      ...post,
+      cover: cover ? { alt: cover.alt, src: cover.src } : null,
+    })),
+    // A tag whose route a redirect answers has no page to link.
+    tags: blogTags(
+      indexedPosts(posts, project.config.i18n?.defaultLocale ?? null)
+    ).filter(
+      (tag) =>
+        !redirectCovers(
+          project.config.redirects,
+          project.config.basePath,
+          blogTagRoute(tag.slug)
+        )
+    ),
+  };
+};
+
+/** The sidebar width each dated type's config asks for on its pages. */
+const sidebarWidths = (config: ResolvedConfig): BlumeData["sidebarWidths"] => {
+  const widths: BlumeData["sidebarWidths"] = {};
+  if (config.blog?.sidebar.width) {
+    widths.blog = config.blog.sidebar.width;
+  }
+  if (config.changelog?.sidebar.width) {
+    widths.changelog = config.changelog.sidebar.width;
+  }
+  return widths;
+};
+
 /** Serialize the content graph into the data module the runtime consumes. */
 export const buildRuntimeData = (project: BlumeProject): string => {
   const { config, context, graph, manifest } = project;
@@ -1178,13 +1231,15 @@ export const buildRuntimeData = (project: BlumeProject): string => {
 
   // Resolved UI dictionaries: one per locale under i18n, English baseline
   // otherwise. Threaded into chrome so the catch-all can pick the active locale.
-  // The `changelog` config's title and description replace the dictionaries'.
+  // The `changelog` and `blog` configs' titles and descriptions replace the
+  // dictionaries'.
+  const withIndexText = (ui: UIStrings, code?: string): UIStrings =>
+    withBlogIndexText(config, withChangelogIndexText(config, ui, code), code);
   const uiByLocale = i18n
     ? Object.fromEntries(
         i18n.locales.map(({ code }) => [
           code,
-          withChangelogIndexText(
-            config,
+          withIndexText(
             resolveUIStrings(code, {
               defaultLocale: i18n.defaultLocale,
               overrides: i18n.ui,
@@ -1194,8 +1249,7 @@ export const buildRuntimeData = (project: BlumeProject): string => {
         ])
       )
     : {};
-  const defaultUi = withChangelogIndexText(
-    config,
+  const defaultUi = withIndexText(
     i18n
       ? resolveUIStrings(i18n.defaultLocale, {
           defaultLocale: i18n.defaultLocale,
@@ -1226,6 +1280,7 @@ export const buildRuntimeData = (project: BlumeProject): string => {
     : {};
 
   const data: BlumeData = {
+    blog: blogData(project),
     config: {
       analytics: config.analytics,
       api: resolveApiPages(config),
@@ -1370,6 +1425,7 @@ export const buildRuntimeData = (project: BlumeProject): string => {
       version: route.version,
       versionAlternates: route.versionAlternates,
     })),
+    sidebarWidths: sidebarWidths(config),
     // Default-locale chrome strings (English baseline when not under i18n).
     ui: defaultUi,
     // Per-locale chrome strings, selected by the catch-all under i18n.
@@ -2138,6 +2194,14 @@ export const generateRuntime = async (
   // (which adds the index's own card) and the page write below. Computed here,
   // before the MCP discovery pages are appended, on the user's own pages.
   const changelogIndex = hasGeneratedChangelog(project, pages);
+  // Likewise the generated `/blog` index and its tag pages (each route a user
+  // page owns is left to it), whose cards the OG endpoint adds too.
+  const blogIndex = hasGeneratedBlog(project, pages);
+  const blogPages = blogPageFiles(project, pages, srcDir, {
+    exportEpub,
+    exportPdf,
+    needsReact,
+  });
 
   // The hosted MCP server. The `.well-known` discovery docs are injected as
   // prerendered routes alongside user pages; the server endpoint itself is a
@@ -2327,7 +2391,12 @@ export const generateRuntime = async (
           },
           pageDescriptions: config.seo.og.description !== false,
         },
-        changelogIndex
+        changelogIndex,
+        {
+          covers: blogCoverSources(blogPosts(project)),
+          index: blogIndex,
+          tags: generatedBlogTagRoutes(project, pages).length > 0,
+        }
       )
     );
   }
@@ -2343,6 +2412,9 @@ export const generateRuntime = async (
       })
     );
   }
+
+  // Blog index (`/blog`), and a page per tag (`/blog/tags/<slug>`).
+  await Promise.all(blogPages.map((file) => write(file.path, file.content)));
 
   // Three independent writes: the per-example preview routes that
   // `<Component />` iframes embed (returning a warning when the configured
@@ -2419,8 +2491,9 @@ export const generateRuntime = async (
   ]);
 
   // Automatic RSS feeds for blog/changelog content types (a no-op when no such
-  // pages exist or no deployment.site is configured).
-  const feeds = buildRssFeeds(project);
+  // pages exist or no deployment.site is configured), each item's whole page
+  // with them when `seo.rss.content` asks.
+  const feeds = buildRssFeeds(project, await buildFeedMarkdown(project));
   if (feeds.length > 0) {
     const feedXml = Object.fromEntries(
       feeds.map((feed) => [feed.type, renderRssFeed(feed)])

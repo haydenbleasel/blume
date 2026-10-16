@@ -46,6 +46,17 @@ export const bn: UIStringsOverride = {
     you: "আপনি",
   },
   banner: { dismiss: "ঘোষণা বন্ধ করুন" },
+  blog: {
+    allPosts: "সব পোস্ট",
+    description: "দলের খবর, আপডেট এবং গল্প।",
+    empty: "এখনও কোনো পোস্ট নেই।",
+    newer: "নতুনতর পোস্ট",
+    older: "পুরোনো পোস্ট",
+    readingTime: "{minutes} মিনিটের পড়া",
+    tagged: "“{tag}” ট্যাগযুক্ত পোস্ট",
+    tags: "ট্যাগ",
+    title: "ব্লগ",
+  },
   changelog: {
     description: "পণ্য আপডেট এবং রিলিজ নোট।",
     empty: "পরিবর্তন লগে এখনও কোনো এন্ট্রি নেই।",

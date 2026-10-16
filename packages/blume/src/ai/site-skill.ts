@@ -1,9 +1,10 @@
-import { hasGeneratedChangelog } from "../astro/pages.ts";
+import { hasGeneratedBlog, hasGeneratedChangelog } from "../astro/pages.ts";
 import {
   mountBasePath,
   normalizeBasePath,
   withBasePath,
 } from "../core/base-path.ts";
+import { BLOG_INDEX_ROUTE, nonBlank } from "../core/blog.ts";
 import { CHANGELOG_INDEX_ROUTE } from "../core/changelog-index.ts";
 import { discoverPagesSync } from "../core/custom-pages.ts";
 import { isHiddenPage } from "../core/hidden-pages.ts";
@@ -57,9 +58,13 @@ export const siteSkillName = (project: BlumeProject): string => {
 
 /**
  * Current-version, default-locale pages worth listing: not API operations,
- * and not changelog entries, which the changelog index covers in one line.
+ * and not changelog entries, which the changelog index covers in one line —
+ * nor blog posts while the generated blog index does (`blogIndexed`).
  */
-const mappedPages = (project: BlumeProject): PageRecord[] => {
+const mappedPages = (
+  project: BlumeProject,
+  blogIndexed: boolean
+): PageRecord[] => {
   const defaultLocale = project.config.i18n?.defaultLocale;
   return project.graph.pages.filter(
     (page) =>
@@ -70,7 +75,8 @@ const mappedPages = (project: BlumeProject): PageRecord[] => {
         page.meta.seo.noindex ||
         page.version !== "" ||
         page.source.name === "openapi" ||
-        page.contentType === "changelog"
+        page.contentType === "changelog" ||
+        (blogIndexed && page.contentType === "blog")
       ) &&
       (defaultLocale === undefined || page.locale === defaultLocale)
   );
@@ -103,8 +109,9 @@ class PageMap {
       return [];
     }
     this.#listed.add(route);
-    // As `llms.txt` lists it: the page's meta description.
-    const description = metaDescription(page);
+    // As `llms.txt` lists it: the page's meta description, else, for a blog
+    // post, its first paragraph.
+    const description = nonBlank(metaDescription(page)) ?? page.post?.excerpt;
     const summary = description ? `: ${description}` : "";
     return [`- [${linkText(page.title)}](${this.#url(route)})${summary}`];
   }
@@ -116,6 +123,12 @@ class PageMap {
     for (const node of nodes) {
       if (node.kind === "page") {
         list.push(...this.line(node.route));
+        continue;
+      }
+      // A year group of dated entries is no section: its pages list with
+      // the level's own, as in llms.txt.
+      if (node.period) {
+        list.push(...this.level(node.children, depth));
         continue;
       }
       const blocks = [
@@ -175,6 +188,11 @@ const surfaceLines = (
       `- [Changelog](${url(`${CHANGELOG_INDEX_ROUTE}.md`)}): release notes, newest first.`
     );
   }
+  if (hasGeneratedBlog(project, userPages)) {
+    lines.push(
+      `- [Blog](${url(`${BLOG_INDEX_ROUTE}.md`)}): blog posts, newest first.`
+    );
+  }
   return lines;
 };
 
@@ -218,7 +236,13 @@ const skillMarkdown = (project: BlumeProject, name: string): string => {
   const markdownUrl = (route: string): string =>
     url(route === "/" ? "/index.md" : `${route}.md`);
 
-  const map = new PageMap(mappedPages(project), markdownUrl);
+  const userPages = project.context.pagesRoot
+    ? discoverPagesSync(project.context.pagesRoot)
+    : [];
+  const map = new PageMap(
+    mappedPages(project, hasGeneratedBlog(project, userPages)),
+    markdownUrl
+  );
   const pages = [
     ...map.level(project.graph.navigation.sidebar, 3),
     ...map.rest(),
