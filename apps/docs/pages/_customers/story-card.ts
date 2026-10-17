@@ -70,9 +70,8 @@ export const renderStoryCard = async (
 
   const lockup = container({
     children: [
-      // The Blume lockup in the launch video's proportions
-      // (packages/video/src/scenes/blume-logo.tsx): Geist SemiBold beside
-      // the mark at 0.78 of the type size, a fifth of it apart.
+      // The Blume lockup in the launch video's proportions: Geist SemiBold
+      // beside the mark at 0.78 of the type size, a fifth of it apart.
       image({
         height: 28,
         src: await whiteSvg(publicDir, "/logo.svg"),

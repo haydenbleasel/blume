@@ -31,14 +31,6 @@ playwright-report/
 # Blume
 .blume-verify
 
-# Remotion
-build/
-out/
-.remotion/
-# Licensed music (Epidemic Sound) — renders may use it, but the raw tracks
-# can't be redistributed from a public repo.
-packages/video/public/music/
-
 # Claude Code isolated worktrees (EnterWorktree)
 .claude/worktrees/
 
