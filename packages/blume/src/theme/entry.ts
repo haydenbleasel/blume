@@ -973,10 +973,11 @@ pre:has(.line.focused):hover .line:not(.focused) {
    the chrome itself, never bare \`header\`/\`aside\`: content renders those too
    (every Callout and Panel is an <aside>, every changelog Update has a
    <header>), and they belong in the printout. \`body > header\` and
-   \`body > footer\` keep \`layout.Header\` and \`layout.Footer\` overrides out
-   as well. Everything after the article (directory and related-page cards,
-   last updated, feedback, prev/next) is page chrome too, and so are the
-   copy, ask, and expand buttons on code blocks. */
+   \`body > footer\` (or the docs layout's footer row) keep \`layout.Header\`
+   and \`layout.Footer\` overrides out as well. Everything after the article
+   (directory and related-page cards, last updated, feedback, prev/next) is
+   page chrome too, and so are the copy, ask, and expand buttons on code
+   blocks. */
 @media print {
   [data-blume-banner],
   [data-blume-header],
@@ -990,6 +991,7 @@ pre:has(.line.focused):hover .line:not(.focused) {
   [data-blume-page-end],
   [data-blume-footer],
   body > footer,
+  [data-blume-footer-row],
   [data-blume-copy],
   [data-blume-ask],
   [data-blume-code-expand] {

@@ -736,7 +736,10 @@ const localeRedirect = localeTargets
       switcherStrings={strings.languageSwitcher}
     />
     <div
-      class:list={["mx-auto grid grid-cols-1 items-start", gridClass]}
+      class:list={[
+        "mx-auto grid grid-cols-1 grid-rows-[1fr_auto] items-start",
+        gridClass,
+      ]}
       data-blume-doc-grid
     >
       <aside
@@ -744,7 +747,7 @@ const localeRedirect = localeTargets
         data-blume-nav-drawer
         id="blume-nav-drawer"
         class:list={[
-          "fixed top-[var(--blume-drawer-top,4rem)] start-0 z-[35] h-[calc(100dvh-var(--blume-drawer-top,4rem))] w-64 max-w-[80vw] -translate-x-[105%] overflow-y-auto border-border border-e bg-background px-5 pt-4 pb-6 transition-transform rtl:translate-x-[105%] [:where([data-blume-nav-open])_&]:translate-x-0! lg:sticky lg:top-16 lg:z-auto lg:h-[calc(100dvh-4rem)] lg:w-auto lg:max-w-none lg:translate-x-0! lg:scrollbar-thin lg:scrollbar-thumb-border lg:scrollbar-track-transparent lg:border-e-0 lg:bg-transparent lg:px-4",
+          "fixed top-[var(--blume-drawer-top,4rem)] start-0 z-[35] h-[calc(100dvh-var(--blume-drawer-top,4rem))] w-64 max-w-[80vw] -translate-x-[105%] overflow-y-auto overscroll-contain border-border border-e bg-background px-5 pt-4 pb-6 transition-transform rtl:translate-x-[105%] [:where([data-blume-nav-open])_&]:translate-x-0! lg:sticky lg:col-start-1 lg:row-span-2 lg:row-start-1 lg:top-16 lg:z-auto lg:h-[calc(100dvh-4rem)] lg:w-auto lg:max-w-none lg:translate-x-0! lg:scrollbar-thin lg:scrollbar-thumb-border lg:scrollbar-track-transparent lg:border-e-0 lg:bg-transparent lg:px-4",
           // A "bare" landing (the changelog index) has no sidebar column on
           // desktop, but the header hamburger still needs a drawer to open on
           // mobile — without it the toggle only locked page scroll.
@@ -975,7 +978,7 @@ const localeRedirect = localeTargets
         showToc && (
           <aside
             aria-label={strings.toc.title}
-            class="sticky top-16 hidden h-[calc(100dvh-4rem)] scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent overflow-y-auto [--blume-rail-inset:1rem] px-(--blume-rail-inset) pt-6 pb-10 text-sm xl:block"
+            class="sticky top-16 col-start-3 row-span-2 row-start-1 hidden h-[calc(100dvh-4rem)] scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent overflow-y-auto overscroll-contain [--blume-rail-inset:1rem] px-(--blume-rail-inset) pt-6 pb-10 text-sm xl:block"
             data-blume-toc
           >
             {hasToc && (
@@ -1000,18 +1003,27 @@ const localeRedirect = localeTargets
           </aside>
         )
       }
+      {/* The site footer is the grid's last row, under every column. The
+          sidebar and TOC rail span both rows, so their sticky range runs to
+          the end of the page: they stay pinned while the footer scrolls in
+          over their bottom edge, rather than being pushed up with the page. */}
+      {
+        showChrome && (
+          <div
+            class="relative z-10 col-span-full row-start-2 bg-background"
+            data-blume-footer-row
+          >
+            <FooterSlot
+              footer={data.config.footer}
+              locale={locale}
+              navigation={navigation}
+              site={site}
+              ui={strings}
+            />
+          </div>
+        )
+      }
     </div>
-    {
-      showChrome && (
-        <FooterSlot
-          footer={data.config.footer}
-          locale={locale}
-          navigation={navigation}
-          site={site}
-          ui={strings}
-        />
-      )
-    }
     {
       clientDataJson && (
         <script
