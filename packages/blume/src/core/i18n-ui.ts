@@ -83,6 +83,30 @@ const uiStringsObject = z.object({
       dismiss: z.string().default("Dismiss announcement"),
     })
     .prefault({}),
+  // The blog: the generated `/blog` index and tag pages, and a post's byline
+  // and footer.
+  blog: z
+    .object({
+      // The index's filter row: the chip that lists every post, and the link
+      // under a post back to the index.
+      allPosts: z.string().default("All posts"),
+      description: z
+        .string()
+        .default("News, updates, and stories from the team."),
+      // What the index says when it has no posts to list.
+      empty: z.string().default("No posts yet."),
+      // A post's footer links to the posts before and after it by date.
+      newer: z.string().default("Newer post"),
+      older: z.string().default("Older post"),
+      // `{minutes}` is replaced with the post's estimated reading time.
+      readingTime: z.string().default("{minutes} min read"),
+      // A tag page's heading; `{tag}` is replaced with the tag.
+      tagged: z.string().default("Posts tagged “{tag}”"),
+      // The accessible name of a post's, and the index's, list of tags.
+      tags: z.string().default("Tags"),
+      title: z.string().default("Blog"),
+    })
+    .prefault({}),
   changelog: z
     .object({
       description: z

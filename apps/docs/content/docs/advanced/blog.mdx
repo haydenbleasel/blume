@@ -1,9 +1,9 @@
 ---
 title: Blog
-description: Publish posts as content, get an RSS feed and article structured data for free, and build a custom index page.
+description: Publish posts as content and Blume builds the rest — an index grouped by year, a page per tag, a byline with authors and reading time, an RSS feed, and article structured data.
 ---
 
-A blog in Blume is just content with a type. Mark a page `type: blog` and Blume gives it an RSS feed and richer article metadata automatically. Unlike the [changelog](/docs/advanced/changelog), there's no generated index page — you compose the landing page yourself, which keeps the design entirely in your hands.
+A blog in Blume is content with a type. Mark a page `type: blog` and Blume lists it on a generated **`/blog`** index, gives it a byline, a cover, and links to the posts around it, adds it to the blog's RSS feed, and describes it to search engines as a `BlogPosting`. There's no layout to build and no list to maintain.
 
 ## Write a post
 
@@ -15,98 +15,128 @@ title: Introducing Blume
 type: blog
 date: 2026-06-22
 description: Why we built a markdown-first docs framework.
+authors:
+  - name: Hayden Bleasel
+    avatar: ./hayden.png
+    url: https://x.com/haydenbleasel
+tags: [Announcements, Product]
+cover: ./cover.png
 ---
 
 Documentation should be fast, AI-ready, and zero-config — down to not needing a starter template at all. Here's the thinking behind Blume.
 ```
 
-Give every post a `date` so feed items sort newest-first and carry a `pubDate`, and a `description` — it's used for both the feed summary and SEO.
+Give every post a `date`, written `YYYY-MM-DD` (another form, like `March 1, 2025`, is read in the build machine's time zone): the index, the sidebar, and the feed sort newest first by it. Without one, a post sorts last, under no year (with [`seo.datePublished: "git"`](/docs/discoverability/structured-data#publication-date-from-git), the commit that added the file dates it).
 
-## The RSS feed
+<TypeTable
+  type={{
+    authors: {
+      type: "string | string[] | object[]",
+      description:
+        "Who wrote the post: a name, or objects with a name plus an optional avatar (or image) and url. Shown in the byline, with initials where there's no avatar.",
+    },
+    tags: {
+      type: "string[]",
+      description:
+        "Shown as chips on the post and the index, each linking a page that lists the tag's posts.",
+    },
+    cover: {
+      type: "string | { src, alt }",
+      description:
+        "An image shown under the byline, on the post's card on the index, and on its OG card. The object form adds alt text; without it the post's title stands in.",
+    },
+    description: {
+      type: "string",
+      description:
+        "The post's summary on the index, in the feed, and in search results. Without one, the post's first paragraph takes its place.",
+    },
+  }}
+/>
 
-Blume builds a blog feed at **`/blog/rss.xml`**, sorted newest-first by `date`. Feeds need an absolute site URL, so set [`deployment.site`](/docs/deployment); Blume then injects a `<link rel="alternate">` tag on every page so readers discover it automatically.
+An avatar or cover takes a path beside the post (`./cover.png`), a path under `public/` (`/images/cover.png`), or a URL; [`blume validate`](/docs/cli/validate) reports a path that names no file. A tag is its own page's URL segment, lowercased: tags that differ only in case or punctuation (`DevOps`, `devops`) share a page. Quote a tag that looks like a number (`"1.10"`): YAML reads a bare `1.10` as the number 1.1. If your site already declared `tags` or `cover` itself, through `frontmatter.extend` or a type's `frontmatter`, your declaration keeps the key, and the blog doesn't read it. Posts from an [Obsidian vault](/docs/content/sources/obsidian) have neither, since a vault's `tags` and `cover` properties mean something else there.
 
-The feed is on by default. Tune it under [`seo.rss`](/docs/discoverability/rss):
+## The post
 
-```ts blume.config.ts lineNumbers
-seo: {
-  rss: {
-    enabled: true,
-    types: ["blog", "changelog"],
-    limit: 50,
+Above a post's title, Blume shows its date, an estimated reading time, and its tags; below the title and description, its authors and cover. At the foot of the post, the previous and next links lead to the newer and older posts by date, followed by a link back to the index. When the post's frontmatter names no [`related`](/docs/content/frontmatter#related-pages) pages, the posts that share the most tags with it are suggested there instead.
+
+## The index
+
+Once you have a `type: blog` post, Blume generates a **`/blog`** page: every post, newest first and grouped by year, each as a card with its date, reading time, title, summary, authors, tags, and cover. Above the list, a row of tags filters it: each tag has a page of its own at **`/blog/tags/<tag>`**, listing the posts that carry it. Drafts and `sidebar.hidden` posts are left out.
+
+The page is headed **Blog**, with a one-line description below, both in the site's language when Blume ships a [UI pack](/docs/content/i18n#translated-ui) for it. Set your own with `blog` in your config; they also become the page's `<title>`, meta description, and OG card, and the top of its Markdown mirror at `/blog.md`:
+
+```ts blume.config.ts
+blog: {
+  title: "Engineering blog",
+  description: "How we build Acme, by the people who build it.",
+},
+```
+
+Each takes a map of locale code to text too, like a [header tab label](/docs/content/i18n#per-locale-navigation). Leave either unset and it keeps the built-in text, which a [UI string override](/docs/content/i18n#translated-ui) (`blog.title` and `blog.description` under `i18n.ui`) replaces. Like the [changelog](/docs/advanced/changelog#the-index-page), the index lists the default locale's posts and renders in the default locale.
+
+The index and each tag page appear only when nothing already occupies their route: a page of your own (a dynamic one under `pages/blog/`, like `pages/blog/tags/[tag].astro`, too, but not a site-wide `pages/[...slug].astro`: give that one's `/blog` a `pages/blog.astro`), or a [redirect](/docs/deployment#redirects) (a site whose posts live elsewhere may send `/blog/:slug*` there). Like the changelog's, they mount at the site root even under a [`basePath`](/docs/deployment#mount-the-docs-under-a-path), so there a hand-written `blog/index.mdx`, at `/<basePath>/blog`, sits beside the generated index rather than replacing it.
+
+### Writing your own index
+
+To put something above the list, write the page yourself at `blog/index.mdx` and place `<Blog />` where the list belongs. Blume still owns the list, tag filter included. The page isn't a post, so it sets no `type` (on a site whose [`content.defaultType`](/docs/configuration#content) is `blog`, it sets `type: doc`):
+
+```mdx blog/index.mdx
+---
+title: Blog
+description: How we build Acme, by the people who build it.
+mode: center
+---
+
+Subscribe to the [RSS feed](/blog/rss.xml) to follow along.
+
+<Blog />
+```
+
+`<Blog tag="product" />` lists one tag's posts (the tag's slug, as in its page's URL). The list downlevels to Markdown on the agent surfaces (`/blog.md`, llms-full.txt, MCP `get_page`, search) exactly as the generated page's does.
+
+A [custom page](/docs/advanced/custom-pages#reading-site-data) reads the posts from `blume:data`: `data.blog.posts` lists every post newest first, with its route, date, tags, authors, cover, excerpt, and reading time as the index reads them, and `data.blog.tags` the tags the index lists. A content entry's own `tags` and `cover` (`entry.data`) are as written in its front matter.
+
+## The sidebar
+
+Posts sit in the sidebar like any other pages, newest first, but folded into collapsible years: a long-running blog reads as a handful of rows, with the open post's year expanded. A post's title wraps to a second line instead of being cut off. Tune both under `blog.sidebar`:
+
+```ts blume.config.ts
+blog: {
+  sidebar: {
+    groupBy: "month", // "year" (default), "month", or false
+    width: "20rem", // wider than the default 17.5rem, on posts only
   },
+},
+```
+
+`groupBy: false` lists the posts flat. `width` takes a CSS length in `ch`, `em`, `px`, or `rem`, and applies on the posts' own pages. A dated post's numeric filename prefix (`01-intro.md`) doesn't order it, its date does. A post ordered by hand — with a `sidebar.order`, or in a folder `meta.ts` `pages` list — stays outside the year groups, and like every other page beside the posts lists after them, whatever its order (an introduction belongs in the folder's `index.mdx`, which its row opens); posts already kept in period folders (`blog/2025/`, and by month `blog/2025/03/` or `blog/2025-03/`) aren't grouped a second time, nor is a loose post in a period such a folder holds (folders sort by name, so list them newest first in the blog folder's [`meta.ts`](/docs/content/meta) `pages`). The [changelog](/docs/advanced/changelog#group-the-sidebar) takes the same options under `changelog.sidebar`, with grouping off by default. Grouping and wrapping apply to the sidebar Blume generates from your files: an [explicit sidebar](/docs/content/navigation#explicit-sidebar) lists posts as you wrote it, and only `width` applies there.
+
+To give the blog a tab of its own, so its posts leave the docs sidebar, point a [tab](/docs/content/navigation#tabs) at the index:
+
+```ts blume.config.ts
+navigation: {
+  tabs: [
+    { label: "Docs", path: "/" },
+    { label: "Blog", path: "/blog" },
+  ],
 }
 ```
 
-Remove `"blog"` from `rss.types` to skip the feed.
+The tab's `path` has to match the folder the posts live under.
+
+## The RSS feed
+
+Blume builds a blog feed at **`/blog/rss.xml`**, sorted newest first by `date`, with each post's authors (`dc:creator`) and tags (`<category>`). Feeds need an absolute site URL, so set [`deployment.site`](/docs/deployment); Blume then injects a `<link rel="alternate">` tag on every page so readers discover it automatically. Set `seo.rss.content` to put each post's whole text in the feed, not only its summary. See [RSS feeds](/docs/discoverability/rss) for every option.
 
 ## Structured data
 
-When [structured data](/docs/discoverability/structured-data) is on, each post is emitted as a schema.org **`BlogPosting`** with its description and publish date — the richer article type search engines expect for blog content.
-
-## Building an index
-
-Blume doesn't generate a `/blog` landing page, so you build one. The simplest option is a content page that links to each post by hand:
-
-```mdx blog/index.mdx lineNumbers
----
-title: Blog
-description: News and writing from the team.
----
+When [structured data](/docs/discoverability/structured-data) is on, each post is emitted as a schema.org **`BlogPosting`** with its description, publish date, authors, and tags as `keywords` — the richer article type search engines expect for blog content. Its [OG card](/docs/discoverability/open-graph) adds the authors, the date, and the cover.
 
 <CardGroup cols={2}>
-  <Card title="Introducing Blume" href="/blog/introducing-blume">
-    Why we built a markdown-first docs framework.
+  <Card title="Frontmatter" href="/docs/content/frontmatter" icon="file">
+    Every field a post accepts.
   </Card>
-</CardGroup>
-```
-
-To list posts automatically instead, add a [custom page](/docs/advanced/custom-pages) at `pages/blog/index.astro` that reads from Astro's `docs` content collection and pairs each entry with its route from `blume:data`, keyed by the route's `entryId`:
-
-```astro pages/blog/index.astro lineNumbers
----
-import { getCollection } from "astro:content";
-import data from "blume:data";
-import { getBlumeCollection } from "blume/runtime";
-
-// A custom page renders at its own path only, so list the default locale's
-// posts. getBlumeCollection leaves out drafts, hidden pages, and the copies
-// i18n serves for untranslated pages, so each post is listed once.
-const routes = getBlumeCollection(data, {
-  locale: data.config.i18n?.defaultLocale,
-});
-const routeByEntry = new Map(routes.map((route) => [route.entryId, route.path]));
-
-const posts = (await getCollection("docs"))
-  .filter((entry) => entry.data.type === "blog" && routeByEntry.has(entry.id))
-  .map((entry) => ({
-    date: entry.data.date,
-    description: entry.data.description,
-    href: routeByEntry.get(entry.id),
-    title: entry.data.title,
-  }))
-  .toSorted((a, b) => Number(new Date(b.date)) - Number(new Date(a.date)));
----
-
-<ul>
-  {
-    posts.map((post) => (
-      <li>
-        <a href={post.href}>{post.title}</a>
-        <p>{post.description}</p>
-      </li>
-    ))
-  }
-</ul>
-```
-
-See [Custom pages](/docs/advanced/custom-pages#using-the-site-layout) for wrapping this in the full site layout.
-
-<CardGroup cols={2}>
-  <Card title="Custom pages" href="/docs/advanced/custom-pages" icon="folder">
-    Mount the blog index and read from blume:data.
-  </Card>
-  <Card title="Discoverability" href="/docs/discoverability" icon="file">
-    Feeds, Open Graph images, and structured data.
+  <Card title="Changelogs" href="/docs/advanced/changelog" icon="folder">
+    The other dated content type, with its own timeline.
   </Card>
 </CardGroup>

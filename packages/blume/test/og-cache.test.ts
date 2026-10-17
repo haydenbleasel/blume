@@ -11,6 +11,7 @@ import {
   pruneCardCache,
   resetCardCacheTally,
   throughCardCache,
+  withoutStoring,
 } from "../src/og/cache.ts";
 import type { OgCache } from "../src/og/cache.ts";
 import type { OgCardOptions } from "../src/og/card.ts";
@@ -108,6 +109,18 @@ describe("throughCardCache", () => {
     expect(new TextDecoder().decode(again)).toBe("card:A");
     expect(renders).toBe(1);
     expect(cardCacheTally()).toEqual({ hits: 1, misses: 1 });
+  });
+
+  it("serves a card rendered short of its inputs without storing it", async () => {
+    let renders = 0;
+    const render = () => {
+      renders += 1;
+      return Promise.resolve(withoutStoring(png("no cover")));
+    };
+    await throughCardCache(cache, { title: "A" }, render);
+    // The next build tries again: a passing error isn't kept.
+    await throughCardCache(cache, { title: "A" }, render);
+    expect(renders).toBe(2);
   });
 
   it("renders duplicate titles once while the first render is in flight", async () => {

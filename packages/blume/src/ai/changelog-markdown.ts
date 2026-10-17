@@ -1,10 +1,16 @@
 import { mountBasePath, normalizeBasePath } from "../core/base-path.ts";
 import { withChangelogIndexText } from "../core/changelog-index.ts";
 import {
-  compareChangelogDates,
-  groupChangelogYears,
-  parseChangelogDate,
-} from "../core/changelog-list.ts";
+  isoDateFormat,
+  isoDayYear,
+  resolveDateFormatOptions,
+} from "../core/date-format.ts";
+import {
+  compareEntryDates,
+  entryDate,
+  groupEntryYears,
+  parseEntryDate,
+} from "../core/dated-list.ts";
 import { EN_UI, resolveUIStrings } from "../core/i18n-ui.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
 import { absoluteUrl } from "../core/site-url.ts";
@@ -21,6 +27,8 @@ import type { PageRecord } from "../core/types.ts";
 
 interface IndexRow {
   date: Date | null;
+  /** The date's day in the configured time zone, as the page shows it. */
+  day: string | null;
   page: PageRecord;
 }
 
@@ -31,11 +39,10 @@ const entryUrl = (project: BlumeProject, route: string): string => {
   return encodeURI(site ? absoluteUrl(site, path) : path);
 };
 
-const rowLine = (project: BlumeProject, { date, page }: IndexRow): string => {
-  const details = [
-    date ? date.toISOString().slice(0, 10) : "",
-    page.meta.changelog?.category ?? "",
-  ].filter(Boolean);
+const rowLine = (project: BlumeProject, { day, page }: IndexRow): string => {
+  const details = [day ?? "", page.meta.changelog?.category ?? ""].filter(
+    Boolean
+  );
   const title = page.title.replaceAll(/[[\]]/gu, String.raw`\$&`);
   const tail = details.length > 0 ? ` — ${details.join(", ")}` : "";
   return `- [${title}](${entryUrl(project, page.route)})${tail}`;
@@ -54,6 +61,9 @@ const rowLine = (project: BlumeProject, { date, page }: IndexRow): string => {
  */
 export const changelogIndexBlocks = (project: BlumeProject): string[] => {
   const { i18n } = project.config;
+  const iso = isoDateFormat(
+    resolveDateFormatOptions(project.config.dateFormat).timeZone
+  );
   const rows: IndexRow[] = project.graph.pages
     .filter(
       (page) =>
@@ -64,15 +74,15 @@ export const changelogIndexBlocks = (project: BlumeProject): string[] => {
         page.version === "" &&
         (!i18n || page.locale === i18n.defaultLocale)
     )
-    .map((page) => ({
-      date: parseChangelogDate(page.meta.date ?? page.meta.changelog?.date),
-      page,
-    }))
-    .toSorted((a, b) => compareChangelogDates(a.date, b.date));
+    .map((page) => {
+      const date = parseEntryDate(entryDate(page));
+      return { date, day: date ? iso(date) : null, page };
+    })
+    .toSorted((a, b) => compareEntryDates(a.date, b.date));
 
   // Undated entries sort last, under a heading of their own.
-  return groupChangelogYears(rows, (row) =>
-    row.date ? String(row.date.getUTCFullYear()) : null
+  return groupEntryYears(rows, (row) =>
+    row.day ? isoDayYear(row.day) : null
   ).flatMap((group) => [
     `## ${group.year ?? "Undated"}`,
     group.items.map((row) => rowLine(project, row)).join("\n"),

@@ -4,10 +4,17 @@ import { isAbsolute, join, relative } from "pathe";
 
 import { alertDiagnostics } from "./alert-diagnostics.ts";
 import { normalizePath, withBasePath } from "./base-path.ts";
+import {
+  BLOG_INDEX_ROUTE,
+  blogTagRoutes,
+  datedSidebarGroups,
+  hasBlogIndex,
+} from "./blog.ts";
 import { CHANGELOG_INDEX_ROUTE, hasChangelogIndex } from "./changelog-index.ts";
 import { codeFenceDiagnostics } from "./code-fence-diagnostics.ts";
 import { loadConfig } from "./config.ts";
 import { customStaticRoutes, discoverPages } from "./custom-pages.ts";
+import { resolveDateFormatOptions } from "./date-format.ts";
 import { directiveDiagnostics } from "./directive-diagnostics.ts";
 import { formerRouteRedirects } from "./former-routes.ts";
 import { buildContentGraph } from "./graph.ts";
@@ -31,7 +38,11 @@ import { folderMetaDiagnostics } from "./meta-diagnostics.ts";
 import { discoverFolderMeta, withGeneratedFolderMeta } from "./meta.ts";
 import type { FolderMetaSource } from "./meta.ts";
 import { resolveProjectContext } from "./project.ts";
-import { isPatternPath, pathsUnderPattern } from "./redirect-patterns.ts";
+import {
+  isPatternPath,
+  pathsUnderPattern,
+  redirectCovers,
+} from "./redirect-patterns.ts";
 import type { ResolvedConfig } from "./schema.ts";
 import { normalizeEntry, strippedLineOffset } from "./sources/normalize.ts";
 import { resolveDocsCollection, resolveSources } from "./sources/resolve.ts";
@@ -763,26 +774,38 @@ export const scanProject = async (
   // the manifest (which shares these page objects) picks them up.
   const gitDateWarnings = applyGitDates(pages, sources, context.root, config);
 
-  // Custom `.astro` pages and the generated changelog index aren't content
-  // pages, so name them for navigation: a `/changelog` tab should open the
-  // timeline, not the newest entry, and a tab or brand link to a custom page
-  // must stay on its route in every locale.
+  // Custom `.astro` pages and the generated changelog and blog indexes aren't
+  // content pages, so name them for navigation: a `/changelog` tab should open
+  // the timeline, not the newest entry, and a tab or brand link to a custom
+  // page must stay on its route in every locale.
   const customPages = context.pagesRoot
     ? await discoverPages(context.pagesRoot)
     : [];
   const extraRoutes = new Set([
     ...customStaticRoutes(customPages),
     ...(hasChangelogIndex(pages, config) ? [CHANGELOG_INDEX_ROUTE] : []),
+    // A blog route a configured redirect answers stays the redirect's.
+    ...(hasBlogIndex(pages, config.i18n?.defaultLocale ?? null)
+      ? [
+          BLOG_INDEX_ROUTE,
+          ...blogTagRoutes(pages, config.i18n?.defaultLocale ?? null),
+        ].filter(
+          (route) => !redirectCovers(config.redirects, config.basePath, route)
+        )
+      : []),
   ]);
   const graph = buildContentGraph(pages, {
     bannerHref: bannerLinkHref(config.banner),
     basePath: config.basePath,
     brandHref: logoHref(config.logo),
+    datedGroups: datedSidebarGroups(config),
     extraRoutes,
     folderMeta: mergedFolderMeta.meta,
     i18n: config.i18n,
     navigation: config.navigation,
     sharedFolderMeta: mergedFolderMeta.shared,
+    // Year groups read a date in the zone the indexes write it in.
+    timeZone: resolveDateFormatOptions(config.dateFormat).timeZone,
     versions: config.versions,
   });
   const manifest = buildManifest({ config, context, graph });

@@ -49,6 +49,17 @@ export const ptBR: UIStringsOverride = {
     you: "Você",
   },
   banner: { dismiss: "Fechar o anúncio" },
+  blog: {
+    allPosts: "Todas as postagens",
+    description: "Notícias, novidades e histórias da equipe.",
+    empty: "Ainda não há postagens.",
+    newer: "Postagem mais recente",
+    older: "Postagem mais antiga",
+    readingTime: "{minutes} min de leitura",
+    tagged: "Postagens com a tag “{tag}”",
+    tags: "Tags",
+    title: "Blog",
+  },
   changelog: {
     description: "Atualizações do produto e notas de lançamento.",
     empty: "Ainda não há entradas no registro de alterações.",
