@@ -15,6 +15,7 @@
     "src/ai/index.ts",
     "src/analytics/index.ts",
     "src/captcha/index.ts",
+    "src/components/layout/locale-redirect.ts",
     "src/consent/index.ts",
     "src/core/schema.ts",
     "src/deploy/adapters/index.ts",
