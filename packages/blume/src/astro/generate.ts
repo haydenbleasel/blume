@@ -27,6 +27,7 @@ import type { RawMarkdownEntry } from "../ai/markdown.ts";
 import { buildMcpData } from "../ai/mcp/data.ts";
 import type { McpData } from "../ai/mcp/data.ts";
 import { buildMcpDiscovery, buildMcpServerCard } from "../ai/mcp/discovery.ts";
+import { servesSkillsIndex } from "../ai/skills.ts";
 import { captchaSettings } from "../captcha/schema.ts";
 import { parseApiEndpoint } from "../components/content/api-page.ts";
 import {
@@ -1319,6 +1320,7 @@ export const buildRuntimeData = (project: BlumeProject): string => {
       webmcp: {
         enabled: config.agents.webmcp,
         llms: config.agents.llmsTxt.enabled,
+        skills: servesSkillsIndex(config),
       },
       x: config.seo.x,
     },

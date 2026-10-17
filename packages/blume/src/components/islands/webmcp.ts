@@ -7,7 +7,8 @@ import { joinBase, mountBase, prefixBase } from "./base-path.ts";
  * WebMCP (W3C Web Machine Learning CG): in-page tools an agentic browser can
  * call, registered on the page's model context. Blume exposes the same
  * read-only surface its hosted MCP server has — search, page Markdown, the
- * docs index — so an agent driving the browser needs no separate connection.
+ * docs index — plus the site's agent skills and same-origin navigation, so
+ * an agent driving the browser needs no separate connection.
  * The module is inert everywhere else: registration is attempted only when
  * the page exposes a model context.
  */
@@ -32,6 +33,7 @@ export type WebMcpJsonValue =
  * guarantee schema validation, so each tool checks its own fields at runtime.
  */
 export interface WebMcpToolArgs {
+  name?: WebMcpJsonValue;
   query?: WebMcpJsonValue;
   route?: WebMcpJsonValue;
 }
@@ -79,6 +81,32 @@ const isCallable = <T extends (...args: never[]) => void>(
   value: T | undefined
 ): value is T => typeof value === "function";
 
+const PROBE_ORIGIN = "http://blume.invalid";
+
+/**
+ * A root-relative route that stays on this origin. Resolved with the URL
+ * parser itself rather than matched by pattern: browsers strip tabs and
+ * newlines and read `\` as `/`, so `/\t/host` or `/\\host` becomes `//host`.
+ */
+const isLocalRoute = (route: string): boolean =>
+  route.startsWith("/") &&
+  URL.parse(route, PROBE_ORIGIN)?.origin === PROBE_ORIGIN;
+
+/** One entry of the Agent Skills discovery index (`index.json`). */
+interface SkillsIndexEntry {
+  description?: string;
+  name: string;
+  type?: string;
+  url?: string;
+}
+
+/** An index entry with at least a name; anything else is skipped. */
+const isSkillEntry = (value: unknown): value is SkillsIndexEntry =>
+  typeof value === "object" &&
+  value !== null &&
+  "name" in value &&
+  typeof value.name === "string";
+
 const TAG = /<[^>]*>?/gu;
 
 /**
@@ -111,8 +139,12 @@ export interface WebMcpToolOptions {
   loadSearch: () => Promise<SearchFn>;
   /** Whether the site publishes llms.txt (gates the list tool). */
   llms: boolean;
+  /** Injectable for tests; defaults to `location.assign`. */
+  navigate?: (url: string) => void;
   /** Whether site search is configured (gates the search tool). */
   search: boolean;
+  /** Whether the site serves a skills discovery index (gates `read_skill`). */
+  skills: boolean;
 }
 
 /** Build the tool set. Pure — registration is the caller's business. */
@@ -170,7 +202,7 @@ export const buildWebMcpTools = (options: WebMcpToolOptions): WebMcpTool[] => {
       "Fetch a page of this site as plain Markdown. Pass the page's root-relative route, e.g. `/quickstart`.",
     async execute(input) {
       const route = isString(input.route) ? input.route : "";
-      if (!route.startsWith("/")) {
+      if (!isLocalRoute(route)) {
         return text("Pass a root-relative route, e.g. `/quickstart`.", true);
       }
       const trimmed = route.length > 1 ? route.replace(/\/+$/u, "") : route;
@@ -216,6 +248,115 @@ export const buildWebMcpTools = (options: WebMcpToolOptions): WebMcpTool[] => {
       name: "list_pages",
     });
   }
+
+  if (options.skills) {
+    const indexUrl = joinBase(
+      options.base,
+      ".well-known/agent-skills/index.json"
+    );
+    /** The published skills; none when the index is missing or malformed. */
+    const loadSkills = async (): Promise<SkillsIndexEntry[]> => {
+      try {
+        const response = await fetchFn(indexUrl);
+        if (!response.ok) {
+          return [];
+        }
+        // SAFETY: only `skills` is read, and it's checked to be an array
+        // before use; entry fields are each read defensively.
+        const { skills } = (await response.json()) as { skills?: unknown };
+        return Array.isArray(skills) ? skills.filter(isSkillEntry) : [];
+      } catch {
+        return [];
+      }
+    };
+    /** A skill's `SKILL.md`, or null when it can't be fetched. */
+    const loadSkillMd = async (url: string): Promise<string | null> => {
+      try {
+        const index = new URL(indexUrl, window.location.href);
+        const response = await fetchFn(new URL(url, index).href);
+        return response.ok ? await response.text() : null;
+      } catch {
+        return null;
+      }
+    };
+    tools.push({
+      annotations: readOnly,
+      description:
+        "Read one of this site's agent skills as Markdown. Omit `name` to list the available skills with their descriptions.",
+      async execute(input) {
+        const skills = await loadSkills();
+        if (skills.length === 0) {
+          return text("This site publishes no agent skills.", true);
+        }
+        const name = isString(input.name) ? input.name.trim() : "";
+        if (!name) {
+          return text(
+            skills
+              .map((skill) => `${skill.name} — ${skill.description ?? ""}`)
+              .join("\n")
+          );
+        }
+        const skill = skills.find((entry) => entry.name === name);
+        if (!skill?.url) {
+          return text(
+            `No skill named "${name}". Available: ${skills.map((entry) => entry.name).join(", ")}.`,
+            true
+          );
+        }
+        if (skill.type !== "skill-md") {
+          // Skills with supporting files ship as a .tar.gz the agent must
+          // download and unpack; there's no single Markdown file to return.
+          return text(`"${name}" is an archive skill: download ${skill.url}`);
+        }
+        const markdown = await loadSkillMd(skill.url);
+        if (markdown === null) {
+          return text(`The "${name}" skill is unavailable.`, true);
+        }
+        return text(markdown);
+      },
+      inputSchema: {
+        properties: {
+          name: {
+            description: "The skill's name. Omit to list available skills.",
+            type: "string",
+          },
+        },
+        type: "object",
+      },
+      name: "read_skill",
+    });
+  }
+
+  const navigate =
+    options.navigate ?? ((url: string) => window.location.assign(url));
+  tools.push({
+    // Not read-only: it moves the user's tab, though never off-site.
+    annotations: { openWorldHint: false, readOnlyHint: false },
+    description:
+      "Open a page of this site in the current browser tab. Pass the page's root-relative route, e.g. `/quickstart`, optionally with a `#heading` fragment.",
+    execute(input) {
+      const route = isString(input.route) ? input.route : "";
+      if (!isLocalRoute(route)) {
+        return Promise.resolve(
+          text("Pass a root-relative route, e.g. `/quickstart`.", true)
+        );
+      }
+      const url = prefixBase(options.base, route);
+      navigate(url);
+      return Promise.resolve(text(`Navigating to ${url}.`));
+    },
+    inputSchema: {
+      properties: {
+        route: {
+          description: "Root-relative page route, e.g. `/quickstart`.",
+          type: "string",
+        },
+      },
+      required: ["route"],
+      type: "object",
+    },
+    name: "navigate_page",
+  });
 
   return tools;
 };

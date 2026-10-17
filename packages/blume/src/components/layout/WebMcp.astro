@@ -1,9 +1,9 @@
 ---
-// WebMCP: expose the docs' read-only tools (search, page Markdown, the docs
-// index) to agentic browsers via the page's model context. Rendered by
+// WebMCP: expose the docs' tools (search, page Markdown, the docs index,
+// agent skills, navigation) to agentic browsers via the page's model context. Rendered by
 // PageLayout on every page; the marker element below both gates the script
 // (absent when `agents.webmcp` is off, so it returns immediately) and carries the
-// two config flags the client needs — importing `blume:data` from the client
+// config flags the client needs — importing `blume:data` from the client
 // script would drag the whole navigation snapshot into the bundle.
 import data from "blume:data";
 
@@ -15,6 +15,7 @@ const { search, webmcp } = data.config;
     <blume-webmcp
       data-llms={webmcp.llms ? "true" : "false"}
       data-search={search.enabled ? "true" : "false"}
+      data-skills={webmcp.skills ? "true" : "false"}
       hidden
     />
   )
@@ -41,6 +42,7 @@ const { search, webmcp } = data.config;
           loadSearch: async () =>
             (await import("blume:search-client")).createSearch(),
           search: marker.dataset.search === "true",
+          skills: marker.dataset.skills === "true",
         }),
         context
       );

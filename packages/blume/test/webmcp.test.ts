@@ -18,6 +18,7 @@ const toolsWith = (
     llms: true,
     loadSearch: noSearch,
     search: true,
+    skills: true,
     ...overrides,
   });
 
@@ -66,19 +67,24 @@ const mangledSearch: SearchFn = () =>
   });
 
 describe("buildWebMcpTools", () => {
-  it("offers the read-only tool set, gated by the config flags", () => {
+  it("offers the tool set, gated by the config flags", () => {
     expect(toolsWith().map((entry) => entry.name)).toEqual([
       "search_docs",
       "get_page",
       "list_pages",
+      "read_skill",
+      "navigate_page",
     ]);
     expect(
-      toolsWith({ llms: false, search: false }).map((entry) => entry.name)
-    ).toEqual(["get_page"]);
+      toolsWith({ llms: false, search: false, skills: false }).map(
+        (entry) => entry.name
+      )
+    ).toEqual(["get_page", "navigate_page"]);
     for (const entry of toolsWith()) {
+      // Only navigation changes anything, and only the user's own tab.
       expect(entry.annotations).toEqual({
         openWorldHint: false,
-        readOnlyHint: true,
+        readOnlyHint: entry.name !== "navigate_page",
       });
       expect(entry.description.length).toBeGreaterThan(20);
       expect(entry.inputSchema.type).toBe("object");
@@ -153,6 +159,12 @@ describe("buildWebMcpTools", () => {
     expect(page.content[0]?.text).toContain("/base/quickstart.md");
     await getPage.execute({ route: "/" });
     expect(fetched).toEqual(["/base/quickstart.md", "/base/index.md"]);
+    // Under a root base, `//host` would pass through unprefixed and fetch
+    // another origin's Markdown; it must not be fetched at all.
+    const rootPage = tool(toolsWith({ base: "/", fetchFn }), "get_page");
+    const offSite = await rootPage.execute({ route: "/\t/evil.test/x" });
+    expect(offSite.isError).toBe(true);
+    expect(fetched).toHaveLength(2);
 
     const relative = await getPage.execute({ route: "quickstart" });
     expect(relative.isError).toBe(true);
@@ -206,10 +218,147 @@ describe("buildWebMcpTools", () => {
     const down = await offline.execute({});
     expect(down.isError).toBe(true);
   });
+
+  it("read_skill lists skills, reads a SKILL.md, and points at archives", async () => {
+    const index = JSON.stringify({
+      skills: [
+        {
+          description: "Use the docs.",
+          name: "docs",
+          type: "skill-md",
+          url: "/base/.well-known/agent-skills/docs/SKILL.md",
+        },
+        {
+          description: "Migrate.",
+          name: "migrate",
+          type: "archive",
+          url: "/base/.well-known/agent-skills/migrate.tar.gz",
+        },
+        { name: "broken", type: "skill-md", url: "/base/missing.md" },
+        { name: "offline", type: "skill-md", url: "/base/offline.md" },
+        null,
+        { description: "No name." },
+      ],
+    });
+    const files = new Map([
+      ["/base/.well-known/agent-skills/index.json", index],
+      ["/base/.well-known/agent-skills/docs/SKILL.md", "# Docs skill\n"],
+    ]);
+    const fetchFn = asFetch((url) => {
+      if (url === "/base/offline.md") {
+        return Promise.reject(new Error("offline"));
+      }
+      const body = files.get(url);
+      return Promise.resolve(
+        body === undefined
+          ? new Response("", { status: 404 })
+          : okResponse(body)
+      );
+    });
+    const read = tool(toolsWith({ fetchFn }), "read_skill");
+
+    const [listed, docs, archive, unknown, broken, offline] = await Promise.all(
+      [
+        {},
+        { name: "docs" },
+        { name: "migrate" },
+        { name: "nope" },
+        { name: "broken" },
+        { name: "offline" },
+      ].map((input) => read.execute(input))
+    );
+    expect(listed?.isError).toBeUndefined();
+    expect(listed?.content[0]?.text).toBe(
+      "docs — Use the docs.\nmigrate — Migrate.\nbroken — \noffline — "
+    );
+    expect(docs?.content[0]?.text).toBe("# Docs skill\n");
+    // An archive isn't an error: the agent gets the URL to download.
+    expect(archive?.isError).toBeUndefined();
+    expect(archive?.content[0]?.text).toContain(
+      "/base/.well-known/agent-skills/migrate.tar.gz"
+    );
+    expect(unknown?.isError).toBe(true);
+    expect(unknown?.content[0]?.text).toContain("docs, migrate, broken");
+    expect(broken?.isError).toBe(true);
+    expect(offline?.isError).toBe(true);
+  });
+
+  it("read_skill reports no skills when the index is missing or malformed", async () => {
+    const responses = [
+      null,
+      new Response("", { status: 404 }),
+      okResponse("not json"),
+      okResponse('{"skills":"docs"}'),
+    ];
+    const results = await Promise.all(
+      responses.map((response) =>
+        tool(
+          toolsWith({
+            fetchFn: asFetch(() =>
+              response
+                ? Promise.resolve(response)
+                : Promise.reject(new Error("offline"))
+            ),
+          }),
+          "read_skill"
+        ).execute({ name: "docs" })
+      )
+    );
+    for (const result of results) {
+      expect(result.isError).toBe(true);
+      expect(result.content[0]?.text).toBe(
+        "This site publishes no agent skills."
+      );
+    }
+  });
+
+  it("navigate_page opens based routes and refuses off-site targets", async () => {
+    const visited: string[] = [];
+    const go = tool(
+      toolsWith({ navigate: (url) => visited.push(url) }),
+      "navigate_page"
+    );
+
+    const result = await go.execute({ route: "/quickstart#install" });
+    expect(result.isError).toBeUndefined();
+    const refused = await Promise.all(
+      [
+        "//evil.test",
+        "/\\evil.test",
+        "/\t/evil.test",
+        "/\n\\evil.test",
+        "https://evil.test",
+        42,
+      ].map((route) => go.execute({ route }))
+    );
+    expect(refused.map((entry) => entry.isError)).toEqual([
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+    ]);
+    expect(visited).toEqual(["/base/quickstart#install"]);
+  });
+
+  it("navigate_page defaults to the page's location.assign", async () => {
+    const assigned: string[] = [];
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: { location: { assign: (url: string) => assigned.push(url) } },
+    });
+    try {
+      await tool(toolsWith(), "navigate_page").execute({ route: "/a" });
+    } finally {
+      Reflect.deleteProperty(globalThis, "window");
+    }
+    expect(assigned).toEqual(["/base/a"]);
+  });
 });
 
 describe("registerWebMcpTools", () => {
-  const tools = toolsWith({ llms: false, search: false });
+  const tools = toolsWith({ llms: false, search: false, skills: false });
 
   it("prefers provideContext and falls back to registerTool", () => {
     const provided: unknown[] = [];

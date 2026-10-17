@@ -290,7 +290,7 @@ export interface BlumeDataConfig {
    */
   /** Docs versioning config; `null` when the site is unversioned. */
   versions: NonNullable<ResolvedConfig["versions"]> | null;
-  webmcp: { enabled: boolean; llms: boolean };
+  webmcp: { enabled: boolean; llms: boolean; skills: boolean };
   /** X (Twitter) attribution: the site's account, and a default creator. */
   x: { creator?: string; handle?: string };
 }
