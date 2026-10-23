@@ -1,7 +1,11 @@
 ---
+import data from "blume:data";
+
 import { stableId } from "../content/tooltip-id.ts";
 
+import type { ComposerStrings } from "./message-composer.ts";
 import type { MessageModel } from "./message.ts";
+import { referenceStrings } from "./strings.ts";
 
 /**
  * The interactive "Try it" panel for one event operation. Server-rendered as a
@@ -25,6 +29,24 @@ const { model } = Astro.props;
 // the \u escape is equivalent, so a spec description can never close the model
 // script early and inject markup.
 const modelJson = JSON.stringify(model).replaceAll("<", "\\u003c");
+
+const strings = referenceStrings(data, Astro.currentLocale);
+// The messages the client module shows, embedded the same way.
+const clientStrings: ComposerStrings = {
+  connectFailed: strings.connectFailed,
+  connected: strings.connected,
+  connecting: strings.connecting,
+  connectionFailed: strings.connectionFailed,
+  disconnected: strings.disconnected,
+  endpointChanged: strings.endpointChanged,
+  fillParameters: strings.fillParameters,
+  invalidJson: strings.invalidJson,
+  notAllowed: strings.notAllowed,
+  notConnected: strings.notConnected,
+  requiredMissing: strings.requiredMissing,
+  wrongType: strings.wrongType,
+};
+const stringsJson = JSON.stringify(clientStrings).replaceAll("<", "\\u003c");
 
 // Unique per rendered composer (a page can hold several), so the textarea's
 // aria-describedby can point at ITS error container and no other.
@@ -51,20 +73,26 @@ const BUTTON_QUIET =
     set:html={modelJson}
     type="application/json"
   />
+  <script
+    data-composer-strings
+    is:inline
+    set:html={stringsJson}
+    type="application/json"
+  />
   <details
     class="not-prose rounded-blume border border-border bg-background"
     data-composer
   >
     <summary class="cursor-pointer px-4 py-3 font-semibold text-foreground text-sm">
-      Try it
+      {strings.tryIt}
     </summary>
     <div class="flex flex-col gap-5 border-border border-t px-4 py-4">
       <div class={GROUP}>
-        <div class={GROUP_HEADING}>Server</div>
+        <div class={GROUP_HEADING}>{strings.server}</div>
         {
           model.servers.length > 0 && (
             <label class="block">
-              <span class={LABEL_ROW}>Server</span>
+              <span class={LABEL_ROW}>{strings.server}</span>
               <select class={FIELD} data-server>
                 {model.servers.map((option, index) => (
                   <option value={String(index)}>{option.label}</option>
@@ -74,27 +102,25 @@ const BUTTON_QUIET =
           )
         }
         <label class="block">
-          <span class={LABEL_ROW}>Custom server URL</span>
+          <span class={LABEL_ROW}>{strings.customServerUrl}</span>
           <input
             class={FIELD}
             data-server-custom
             placeholder="wss://events.example.com"
             type="text"
           />
-          <span class={HINT}>
-            Overrides the selected server; the channel address is appended.
-          </span>
+          <span class={HINT}>{strings.customServerUrlHint}</span>
         </label>
       </div>
       {
         model.params.length > 0 && (
           <div class={GROUP}>
-            <div class={GROUP_HEADING}>Channel parameters</div>
+            <div class={GROUP_HEADING}>{strings.channelParameters}</div>
             {model.params.map((param) => (
               <label class="block">
                 <span class={LABEL_ROW}>
                   <code class="font-mono">{param.name}</code>
-                  <span class="text-red-600 dark:text-red-400" title="required">
+                  <span class="text-red-600 dark:text-red-400" title={strings.required}>
                     *
                   </span>
                 </span>
@@ -130,7 +156,7 @@ const BUTTON_QUIET =
       }
       <div class={GROUP}>
         <div class={GROUP_HEADING}>
-          Payload
+          {strings.payload}
           {
             model.payload.contentType && (
               <span class="ms-1.5 font-mono normal-case">
@@ -140,7 +166,7 @@ const BUTTON_QUIET =
           }
         </div>
         <label class="block">
-          <span class={LABEL_ROW}>Message payload</span>
+          <span class={LABEL_ROW}>{strings.messagePayload}</span>
           <textarea
             aria-describedby={payloadErrorsId}
             class={FIELD}
@@ -159,20 +185,20 @@ const BUTTON_QUIET =
       {
         model.connectable ? (
           <div class={GROUP}>
-            <div class={GROUP_HEADING}>Connection</div>
+            <div class={GROUP_HEADING}>{strings.connection}</div>
             <div class="flex flex-wrap items-center gap-2">
               <button class={BUTTON} data-connect type="button">
-                Connect
+                {strings.connect}
               </button>
               <button class={BUTTON_QUIET} data-disconnect disabled type="button">
-                Disconnect
+                {strings.disconnect}
               </button>
               {/* AsyncAPI 3 states the action from the API's side: a
                   `receive` operation is the one a reader publishes to, while a
                   `send` operation only streams frames at them. */}
               {model.action === "receive" && (
                 <button class={BUTTON} data-send disabled type="button">
-                  Send
+                  {strings.send}
                 </button>
               )}
             </div>
@@ -182,8 +208,8 @@ const BUTTON_QUIET =
               data-status
             >
               {model.action === "send"
-                ? "Not connected. Connect to stream messages as they arrive."
-                : "Not connected."}
+                ? strings.notConnectedStream
+                : strings.notConnected}
             </div>
             <div
               aria-live="polite"
@@ -194,8 +220,11 @@ const BUTTON_QUIET =
         ) : (
           <p class="text-muted-foreground text-xs">
             {model.protocol
-              ? `Live sending isn't possible for ${model.protocol} from a browser tab — copy the sample above and run it against your broker.`
-              : "Live sending needs a WebSocket binding — copy the sample above and run it against your broker."}
+              ? strings.liveUnsupported.replaceAll(
+                  "{protocol}",
+                  () => model.protocol ?? ""
+                )
+              : strings.liveNeedsWebSocket}
           </p>
         )
       }

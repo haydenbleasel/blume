@@ -9,6 +9,7 @@ import {
   defaultValues,
 } from "../src/components/openapi/request.ts";
 import { sampleLanguages } from "../src/components/openapi/snippets.ts";
+import { EN_UI } from "../src/core/i18n-ui.ts";
 
 /**
  * Try it and the code samples ask for the JSON an operation answers with. A
@@ -53,6 +54,7 @@ describe("the Accept header", () => {
       schemas: {},
       security,
       servers: [{ url: "https://api.test" }],
+      strings: EN_UI.reference,
     });
     const sample = buildRequest(model, defaultValues(model));
     expect(sample.headers).toStrictEqual({ Accept: "application/json" });
@@ -77,6 +79,7 @@ describe("the Accept header", () => {
       schemas: {},
       security,
       servers: [],
+      strings: EN_UI.reference,
     });
     expect(buildRequest(declared, defaultValues(declared)).headers).toEqual({
       accept: "text/csv",
@@ -88,6 +91,7 @@ describe("the Accept header", () => {
       schemas: {},
       security,
       servers: [],
+      strings: EN_UI.reference,
     });
     expect(plain.accept).toBeUndefined();
     expect(buildRequest(plain, defaultValues(plain)).headers).toEqual({});

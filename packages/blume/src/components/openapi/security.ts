@@ -8,6 +8,8 @@
  * browser build with no server-only imports.
  */
 
+import type { ReferenceStrings } from "./strings.ts";
+
 /** A permissive view of an OpenAPI security scheme — only the fields we render. */
 export interface SecuritySchemeLike {
   type?: string;
@@ -165,44 +167,65 @@ export const resolveAsyncApiSecurity = (
   return { alternatives, optional: false };
 };
 
+/** The labels {@link schemeLabel} names a scheme with. */
+export type SchemeStrings = Pick<
+  ReferenceStrings,
+  | "apiKey"
+  | "asymmetricEncryption"
+  | "basicAuth"
+  | "bearerToken"
+  | "httpAuth"
+  | "mutualTls"
+  | "oauth2Token"
+  | "openIdConnectToken"
+  | "symmetricEncryption"
+  | "userPassword"
+  | "x509Certificate"
+>;
+
 /**
- * Fixed labels for scheme types with no per-scheme variation. Covers both
- * OpenAPI's types and the broker-auth types AsyncAPI adds; `http` is handled
- * separately (its label depends on the scheme/bearerFormat fields).
+ * Labels for scheme types with no per-scheme variation. Covers both OpenAPI's
+ * types and the broker-auth types AsyncAPI adds; `http` is handled separately
+ * (its label depends on the scheme/bearerFormat fields). The SASL mechanisms
+ * are named as their standards spell them, in every language.
  */
-const TYPE_LABELS = new Map<string, string>([
-  ["X509", "X.509 certificate"],
-  ["apiKey", "API key"],
-  ["asymmetricEncryption", "Asymmetric encryption"],
-  ["gssapi", "SASL/GSSAPI"],
-  ["httpApiKey", "API key"],
-  ["mutualTLS", "Mutual TLS"],
-  ["oauth2", "OAuth2 access token"],
-  ["openIdConnect", "OpenID Connect token"],
-  ["plain", "SASL/PLAIN"],
-  ["scramSha256", "SASL/SCRAM-SHA-256"],
-  ["scramSha512", "SASL/SCRAM-SHA-512"],
-  ["symmetricEncryption", "Symmetric encryption"],
-  ["userPassword", "Username & password"],
-]);
+const typeLabels = (strings: SchemeStrings) =>
+  new Map<string, string>([
+    ["X509", strings.x509Certificate],
+    ["apiKey", strings.apiKey],
+    ["asymmetricEncryption", strings.asymmetricEncryption],
+    ["gssapi", "SASL/GSSAPI"],
+    ["httpApiKey", strings.apiKey],
+    ["mutualTLS", strings.mutualTls],
+    ["oauth2", strings.oauth2Token],
+    ["openIdConnect", strings.openIdConnectToken],
+    ["plain", "SASL/PLAIN"],
+    ["scramSha256", "SASL/SCRAM-SHA-256"],
+    ["scramSha512", "SASL/SCRAM-SHA-512"],
+    ["symmetricEncryption", strings.symmetricEncryption],
+    ["userPassword", strings.userPassword],
+  ]);
 
 /** A short human label for a scheme row, e.g. `Bearer token` or `API key`. */
-export const schemeLabel = (resolved: ResolvedScheme): string => {
+export const schemeLabel = (
+  resolved: ResolvedScheme,
+  strings: SchemeStrings
+): string => {
   const { scheme } = resolved;
   if (scheme?.type === "http") {
     const kind = (scheme.scheme ?? "").toLowerCase();
     if (kind === "bearer") {
       return scheme.bearerFormat
-        ? `Bearer token (${scheme.bearerFormat})`
-        : "Bearer token";
+        ? `${strings.bearerToken} (${scheme.bearerFormat})`
+        : strings.bearerToken;
     }
     if (kind === "basic") {
-      return "Basic auth";
+      return strings.basicAuth;
     }
-    return kind ? `HTTP ${kind}` : "HTTP auth";
+    return kind ? `HTTP ${kind}` : strings.httpAuth;
   }
   // Unknown scheme ref: the component name is the best label available.
-  return TYPE_LABELS.get(scheme?.type ?? "") ?? resolved.key;
+  return typeLabels(strings).get(scheme?.type ?? "") ?? resolved.key;
 };
 
 /**

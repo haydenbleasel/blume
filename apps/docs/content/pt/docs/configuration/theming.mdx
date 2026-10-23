@@ -15,6 +15,7 @@ theme: {
   accent: "teal",   // a named preset or any CSS color
   radius: "md",     // none | sm | md | lg
   mode: "system",   // system | light | dark
+  toggle: true,     // show the light/dark toggle
   fonts: {          // self-hosted Google Fonts
     display: "inter",
     body: "inter",
@@ -52,7 +53,18 @@ O texto sobre um preenchimento de destaque ou de ação, como o rótulo de um bo
 - **`system`** (padrão) — segue a preferência do sistema operacional do leitor
 - **`light`** / **`dark`** — usa um esquema como padrão
 
-Um alternador no cabeçalho sempre permite que os leitores mudem, e a escolha deles é lembrada entre as visitas. O modo escuro é aplicado com um atributo `data-theme="dark"` no elemento `<html>`.
+Um alternador no cabeçalho permite que os leitores mudem, e a escolha deles é lembrada entre as visitas. O modo escuro é aplicado com um atributo `data-theme="dark"` no elemento `<html>`.
+
+Para entregar um único esquema, defina `toggle: false`. O cabeçalho deixa de exibir o alternador, e todas as páginas são renderizadas no `mode`, mesmo para os leitores que escolheram o outro esquema antes de o alternador ser removido:
+
+```ts blume.config.ts lineNumbers
+theme: {
+  mode: "dark",
+  toggle: false,
+}
+```
+
+Com `mode: "system"`, `toggle: false` segue a configuração do sistema operacional de cada leitor e não oferece nenhuma forma de sobrescrevê-la.
 
 ### Fontes [#fonts]
 

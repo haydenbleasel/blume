@@ -15,6 +15,7 @@ theme: {
   accent: "teal",   // a named preset or any CSS color
   radius: "md",     // none | sm | md | lg
   mode: "system",   // system | light | dark
+  toggle: true,     // show the light/dark toggle
   fonts: {          // self-hosted Google Fonts
     display: "inter",
     body: "inter",
@@ -53,6 +54,17 @@ theme: {
 - **`light`** / **`dark`** — いずれかのスキームをデフォルトにする
 
 ヘッダーのトグルで読者はいつでも切り替えられ、その選択は再訪時にも記憶されます。ダークモードは `<html>` 要素の `data-theme="dark"` 属性によって適用されます。
+
+単一のスキームだけを提供するには、`toggle: false` を設定します。ヘッダーからトグルがなくなり、すべてのページが `mode` で表示されます。トグルが削除される前にもう一方のスキームを選んでいた読者に対しても同様です:
+
+```ts blume.config.ts lineNumbers
+theme: {
+  mode: "dark",
+  toggle: false,
+}
+```
+
+`mode: "system"` と `toggle: false` を組み合わせると、各読者の OS の設定に従い、読者がそれを上書きする手段はなくなります。
 
 ### フォント [#fonts]
 

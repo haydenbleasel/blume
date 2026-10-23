@@ -13,7 +13,9 @@
 import { asyncSampleLanguages, webSocketUrl } from "./async-snippets.ts";
 import type { MessageModel, MessageValues } from "./message.ts";
 import { buildMessage, messageFrame } from "./message.ts";
+import type { ReferenceStrings } from "./strings.ts";
 import { validateJson } from "./validate-json.ts";
+import type { ValidationStrings } from "./validate-json.ts";
 import type { WsFrame, WsState } from "./ws-client.ts";
 import { createWsClient } from "./ws-client.ts";
 
@@ -24,13 +26,24 @@ const ERROR_TEXT = "text-red-600 text-xs dark:text-red-400";
 const MUTED_TEXT = "text-muted-foreground text-xs";
 
 /**
- * A failed WebSocket handshake gives the page no reason — the browser withholds
- * it — so the status line explains the causes a docs author can act on instead
- * of showing a bare "error".
+ * The status line's messages, in the page's language: MessageComposer.astro
+ * renders them as JSON beside the model, so this lazily loaded module carries
+ * no dictionaries of its own. A failed WebSocket handshake gives the page no
+ * reason — the browser withholds it — so `connectionFailed` explains the
+ * causes a docs author can act on instead of showing a bare "error".
  */
-const ERROR_MESSAGE =
-  "The connection failed. The broker may reject requests from this origin, " +
-  "require credentials the URL doesn't carry, or be unreachable from here.";
+export type ComposerStrings = Pick<
+  ReferenceStrings,
+  | "connectFailed"
+  | "connected"
+  | "connecting"
+  | "connectionFailed"
+  | "disconnected"
+  | "endpointChanged"
+  | "fillParameters"
+  | "notConnected"
+> &
+  ValidationStrings;
 
 /** Wall-clock prefix for a logged frame, e.g. `14:03:11`. */
 const stamp = (at: number): string => new Date(at).toLocaleTimeString();
@@ -49,6 +62,11 @@ export const initComposer = (root: HTMLElement): void => {
   // serializes a typed MessageModel into it at build time — the JSON here can
   // hold nothing else.
   const model = JSON.parse(modelScript.textContent ?? "") as MessageModel;
+  // SAFETY: rendered beside the model by MessageComposer.astro, from the
+  // page's resolved dictionary, so every `ComposerStrings` key is present.
+  const strings = JSON.parse(
+    root.querySelector("script[data-composer-strings]")?.textContent ?? "{}"
+  ) as ComposerStrings;
 
   // The sample panes live in the sibling rail, so they are looked up from the
   // shared operation-panel wrapper rather than this element.
@@ -117,7 +135,12 @@ export const initComposer = (root: HTMLElement): void => {
     const errors =
       payloadArea.value.trim() === ""
         ? []
-        : validateJson(payloadArea.value, model.payload.schema, "payload");
+        : validateJson(
+            payloadArea.value,
+            strings,
+            model.payload.schema,
+            "payload"
+          );
     payloadErrors.textContent = "";
     for (const error of errors) {
       const item = document.createElement("span");
@@ -163,24 +186,31 @@ export const initComposer = (root: HTMLElement): void => {
       sendButton.disabled = state !== "open";
     }
     if (state === "connecting") {
-      setStatus("Connecting\u2026", MUTED_TEXT);
+      setStatus(strings.connecting, MUTED_TEXT);
       return;
     }
     if (state === "open") {
-      setStatus(`Connected to ${connectedUrl}.`, MUTED_TEXT);
+      setStatus(
+        strings.connected.replaceAll("{url}", () => connectedUrl),
+        MUTED_TEXT
+      );
       return;
     }
     if (state === "error") {
       // A detail is the browser refusing the URL before dialing; a failed
       // handshake carries none.
       setStatus(
-        detail ? `Couldn't connect: ${detail}` : ERROR_MESSAGE,
+        detail
+          ? strings.connectFailed.replaceAll("{detail}", () => detail)
+          : strings.connectionFailed,
         ERROR_TEXT
       );
       return;
     }
     setStatus(
-      detail ? `Disconnected (${detail}).` : "Not connected.",
+      detail
+        ? strings.disconnected.replaceAll("{detail}", () => detail)
+        : strings.notConnected,
       MUTED_TEXT
     );
   };
@@ -223,7 +253,7 @@ export const initComposer = (root: HTMLElement): void => {
       .map((input) => input.dataset.param ?? "");
     if (missing.length > 0) {
       setStatus(
-        `Fill in every channel parameter before connecting: ${missing.join(", ")}.`,
+        strings.fillParameters.replaceAll("{names}", () => missing.join(", ")),
         ERROR_TEXT
       );
       return;
@@ -245,7 +275,7 @@ export const initComposer = (root: HTMLElement): void => {
     // is dropped rather than left to answer for the form on screen.
     if (connectedUrl !== "" && formUrl() !== connectedUrl) {
       client.disconnect();
-      setStatus("The endpoint changed. Connect again to use it.", MUTED_TEXT);
+      setStatus(strings.endpointChanged, MUTED_TEXT);
     }
     validatePayload();
     syncSamples();

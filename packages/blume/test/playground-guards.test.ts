@@ -5,6 +5,7 @@ import { initPlayground } from "../src/components/openapi/playground-client.ts";
 import { validationSchema } from "../src/components/openapi/playground-schema.ts";
 import type { PlaygroundModel } from "../src/components/openapi/request.ts";
 import { validateJson } from "../src/components/openapi/validate-json.ts";
+import { EN_UI } from "../src/core/i18n-ui.ts";
 import {
   asElement,
   el,
@@ -72,6 +73,7 @@ const petModel = (): PlaygroundModel =>
     schemas: PET_SCHEMAS,
     security: { alternatives: [], optional: false },
     servers: [{ url: "https://api.example.com" }],
+    strings: EN_UI.reference,
   });
 
 interface Fixture {
@@ -94,6 +96,11 @@ const createFixture = (model: PlaygroundModel): Fixture => {
       "script",
       { "data-playground-model": "", type: "application/json" },
       JSON.stringify(model)
+    ),
+    el(
+      "script",
+      { "data-playground-strings": "", type: "application/json" },
+      JSON.stringify(EN_UI.reference)
     )
   );
   const token = el("input", { "data-auth-value": "bearerAuth" });
@@ -131,11 +138,15 @@ describe("request body validation", () => {
     );
     expect(schema?.required).toStrictEqual(["name"]);
     expect(
-      validateJson('{"name":"Rex","nickname":null,"owner":null}', schema)
+      validateJson(
+        '{"name":"Rex","nickname":null,"owner":null}',
+        EN_UI.reference,
+        schema
+      )
     ).toStrictEqual([]);
-    expect(validateJson('{"name":null}', schema)).toStrictEqual([
-      "body.name should be string, got null",
-    ]);
+    expect(
+      validateJson('{"name":null}', EN_UI.reference, schema)
+    ).toStrictEqual(["body.name should be string, got null"]);
   });
 
   it("checks no single type for a multi-type field", () => {
@@ -147,8 +158,12 @@ describe("request body validation", () => {
       {}
     );
     expect(schema?.properties?.size?.type).toBeUndefined();
-    expect(validateJson('{"size":3}', schema)).toStrictEqual([]);
-    expect(validateJson('{"size":"L"}', schema)).toStrictEqual([]);
+    expect(validateJson('{"size":3}', EN_UI.reference, schema)).toStrictEqual(
+      []
+    );
+    expect(validateJson('{"size":"L"}', EN_UI.reference, schema)).toStrictEqual(
+      []
+    );
   });
 });
 

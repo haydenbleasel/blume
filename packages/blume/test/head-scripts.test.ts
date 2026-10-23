@@ -12,19 +12,23 @@ import {
 type Listener = (event: { newDocument: FakeDocument }) => void;
 
 interface FakeDocument {
-  currentScript: { dataset: { mode?: string } } | null;
+  currentScript: { dataset: { fixed?: string; mode?: string } } | null;
   documentElement: { dataset: { theme?: string } };
   addEventListener: (type: string, listener: Listener) => void;
   dispatch: (type: string, event: { newDocument: FakeDocument }) => void;
 }
 
-const fakeDocument = (mode?: string): FakeDocument => {
+/** `fixed` stamps `data-fixed`, as the layouts do when `theme.toggle` is off. */
+const fakeDocument = (mode?: string, fixed = false): FakeDocument => {
   const listeners = new Map<string, Listener[]>();
   return {
     addEventListener: (type, listener) => {
       listeners.set(type, [...(listeners.get(type) ?? []), listener]);
     },
-    currentScript: mode === undefined ? null : { dataset: { mode } },
+    currentScript:
+      mode === undefined
+        ? null
+        : { dataset: fixed ? { fixed: "", mode } : { mode } },
     dispatch: (type, event) => {
       for (const listener of listeners.get(type) ?? []) {
         listener(event);
@@ -113,6 +117,26 @@ describe("THEME_INIT_SCRIPT", () => {
     const system = fakeDocument();
     await runThemeScript({ document: system, prefersDark: true, stored: null });
     expect(system.documentElement.dataset.theme).toBe("dark");
+  });
+
+  test("ignores a stored theme when the toggle is off", async () => {
+    // A reader who picked light before the site went dark-only stays dark,
+    // including after a swap re-applies the theme.
+    const document = fakeDocument("dark", true);
+    await runThemeScript({ document, prefersDark: false, stored: "light" });
+    expect(document.documentElement.dataset.theme).toBe("dark");
+    Reflect.deleteProperty(document.documentElement.dataset, "theme");
+    document.dispatch("astro:after-swap", { newDocument: fakeDocument() });
+    expect(document.documentElement.dataset.theme).toBe("dark");
+
+    // `system` without the toggle follows the OS, whatever was stored.
+    const system = fakeDocument("system", true);
+    await runThemeScript({
+      document: system,
+      prefersDark: false,
+      stored: "dark",
+    });
+    expect(system.documentElement.dataset.theme).toBe("light");
   });
 
   test("carries the live theme onto the incoming document before the swap", async () => {

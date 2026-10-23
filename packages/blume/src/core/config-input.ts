@@ -500,6 +500,12 @@ export interface ThemeConfig {
   mode?: "system" | "light" | "dark";
   /** Corner radius scale. Defaults to `md`. */
   radius?: RadiusScale;
+  /**
+   * Show the header's light/dark toggle. Defaults to `true`. `false` hides it
+   * and ignores any choice a reader saved earlier, so every page renders in
+   * `mode` (`system` follows the reader's OS setting).
+   */
+  toggle?: boolean;
 }
 
 // ---------------------------------------------------------------------------

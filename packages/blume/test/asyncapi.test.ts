@@ -26,6 +26,7 @@ import {
   schemeCarrier,
   schemeLabel,
 } from "../src/components/openapi/security.ts";
+import { EN_UI } from "../src/core/i18n-ui.ts";
 import {
   applyAsyncApiTraits,
   asyncApiOperationObject,
@@ -1041,9 +1042,9 @@ describe("security.resolveAsyncApiSecurity", () => {
       ["httpApiKey", "API key"],
     ];
     for (const [type, labelText] of expected) {
-      expect(schemeLabel({ key: "k", scheme: { type }, scopes: [] })).toBe(
-        labelText
-      );
+      expect(
+        schemeLabel({ key: "k", scheme: { type }, scopes: [] }, EN_UI.reference)
+      ).toBe(labelText);
     }
     expect(
       schemeCarrier({

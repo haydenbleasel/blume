@@ -167,6 +167,8 @@ Blume ships built-in translations for its own interface chrome — “On this pa
 
 Packs ship for over 30 languages — Arabic, Bengali, Bulgarian, Catalan, Chinese (Simplified and Traditional), Croatian, Czech, Danish, Dutch, Finnish, French, German, Greek, Hebrew, Hindi, Hungarian, Indonesian, Italian, Japanese, Korean, Norwegian, Persian, Polish, Portuguese (and Brazilian Portuguese), Romanian, Russian, Serbian, Slovak, Spanish, Swedish, Thai, Turkish, Ukrainian, and Vietnamese. They're community-maintained — open a PR to add a locale or sharpen a translation.
 
+The packs cover the [API reference](/docs/references/openapi) too: an operation page's headings, schema tables, and Try it panel follow the page's language. The labels the reference adds to the sidebar, its overview page and the groups it names itself (Operations, Webhooks, and GraphQL's kinds), use the default locale's words, since the reference publishes in that locale. Only the labels change, so the reference's URLs stay the same in every language.
+
 Missing or unshipped strings fall back to the default locale, then to English. To override a string or supply your own language, set `i18n.ui`, keyed by locale:
 
 ```ts blume.config.ts lineNumbers
@@ -176,6 +178,7 @@ i18n: {
     fr: {
       search: { button: "Rechercher", placeholder: "Rechercher…" },
       page: { previous: "Précédent", next: "Suivant" },
+      reference: { tryIt: "Essayer" },
     },
   },
 }

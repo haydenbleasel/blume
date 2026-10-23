@@ -31,42 +31,18 @@ import { storyById } from "../_customers/customers.ts";
 
   <h2>The challenge</h2>
   <p>
-    Ordinal's docs started on Mintlify, and Mintlify got them off the ground
-    fast. Francisco's co-founder, Jeffrey Zhao, signed the team up, and though
-    Jeffrey isn't an engineer, within a few days and with a $200 Cursor
-    subscription he had fed Mintlify all of Ordinal's product context and stood
-    up solid docs. The team paid for a yearly plan.
+    Ordinal's docs had been MDX in their own repository from the start, and
+    every change went through GitHub. The team wanted a docs site that worked
+    the same way, and docs that kept up with the product as it changed.
   </p>
-  <p>
-    The web editor never caught on. It was used for two pull requests, and
-    every other change went through GitHub, because the docs had been MDX in
-    their own repository all along. What did earn its keep was Mintlify's
-    agent, which opened pull requests to update the docs as the product
-    changed: it wrote 46 of the last 60 docs changes Ordinal merged before the
-    move.
-  </p>
-  <p>
-    Ordinal paid $1,500 for the year, on an old tier with a YC alum discount.
-    At renewal in January 2027, that would have doubled to $3,000.
-  </p>
-
-  <Quote
-    avatar="/customers/francisco.webp"
-    name="Francisco"
-    role="Co-founder, Ordinal"
-  >
-    Our docs were already MDX in our own repo. Once you see that, the question
-    is what you're paying for.
-  </Quote>
 
   <h2>The move</h2>
   <p>
     Francisco had had his eye on Blume for a few months. One evening in
-    September 2026, he ran <code>npx blume migrate mintlify</code>, which found
-    Ordinal's <code>docs.json</code> and handed the job to Claude Code with
-    Blume's migration playbook. Its bundled codemod rewrote the frontmatter and
-    icons on 68 pages in one pass, and Claude worked through the rest unattended
-    while Francisco walked the dog.
+    September 2026, he handed the migration to Claude Code with Blume's
+    migration playbook. It rewrote the frontmatter and icons on 68 pages in one
+    pass, then worked through the rest unattended while Francisco walked the
+    dog.
   </p>
   <p>
     The content moved almost one to one. Cards (about 250 of them), Steps, Tabs,
@@ -75,8 +51,8 @@ import { storyById } from "../_customers/customers.ts";
     The 273 response fields on the 22 webhook event pages became type tables.
   </p>
   <p>
-    The real work was keeping URLs. Mintlify's sidebar groups lived only in{" "}
-    <code>docs.json</code>, so Claude rebuilt them as{" "}
+    The real work was keeping URLs. The old sidebar groups lived only in a
+    config file, so Claude rebuilt them as{" "}
     <a href="/docs/content/navigation#folder-groups">group folders</a> like{" "}
     <code>(calendar-and-posts)/</code>, which add no segment to the URL, and
     gave pages that changed folders a <code>slug</code> that kept their old
@@ -88,7 +64,7 @@ import { storyById } from "../_customers/customers.ts";
     <a href="/docs/references/openapi"><code>openapi()</code></a> at Ordinal's
     two existing specs built 72 endpoint pages with schemas, code samples, and
     a Try it panel. Blume names endpoint pages by their operation ID, where
-    Mintlify used each one's summary, so 72 of the site's 79{" "}
+    the old site used each one's summary, so 72 of the site's 79{" "}
     <a href="/docs/deployment#redirects">redirects</a> send old endpoint URLs
     to their new pages. On Vercel, they're real 301s.
   </p>
@@ -120,17 +96,15 @@ import { storyById } from "../_customers/customers.ts";
 
   <h2>Docs that keep themselves current</h2>
   <p>
-    Mintlify's agent was the one feature Ordinal relied on, so it became a
-    scheduled Claude Code routine. Every weekday at 5pm
-    Chicago time, a cloud
-    Claude Code session checks out both the product and the docs repositories,
-    then:
+    To keep the docs current, Ordinal set up a scheduled Claude Code routine.
+    Every weekday at 5pm Chicago time, a cloud Claude Code session checks out
+    both the product and the docs repositories, then:
   </p>
   <ol>
     <li>
       Lists the product pull requests merged in the last seven days, skipping
-      any that a docs pull request already references, so it never redoes what
-      Mintlify's agent covered.
+      any that a docs pull request already references, so it never documents
+      the same change twice.
     </li>
     <li>
       Reads each one's description and diff and decides whether customers would
@@ -154,20 +128,10 @@ import { storyById } from "../_customers/customers.ts";
     injected instruction could do.
   </p>
 
-  <Quote
-    avatar="/customers/francisco.webp"
-    name="Francisco"
-    role="Co-founder, Ordinal"
-  >
-    The only thing Mintlify did that we couldn't do ourselves was keep the docs
-    up to date. That's now a Claude Code routine that opens PRs every weekday.
-  </Quote>
-
   <h2>The results</h2>
   <p>
-    Francisco hasn't found anything Mintlify did that Blume and the routine
-    don't cover. Every guide URL survived the move, and the docs now update
-    themselves for the cost of a routine instead of a $3,000 renewal.
+    Every guide URL survived the move, and the docs now keep up with the
+    product on their own, one reviewed pull request at a time.
   </p>
   <table>
     <thead>
@@ -193,23 +157,16 @@ import { storyById } from "../_customers/customers.ts";
       <tr>
         <th scope="row">Francisco's hands-on time</th><td>About 20 minutes</td>
       </tr>
-      <tr>
-        <th scope="row">Mintlify renewal avoided</th><td>$3,000 a year</td>
-      </tr>
     </tbody>
   </table>
   <p>
-    The whole move is one{" "}
-    <a href="https://github.com/ordinalhq/docs/pull/145" {...NEW_TAB_ATTRS}
-      >public pull request</a
-    >, and the new docs are live at{" "}
+    The whole move was one pull request, and the new docs are live at{" "}
     <a href="https://docs.tryordinal.com" {...NEW_TAB_ATTRS}
       >docs.tryordinal.com</a
     >.
   </p>
   <p>
-    To make the same move, follow the{" "}
-    <a href="/guides/migrate-from-mintlify">Mintlify migration guide</a>, and
-    see <a href="/compare/mintlify">how Blume compares with Mintlify</a>.
+    To move your own docs, read{" "}
+    <a href="/docs/migrating">Migrate to Blume</a>.
   </p>
 </StoryPage>

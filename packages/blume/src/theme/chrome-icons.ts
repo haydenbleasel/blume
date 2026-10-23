@@ -10,7 +10,8 @@
  * time via `resolveIcon` and inline as zero-JS SVG.
  *
  * Values are Lucide inner-SVG markup; the client `svg()` helpers wrap them in an
- * `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" …>`.
+ * `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" …>`. Lucide's
+ * license is in THIRD-PARTY-NOTICES.md.
  */
 /** Inner-SVG markup keyed by the icon name a client script requests. */
 interface ChromeIconSet {

@@ -761,6 +761,7 @@ const themeConfigFields = {
     .prefault({}),
   mode: z.enum(["system", "light", "dark"]).default("system"),
   radius: z.enum(["none", "sm", "md", "lg"]).default("md"),
+  toggle: z.boolean().default(true),
 };
 
 const themeConfigSchema = z.strictObject(

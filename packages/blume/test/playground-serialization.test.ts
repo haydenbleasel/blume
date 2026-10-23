@@ -17,6 +17,7 @@ import {
 import type { PlaygroundModel } from "../src/components/openapi/request.ts";
 import { sampleLanguages } from "../src/components/openapi/snippets.ts";
 import type { RequestSample } from "../src/components/openapi/snippets.ts";
+import { EN_UI } from "../src/core/i18n-ui.ts";
 
 /**
  * How the playground puts a request on the wire: parameter `style`/`explode`
@@ -35,6 +36,7 @@ const buildModel = (overrides: Partial<ModelArgs> = {}): PlaygroundModel =>
     schemas: {},
     security: { alternatives: [], optional: false },
     servers: [{ url: "https://api.test" }],
+    strings: EN_UI.reference,
     ...overrides,
   });
 

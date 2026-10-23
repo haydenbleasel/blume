@@ -1,8 +1,12 @@
 ---
+import data from "blume:data";
+
 import { stableId } from "../content/tooltip-id.ts";
 import { withMountedBase } from "../islands/base-path.ts";
 
+import type { PlaygroundStrings } from "./playground-client.ts";
 import { paramKey, type PlaygroundModel } from "./request.ts";
+import { referenceStrings } from "./strings.ts";
 
 /**
  * The interactive "Try it" panel for one operation. Everything is
@@ -39,6 +43,23 @@ const proxyUrl = proxy ? withMountedBase(proxy) : undefined;
 // the model script early and inject markup.
 const modelJson = JSON.stringify(model).replaceAll("<", "\\u003c");
 
+const strings = referenceStrings(data, Astro.currentLocale);
+// The messages the client module shows, embedded the same way.
+const clientStrings: PlaygroundStrings = {
+  cookieBlocked: strings.cookieBlocked,
+  cors: strings.cors,
+  invalidJson: strings.invalidJson,
+  notAllowed: strings.notAllowed,
+  requestFailed: strings.requestFailed,
+  requiredMissing: strings.requiredMissing,
+  sending: strings.sending,
+  serverUrl: strings.serverUrl,
+  traceBlocked: strings.traceBlocked,
+  unreachable: strings.unreachable,
+  wrongType: strings.wrongType,
+};
+const stringsJson = JSON.stringify(clientStrings).replaceAll("<", "\\u003c");
+
 // Unique per rendered panel (a page can hold several), so the textarea's
 // aria-describedby can point at ITS error container and no other.
 const bodyErrorsId = stableId(Astro.locals, "blume-body-errors", [slug, operation]);
@@ -67,20 +88,26 @@ const CHECKBOX_ROW =
     set:html={modelJson}
     type="application/json"
   />
+  <script
+    data-playground-strings
+    is:inline
+    set:html={stringsJson}
+    type="application/json"
+  />
   <details
     class="not-prose rounded-blume border border-border bg-background"
     data-playground
   >
     <summary class="cursor-pointer px-4 py-3 font-semibold text-foreground text-sm">
-      Try it
+      {strings.tryIt}
     </summary>
     <div class="flex flex-col gap-5 border-border border-t px-4 py-4">
       <div class={GROUP}>
-        <div class={GROUP_HEADING}>Server</div>
+        <div class={GROUP_HEADING}>{strings.server}</div>
         {
           model.servers.length > 0 && (
             <label class="block">
-              <span class={LABEL_ROW}>Base URL</span>
+              <span class={LABEL_ROW}>{strings.baseUrl}</span>
               <select class={FIELD} data-server>
                 {model.servers.map((server) => (
                   <option value={server}>{server}</option>
@@ -90,27 +117,31 @@ const CHECKBOX_ROW =
           )
         }
         <label class="block">
-          <span class={LABEL_ROW}>Custom base URL</span>
+          <span class={LABEL_ROW}>{strings.customBaseUrl}</span>
           <input
             class={FIELD}
             data-server-custom
             placeholder="https://api.example.com"
             type="text"
           />
-          <span class={HINT}>Overrides the selected server when set.</span>
+          <span class={HINT}>{strings.customBaseUrlHint}</span>
         </label>
       </div>
       {
         model.auth.length > 0 && (
           <div class={GROUP}>
             <div class={GROUP_HEADING}>
-              Authorization{model.authOptional && " (optional)"}
+              {model.authOptional
+                ? strings.authorizationOptional
+                : strings.authorization}
             </div>
             {model.auth.map((input) =>
               input.kind === "basic" ? (
                 <div class={GROUP}>
                   <label class="block">
-                    <span class={LABEL_ROW}>{input.label} username</span>
+                    <span class={LABEL_ROW}>
+                      {strings.authUsername.replaceAll("{label}", () => input.label)}
+                    </span>
                     <input
                       autocomplete="off"
                       class={FIELD}
@@ -119,7 +150,9 @@ const CHECKBOX_ROW =
                     />
                   </label>
                   <label class="block">
-                    <span class={LABEL_ROW}>{input.label} password</span>
+                    <span class={LABEL_ROW}>
+                      {strings.authPassword.replaceAll("{label}", () => input.label)}
+                    </span>
                     <input
                       autocomplete="off"
                       class={FIELD}
@@ -143,11 +176,11 @@ const CHECKBOX_ROW =
             )}
             <label class={CHECKBOX_ROW}>
               <input data-auth-remember type="checkbox" />
-              Remember on this device
+              {strings.remember}
             </label>
             <label class={CHECKBOX_ROW}>
               <input data-samples-auth type="checkbox" />
-              Include my values in samples
+              {strings.includeInSamples}
             </label>
           </div>
         )
@@ -155,7 +188,7 @@ const CHECKBOX_ROW =
       {
         model.params.length > 0 && (
           <div class={GROUP}>
-            <div class={GROUP_HEADING}>Parameters</div>
+            <div class={GROUP_HEADING}>{strings.parameters}</div>
             {model.params.map((param) => (
               <label class="block">
                 <span class={LABEL_ROW}>
@@ -164,7 +197,7 @@ const CHECKBOX_ROW =
                   {param.required && (
                     <span
                       class="text-red-600 dark:text-red-400"
-                      title="required"
+                      title={strings.required}
                     >
                       *
                     </span>
@@ -205,7 +238,7 @@ const CHECKBOX_ROW =
         model.body && (
           <div class={GROUP}>
             <div class={GROUP_HEADING}>
-              Body
+              {strings.body}
               <span class="ms-1.5 font-mono normal-case">
                 {model.body.contentType}
               </span>
@@ -219,7 +252,7 @@ const CHECKBOX_ROW =
                     {bodyField.required && (
                       <span
                         class="text-red-600 dark:text-red-400"
-                        title="required"
+                        title={strings.required}
                       >
                         *
                       </span>
@@ -259,7 +292,7 @@ const CHECKBOX_ROW =
             ) : (
               <>
                 <label class="block">
-                  <span class={LABEL_ROW}>Request body</span>
+                  <span class={LABEL_ROW}>{strings.requestBody}</span>
                   <textarea
                     aria-describedby={bodyErrorsId}
                     class={FIELD}
@@ -285,7 +318,7 @@ const CHECKBOX_ROW =
           data-send
           type="button"
         >
-          Send
+          {strings.send}
         </button>
       </div>
       <div

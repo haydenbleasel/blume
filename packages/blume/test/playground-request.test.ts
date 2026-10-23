@@ -12,6 +12,7 @@ import type { PlaygroundAuthInput } from "../src/components/openapi/request.ts";
 import { resolveSecurity } from "../src/components/openapi/security.ts";
 import { sampleLanguages } from "../src/components/openapi/snippets.ts";
 import { validateJson } from "../src/components/openapi/validate-json.ts";
+import { EN_UI } from "../src/core/i18n-ui.ts";
 
 const SCHEMES = {
   apiCookie: { in: "cookie", name: "session", type: "apiKey" },
@@ -39,6 +40,7 @@ const buildModel = (overrides: Partial<ModelArgs> = {}) =>
     schemas: {},
     security: { alternatives: [], optional: false },
     servers: [{ url: "https://api.test/v1" }],
+    strings: EN_UI.reference,
     ...overrides,
   });
 
@@ -804,39 +806,53 @@ describe("operationModel", () => {
 
 describe("validateJson", () => {
   it("reports JSON syntax errors as a single message", () => {
-    const errors = validateJson("{nope");
+    const errors = validateJson("{nope", EN_UI.reference);
     expect(errors).toHaveLength(1);
     expect(errors[0]).toContain("Invalid JSON:");
   });
 
   it("passes anything without a schema", () => {
-    expect(validateJson("5")).toStrictEqual([]);
+    expect(validateJson("5", EN_UI.reference)).toStrictEqual([]);
   });
 
   it("checks primitive types", () => {
-    expect(validateJson("5", { type: "integer" })).toStrictEqual([]);
-    expect(validateJson("5.5", { type: "integer" })).toStrictEqual([
-      "body should be integer, got number",
-    ]);
-    expect(validateJson("5.5", { type: "number" })).toStrictEqual([]);
-    expect(validateJson('"x"', { type: "number" })).toStrictEqual([
-      "body should be number, got string",
-    ]);
-    expect(validateJson("true", { type: "boolean" })).toStrictEqual([]);
-    expect(validateJson("null", { type: "boolean" })).toStrictEqual([
-      "body should be boolean, got null",
-    ]);
-    expect(validateJson('"x"', { type: "string" })).toStrictEqual([]);
-    expect(validateJson("[]", { type: "object" })).toStrictEqual([
-      "body should be object, got array",
-    ]);
-    expect(validateJson("{}", { type: "array" })).toStrictEqual([
-      "body should be array, got object",
-    ]);
-    expect(validateJson("{}", { type: "object" })).toStrictEqual([]);
-    expect(validateJson("[]", { type: "array" })).toStrictEqual([]);
+    expect(
+      validateJson("5", EN_UI.reference, { type: "integer" })
+    ).toStrictEqual([]);
+    expect(
+      validateJson("5.5", EN_UI.reference, { type: "integer" })
+    ).toStrictEqual(["body should be integer, got number"]);
+    expect(
+      validateJson("5.5", EN_UI.reference, { type: "number" })
+    ).toStrictEqual([]);
+    expect(
+      validateJson('"x"', EN_UI.reference, { type: "number" })
+    ).toStrictEqual(["body should be number, got string"]);
+    expect(
+      validateJson("true", EN_UI.reference, { type: "boolean" })
+    ).toStrictEqual([]);
+    expect(
+      validateJson("null", EN_UI.reference, { type: "boolean" })
+    ).toStrictEqual(["body should be boolean, got null"]);
+    expect(
+      validateJson('"x"', EN_UI.reference, { type: "string" })
+    ).toStrictEqual([]);
+    expect(
+      validateJson("[]", EN_UI.reference, { type: "object" })
+    ).toStrictEqual(["body should be object, got array"]);
+    expect(
+      validateJson("{}", EN_UI.reference, { type: "array" })
+    ).toStrictEqual(["body should be array, got object"]);
+    expect(
+      validateJson("{}", EN_UI.reference, { type: "object" })
+    ).toStrictEqual([]);
+    expect(
+      validateJson("[]", EN_UI.reference, { type: "array" })
+    ).toStrictEqual([]);
     // A type keyword the pruned subset doesn't model: no opinion.
-    expect(validateJson("null", { type: "null" })).toStrictEqual([]);
+    expect(
+      validateJson("null", EN_UI.reference, { type: "null" })
+    ).toStrictEqual([]);
   });
 
   it("checks required properties recursively", () => {
@@ -851,39 +867,50 @@ describe("validateJson", () => {
       required: ["pet"],
       type: "object",
     };
-    expect(validateJson('{"pet":{"name":"Rex"}}', schema)).toStrictEqual([]);
-    expect(validateJson("{}", schema)).toStrictEqual(["body.pet is required"]);
-    expect(validateJson('{"pet":{}}', schema)).toStrictEqual([
+    expect(
+      validateJson('{"pet":{"name":"Rex"}}', EN_UI.reference, schema)
+    ).toStrictEqual([]);
+    expect(validateJson("{}", EN_UI.reference, schema)).toStrictEqual([
+      "body.pet is required",
+    ]);
+    expect(validateJson('{"pet":{}}', EN_UI.reference, schema)).toStrictEqual([
       "body.pet.name is required",
     ]);
-    expect(validateJson('{"pet":{"name":5}}', schema)).toStrictEqual([
-      "body.pet.name should be string, got number",
-    ]);
+    expect(
+      validateJson('{"pet":{"name":5}}', EN_UI.reference, schema)
+    ).toStrictEqual(["body.pet.name should be string, got number"]);
   });
 
   it("checks enum membership including structured members", () => {
-    expect(validateJson('"admin"', { enum: ["admin", "user"] })).toStrictEqual(
-      []
-    );
-    expect(validateJson('"root"', { enum: ["admin", "user"] })).toStrictEqual([
-      'body must be one of: "admin", "user"',
-    ]);
-    expect(validateJson('{"a":1}', { enum: [{ a: 1 }] })).toStrictEqual([]);
+    expect(
+      validateJson('"admin"', EN_UI.reference, { enum: ["admin", "user"] })
+    ).toStrictEqual([]);
+    expect(
+      validateJson('"root"', EN_UI.reference, { enum: ["admin", "user"] })
+    ).toStrictEqual(['body must be one of: "admin", "user"']);
+    expect(
+      validateJson('{"a":1}', EN_UI.reference, { enum: [{ a: 1 }] })
+    ).toStrictEqual([]);
   });
 
   it("validates array items with indexed paths", () => {
     const schema = { items: { type: "integer" }, type: "array" };
-    expect(validateJson("[1,2]", schema)).toStrictEqual([]);
-    expect(validateJson('[1,"x"]', schema)).toStrictEqual([
+    expect(validateJson("[1,2]", EN_UI.reference, schema)).toStrictEqual([]);
+    expect(validateJson('[1,"x"]', EN_UI.reference, schema)).toStrictEqual([
       "body[1] should be integer, got string",
     ]);
     // Arrays without an items schema have nothing to check.
-    expect(validateJson("[1]", { type: "array" })).toStrictEqual([]);
+    expect(
+      validateJson("[1]", EN_UI.reference, { type: "array" })
+    ).toStrictEqual([]);
   });
 
   it("stops descending after a type mismatch", () => {
     expect(
-      validateJson("[]", { required: ["name"], type: "object" })
+      validateJson("[]", EN_UI.reference, {
+        required: ["name"],
+        type: "object",
+      })
     ).toStrictEqual(["body should be object, got array"]);
   });
 });

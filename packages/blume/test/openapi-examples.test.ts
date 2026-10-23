@@ -19,6 +19,7 @@ import {
   buildRequest,
   defaultValues,
 } from "../src/components/openapi/request.ts";
+import { EN_UI } from "../src/core/i18n-ui.ts";
 
 /**
  * Author-written examples survive Scalar's upgrade: an OpenAPI 3.0 or Swagger
@@ -124,6 +125,7 @@ describe("declared examples after the 3.1 upgrade", () => {
       schemas,
       security: { alternatives: [], optional: false },
       servers: [{ url: "https://api.test" }],
+      strings: EN_UI.reference,
     });
     const sample = buildRequest(model, defaultValues(model));
     expect(sample.url).toBe("https://api.test/pets/pet_123");
@@ -222,6 +224,7 @@ describe("flat body fields", () => {
       schemas: { Slug: { readOnly: true, type: "string" } },
       security: { alternatives: [], optional: false },
       servers: [],
+      strings: EN_UI.reference,
     });
     expect(
       model.body?.fields?.map((field) => [field.name, field.required])
@@ -246,6 +249,7 @@ describe("flat body fields", () => {
       schemas: {},
       security: { alternatives: [], optional: false },
       servers: [],
+      strings: EN_UI.reference,
     });
     expect(model.body?.fields).toBeUndefined();
     expect(model.body?.example).toBe("{}");
@@ -294,6 +298,7 @@ describe("examples follow the schema's direction", () => {
       schemas,
       security: { alternatives: [], optional: false },
       servers: ["https://api.test"].map((url) => ({ url })),
+      strings: EN_UI.reference,
     });
     expect(JSON.parse(model.body?.example ?? "")).toStrictEqual({
       name: "Rex",

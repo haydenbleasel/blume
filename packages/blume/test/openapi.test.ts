@@ -38,6 +38,7 @@ import {
   DEFAULT_SAMPLE_LANGUAGES,
   sampleLanguages,
 } from "../src/components/openapi/snippets.ts";
+import { EN_UI } from "../src/core/i18n-ui.ts";
 import { scanProject } from "../src/core/project-graph.ts";
 import { blumeConfigSchema } from "../src/core/schema.ts";
 import { resolveSources } from "../src/core/sources/resolve.ts";
@@ -2206,7 +2207,10 @@ describe("helpers", () => {
     expect(isNullable({ type: ["string", "null"] })).toBe(true);
     expect(isNullable({ type: "string" })).toBe(false);
     expect(
-      constraints({ default: 2, maximum: 10, minimum: 1, pattern: "^x$" })
+      constraints(
+        { default: 2, maximum: 10, minimum: 1, pattern: "^x$" },
+        EN_UI.reference
+      )
     ).toStrictEqual(["min 1", "max 10", "matches ^x$", "default: 2"]);
   });
 
@@ -2412,6 +2416,7 @@ describe("snippets", () => {
       schemas,
       security: { alternatives: [], optional: false },
       servers: [{ url: "https://api.test/v1/" }],
+      strings: EN_UI.reference,
     });
     const sample = buildRequest(model, defaultValues(model));
     expect(sample.method).toBe("POST");
@@ -2622,29 +2627,45 @@ describe("security", () => {
   });
 
   it("labels schemes and locates their credential", () => {
-    expect(schemeLabel(resolved("bearerAuth"))).toBe("Bearer token (JWT)");
-    expect(schemeLabel(resolved("basicAuth"))).toBe("Basic auth");
-    expect(schemeLabel(resolved("apiHeader"))).toBe("API key");
-    expect(schemeLabel(resolved("oauth"))).toBe("OAuth2 access token");
-    expect(schemeLabel(resolved("oidc"))).toBe("OpenID Connect token");
-    expect(schemeLabel(resolved("tls"))).toBe("Mutual TLS");
+    expect(schemeLabel(resolved("bearerAuth"), EN_UI.reference)).toBe(
+      "Bearer token (JWT)"
+    );
+    expect(schemeLabel(resolved("basicAuth"), EN_UI.reference)).toBe(
+      "Basic auth"
+    );
+    expect(schemeLabel(resolved("apiHeader"), EN_UI.reference)).toBe("API key");
+    expect(schemeLabel(resolved("oauth"), EN_UI.reference)).toBe(
+      "OAuth2 access token"
+    );
+    expect(schemeLabel(resolved("oidc"), EN_UI.reference)).toBe(
+      "OpenID Connect token"
+    );
+    expect(schemeLabel(resolved("tls"), EN_UI.reference)).toBe("Mutual TLS");
     // A format-less bearer and a non-bearer/basic HTTP scheme.
     expect(
-      schemeLabel({
-        key: "plain",
-        scheme: { scheme: "bearer", type: "http" },
-        scopes: [],
-      })
+      schemeLabel(
+        {
+          key: "plain",
+          scheme: { scheme: "bearer", type: "http" },
+          scopes: [],
+        },
+        EN_UI.reference
+      )
     ).toBe("Bearer token");
     expect(
-      schemeLabel({
-        key: "digest",
-        scheme: { scheme: "digest", type: "http" },
-        scopes: [],
-      })
+      schemeLabel(
+        {
+          key: "digest",
+          scheme: { scheme: "digest", type: "http" },
+          scopes: [],
+        },
+        EN_UI.reference
+      )
     ).toBe("HTTP digest");
     // Unknown ref: the component name is the only label available.
-    expect(schemeLabel({ key: "ghost", scopes: [] })).toBe("ghost");
+    expect(schemeLabel({ key: "ghost", scopes: [] }, EN_UI.reference)).toBe(
+      "ghost"
+    );
 
     expect(schemeCarrier(resolved("bearerAuth"))).toStrictEqual({
       in: "header",
@@ -2667,6 +2688,7 @@ describe("security", () => {
       schemas: {},
       security,
       servers: [{ url: "https://api.test/v1" }],
+      strings: EN_UI.reference,
     });
     const sample = buildRequest(model, defaultValues(model));
     expect(sample.headers.Authorization).toBe("Bearer YOUR_TOKEN");
@@ -2692,6 +2714,7 @@ describe("security", () => {
       schemas: {},
       security,
       servers: [{ url: "https://api.test/v1" }],
+      strings: EN_UI.reference,
     });
     const sample = buildRequest(model, defaultValues(model));
     expect(sample.url).toBe(
@@ -2715,6 +2738,7 @@ describe("security", () => {
       schemas: {},
       security,
       servers: [{ url: "https://api.test/v1" }],
+      strings: EN_UI.reference,
     });
     const sample = buildRequest(model, defaultValues(model));
     expect(sample.url).toBe("https://api.test/v1/pet?api_key=from-the-spec");
@@ -2736,6 +2760,7 @@ describe("security", () => {
       schemas: {},
       security,
       servers: [{ url: "https://api.test/v1" }],
+      strings: EN_UI.reference,
     });
     const sample = buildRequest(model, defaultValues(model));
     expect(sample.headers.Authorization).toBe("Bearer from-the-spec");

@@ -4,6 +4,8 @@ import {
 } from "../components/openapi/snippets.ts";
 import { withBasePath } from "../core/base-path.ts";
 import matter from "../core/frontmatter.ts";
+import { EN_UI } from "../core/i18n-ui.ts";
+import type { UIStrings } from "../core/i18n-ui.ts";
 import { stripOrderingPrefix } from "../core/ordering-prefix.ts";
 import type { FolderMeta } from "../core/schema.ts";
 import { hashText } from "../core/sources/cache.ts";
@@ -195,7 +197,8 @@ const toEntry = (rendered: RenderedPage, ref: string): SourceEntry => {
 const specEntries = (
   spec: ApiSpecData,
   operations: ApiOperationRef[],
-  reference: BlumeReferenceSource
+  reference: BlumeReferenceSource,
+  strings: UIStrings["reference"]
 ): SourceEntry[] => {
   const entries = operations.map((operation) =>
     toEntry(
@@ -209,7 +212,7 @@ const specEntries = (
   const base = routeToRef(spec.route);
   entries.push(
     toEntry(
-      overviewMdx(spec, reference),
+      overviewMdx(spec, reference, strings),
       base ? `${base}/index.mdx` : "index.mdx"
     )
   );
@@ -288,7 +291,8 @@ interface ParsedReference {
 
 const parseReference = async (
   reference: BlumeReferenceSource,
-  ctx: SourceContext
+  ctx: SourceContext,
+  strings: UIStrings["reference"]
 ): Promise<ParsedReference> => {
   const options = { cacheDir: ctx.cacheDir, refresh: ctx.refresh };
   if (reference.kind === "asyncapi") {
@@ -313,7 +317,11 @@ const parseReference = async (
       ctx.projectRoot,
       options
     );
-    const extracted = extractGraphqlOperations(document, reference.route);
+    const extracted = extractGraphqlOperations(
+      document,
+      reference.route,
+      strings
+    );
     return {
       document,
       extractWarnings: extracted.warnings,
@@ -328,7 +336,7 @@ const parseReference = async (
     ctx.projectRoot,
     { ...options, overlays: reference.overlays }
   );
-  const extracted = extractOperations(document, reference.route);
+  const extracted = extractOperations(document, reference.route, strings);
   return {
     document,
     extractWarnings: extracted.warnings,
@@ -340,9 +348,15 @@ const parseReference = async (
   };
 };
 
+/**
+ * `strings` names what Blume adds to the sidebar — the overview page and the
+ * groups it names itself — in the default locale's words, since the reference
+ * is published in that locale.
+ */
 export const openApiSource = (
   references: BlumeReferenceSource[],
-  ctx: SourceContext
+  ctx: SourceContext,
+  strings: UIStrings["reference"] = EN_UI.reference
 ): OpenApiContentSource => {
   let parsed: OpenApiData = {};
 
@@ -362,7 +376,7 @@ export const openApiSource = (
         moved,
         extractWarnings,
         issues,
-      } = await parseReference(reference, ctx);
+      } = await parseReference(reference, ctx, strings);
       const info = document.info ?? { title: reference.label, version: "" };
       // The playground proxy resolves here, not client-side: `true` selects
       // the built-in `/_api-proxy` route (mounted under the site `basePath`,
@@ -444,7 +458,7 @@ export const openApiSource = (
               ]
             : []),
         ],
-        entries: specEntries(spec, operations, reference),
+        entries: specEntries(spec, operations, reference, strings),
         folderMeta: tagFolderMeta(spec, tags, operations, reference.groupLabel),
         redirects: moved,
         slug: reference.slug,

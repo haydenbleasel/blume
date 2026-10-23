@@ -1,6 +1,6 @@
 {
   "name": "blume",
-  "version": "2.2.3",
+  "version": "2.2.4",
   "description": "The open-source docs framework for humans and agents.",
   "keywords": [
     "agents",
@@ -36,7 +36,8 @@
     "docs",
     "skills",
     "AGENTS.md",
-    "CHANGELOG.md"
+    "CHANGELOG.md",
+    "THIRD-PARTY-NOTICES.md"
   ],
   "type": "module",
   "types": "./dist/types/index.d.ts",
@@ -124,7 +125,7 @@
     "@astrojs/mdx": "^8.0.2",
     "@astrojs/node": "^11.1.6",
     "@astrojs/react": "^7.0.0",
-    "@astrojs/vercel": "^11.0.11",
+    "@astrojs/vercel": "^11.0.14",
     "@clack/prompts": "^1.8.0",
     "@iconify-json/lucide": "^1.2.140",
     "@iconify/types": "^2.0.0",
@@ -193,7 +194,7 @@
     "string-width": "^8.2.2",
     "sucrase": "^3.35.1",
     "tailwindcss": "^4.3.3",
-    "takumi-js": "^2.13.7",
+    "takumi-js": "2.17.1",
     "tinyglobby": "^0.2.17",
     "twoslash": "^0.3.9",
     "typescript": "^6.0.3",

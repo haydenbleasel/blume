@@ -154,7 +154,6 @@ export const stories: CustomerStory[] = [
         { href: "/docs/deployment#server-rendering", label: "Node server" },
       ],
       industry: "Cloud platform for coding agents",
-      migratedFrom: "mintlify",
     },
     id: "specific",
     image: {
@@ -163,17 +162,20 @@ export const stories: CustomerStory[] = [
     },
     meta: {
       description:
-        "Specific migrated its docs from Mintlify to Blume in an afternoon and now hosts them on its own platform: Lighthouse performance went from 87 to 100, and hosting from $500 a month to a couple dollars.",
-      title: "Specific migrated from Mintlify to Blume in an afternoon",
+        "Specific migrated its docs to Blume in an afternoon and now hosts them on its own platform, with a perfect Lighthouse performance score on the first deploy.",
+      title: "Specific migrated to Blume in an afternoon",
     },
     stats: [
-      { label: "Lighthouse performance, up from 87", value: "100" },
-      { label: "Saved every month on docs hosting", value: "$500" },
+      { label: "Lighthouse performance on the first deploy", value: "100" },
+      {
+        label: "Pull requests to Blume, merged and released the same day",
+        value: "2",
+      },
     ],
     summary:
       "Specific, the cloud platform for coding agents, runs everything it can on itself. With Blume, that now includes its docs.",
     tagline: "in an afternoon.",
-    title: "Specific migrated from Mintlify",
+    title: "Specific migrated to Blume",
   },
   {
     color: "oklch(0.42 0.06 179)",
@@ -186,7 +188,6 @@ export const stories: CustomerStory[] = [
         { href: "/docs/discoverability/mcp", label: "MCP server" },
       ],
       industry: "Social media for B2B teams",
-      migratedFrom: "mintlify",
     },
     id: "ordinal",
     image: {
@@ -195,17 +196,17 @@ export const stories: CustomerStory[] = [
     },
     meta: {
       description:
-        "Ordinal moved its docs from Mintlify to Blume in one evening, kept every guide URL, and replaced Mintlify's docs agent with a scheduled Claude Code routine.",
-      title: "Ordinal migrated from Mintlify to Blume in one evening",
+        "Ordinal moved its docs to Blume in one evening, kept every guide URL, and keeps them current with a scheduled Claude Code routine.",
+      title: "Ordinal migrated to Blume in one evening",
     },
     stats: [
       { label: "Hands-on time; Claude Code did the rest", value: "20 min" },
-      { label: "Saved every year at Mintlify's renewal", value: "$3,000" },
+      { label: "Guide URLs changed in the move", value: "0" },
     ],
     summary:
-      "Ordinal, the social media platform for B2B teams, was paying for a docs editor nobody used. Blume moved its docs in an evening, and a Claude Code routine now keeps them current.",
+      "Ordinal, the social media platform for B2B teams, moved its docs to Blume in an evening, and a Claude Code routine now keeps them current.",
     tagline: "while walking the dog.",
-    title: "Ordinal moved from Mintlify",
+    title: "Ordinal moved to Blume",
   },
   {
     color: "oklch(0.48 0.1 230)",
@@ -221,7 +222,6 @@ export const stories: CustomerStory[] = [
         { href: "/docs/discoverability/llms-txt", label: "llms.txt" },
       ],
       industry: "AI models for graphic design",
-      migratedFrom: "mintlify",
     },
     id: "quiverai",
     image: {
@@ -230,12 +230,12 @@ export const stories: CustomerStory[] = [
     },
     meta: {
       description:
-        "QuiverAI, the frontier AI lab behind the Arrow SVG models, helped shape Blume from the start, moved its docs from Mintlify in less than a day, and now runs its internal design system docs on Blume too.",
+        "QuiverAI, the frontier AI lab behind the Arrow SVG models, helped shape Blume from the start, moved its docs in less than a day, and now runs its internal design system docs on Blume too.",
       title:
         "QuiverAI helped shape Blume, then moved its docs in less than a day",
     },
     stats: [
-      { label: "From Mintlify to production", value: "< 1 day" },
+      { label: "Time to production", value: "< 1 day" },
       { label: "Docs sites on Blume, public and internal", value: "2" },
     ],
     summary:
@@ -294,7 +294,6 @@ export const stories: CustomerStory[] = [
         },
       ],
       industry: "Foundation for AI apps",
-      migratedFrom: "mintlify",
     },
     id: "chatjs",
     image: {
@@ -303,8 +302,8 @@ export const stories: CustomerStory[] = [
     },
     meta: {
       description:
-        "ChatJS, the open-source foundation for AI apps, moved 71 pages of docs from Mintlify to Blume in a single AI chat, kept every chatjs.dev/docs URL, and fixed what it needed in Blume itself.",
-      title: "ChatJS moved its docs from Mintlify to Blume in a single AI chat",
+        "ChatJS, the open-source foundation for AI apps, moved 71 pages of docs to Blume in a single AI chat, kept every chatjs.dev/docs URL, and fixed what it needed in Blume itself.",
+      title: "ChatJS moved its docs to Blume in a single AI chat",
     },
     stats: [
       { label: "Pages moved in a single AI chat", value: "71" },
@@ -313,7 +312,7 @@ export const stories: CustomerStory[] = [
     summary:
       "ChatJS, the open-source foundation for AI apps, wanted polished docs without building a docs platform, and room to change them later. Blume gave it both, and the move took a single AI chat.",
     tagline: "in a single AI chat.",
-    title: "ChatJS moved from Mintlify",
+    title: "ChatJS moved to Blume",
   },
   {
     color: "oklch(0.5 0.17 359)",
@@ -343,14 +342,14 @@ export const stories: CustomerStory[] = [
       { label: "URLs changed in the move", value: "0" },
     ],
     summary:
-      "oRPC, the open-source framework for typesafe APIs, wanted Mintlify-level docs without moving them out of its monorepo. Blume moved all 96 pages over in less than a day, Twoslash examples and all.",
+      "oRPC, the open-source framework for typesafe APIs, wanted polished docs without moving them out of its monorepo. Blume moved all 96 pages over in less than a day, Twoslash examples and all.",
     tagline: "inside its own repo.",
-    title: "oRPC got Mintlify-level docs",
+    title: "oRPC got polished docs",
   },
 ];
 
 /**
- * A headline split around its hyphenated words ("Mintlify-level"), each
+ * A headline split around its hyphenated words ("open-source"), each
  * flagged `whole` so the story panel, page, and OG card keep it on one line:
  * in a narrow panel, browsers and the card's renderer otherwise break after
  * the hyphen.

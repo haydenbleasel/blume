@@ -14,6 +14,7 @@ theme: {
   accent: "teal",   // a named preset or any CSS color
   radius: "md",     // none | sm | md | lg
   mode: "system",   // system | light | dark
+  toggle: true,     // show the light/dark toggle
   fonts: {          // self-hosted Google Fonts
     display: "inter",
     body: "inter",
@@ -51,7 +52,18 @@ Text on an accent or action fill, like a button label or a step number, is white
 - **`system`** (default) — follow the reader's OS preference
 - **`light`** / **`dark`** — default to one scheme
 
-A toggle in the header always lets readers switch, and their choice is remembered across visits. Dark mode is applied with a `data-theme="dark"` attribute on the `<html>` element.
+A toggle in the header lets readers switch, and their choice is remembered across visits. Dark mode is applied with a `data-theme="dark"` attribute on the `<html>` element.
+
+To ship a single scheme, set `toggle: false`. The header drops the toggle, and every page renders in `mode`, even for readers who picked the other scheme before the toggle was removed:
+
+```ts blume.config.ts lineNumbers
+theme: {
+  mode: "dark",
+  toggle: false,
+}
+```
+
+With `mode: "system"`, `toggle: false` follows each reader's OS setting and gives them no way to override it.
 
 ### Fonts
 

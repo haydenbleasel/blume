@@ -3,6 +3,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "bun:test";
 import { initComposer } from "../src/components/openapi/message-composer.ts";
 import type { MessageModel } from "../src/components/openapi/message.ts";
 import type { SocketEvent } from "../src/components/openapi/ws-client.ts";
+import { EN_UI } from "../src/core/i18n-ui.ts";
 import type { FakeEl } from "./fake-dom.ts";
 import { asElement, el, fire, installFakeDom, must } from "./fake-dom.ts";
 
@@ -95,7 +96,12 @@ const createFixture = (
 ): Fixture => {
   const root = el("blume-message-composer");
   root.append(
-    el("script", { "data-composer-model": "" }, JSON.stringify(model))
+    el("script", { "data-composer-model": "" }, JSON.stringify(model)),
+    el(
+      "script",
+      { "data-composer-strings": "", type: "application/json" },
+      JSON.stringify(EN_UI.reference)
+    )
   );
   const select = el("select", { "data-server": "" });
   select.value = "0";

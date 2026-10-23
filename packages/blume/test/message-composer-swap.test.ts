@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 
 import { initComposer } from "../src/components/openapi/message-composer.ts";
 import type { MessageModel } from "../src/components/openapi/message.ts";
+import { EN_UI } from "../src/core/i18n-ui.ts";
 import {
   asElement,
   el,
@@ -85,6 +86,11 @@ describe("composer navigation", () => {
     payload.value = "{}";
     root.append(
       el("script", { "data-composer-model": "" }, JSON.stringify(MODEL)),
+      el(
+        "script",
+        { "data-composer-strings": "", type: "application/json" },
+        JSON.stringify(EN_UI.reference)
+      ),
       payload,
       el("div", { "data-payload-errors": "" }),
       connect

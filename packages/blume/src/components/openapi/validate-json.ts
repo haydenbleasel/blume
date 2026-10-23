@@ -1,4 +1,5 @@
 import type { ValidationSchema } from "./request.ts";
+import type { ReferenceStrings } from "./strings.ts";
 
 /**
  * Minimal JSON-schema validation for the playground body editor. Client-safe
@@ -9,6 +10,16 @@ import type { ValidationSchema } from "./request.ts";
  * report blocks the Try it send (`playground-client.ts`) and the event
  * composer's connect and send (`message-composer.ts`).
  */
+
+/**
+ * The messages a failed check reports, in the page's language. The panel
+ * reads them from its server-rendered markup, so this module stays free of
+ * the dictionaries.
+ */
+export type ValidationStrings = Pick<
+  ReferenceStrings,
+  "invalidJson" | "notAllowed" | "requiredMissing" | "wrongType"
+>;
 
 /** An already-parsed JSON object — string keys, parsed-JSON values. */
 interface JsonObject {
@@ -73,15 +84,20 @@ const walk = (
   value: JsonValue,
   schema: ValidationSchema | undefined,
   path: string,
-  errors: string[]
+  errors: string[],
+  strings: ValidationStrings
 ): void => {
   if (!schema || (value === null && schema.nullable === true)) {
     return;
   }
   if (schema.type !== undefined && !matchesType(value, schema.type)) {
     // Deeper checks against a wrong-shaped value would only produce noise.
+    const expected = schema.type;
     errors.push(
-      `${path} should be ${schema.type}, got ${describeValue(value)}`
+      strings.wrongType
+        .replaceAll("{path}", () => path)
+        .replaceAll("{expected}", () => expected)
+        .replaceAll("{actual}", () => describeValue(value))
     );
     return;
   }
@@ -91,16 +107,21 @@ const walk = (
       (member) => JSON.stringify(member) === JSON.stringify(value)
     )
   ) {
+    const values = schema.enum
+      .map((member) => JSON.stringify(member))
+      .join(", ");
     errors.push(
-      `${path} must be one of: ${schema.enum
-        .map((member) => JSON.stringify(member))
-        .join(", ")}`
+      strings.notAllowed
+        .replaceAll("{path}", () => path)
+        .replaceAll("{values}", () => values)
     );
   }
   if (isJsonObject(value)) {
     for (const name of schema.required ?? []) {
       if (!(name in value)) {
-        errors.push(`${path}.${name} is required`);
+        errors.push(
+          strings.requiredMissing.replaceAll("{path}", () => `${path}.${name}`)
+        );
       }
     }
     for (const [name, property] of Object.entries(schema.properties ?? {})) {
@@ -108,13 +129,19 @@ const walk = (
         // SAFETY: `name in value` above proves the key exists, and parsed
         // JSON never holds `undefined` — the lookup is always a `JsonValue`
         // that `noUncheckedIndexedAccess` alone cannot see.
-        walk(value[name] as JsonValue, property, `${path}.${name}`, errors);
+        walk(
+          value[name] as JsonValue,
+          property,
+          `${path}.${name}`,
+          errors,
+          strings
+        );
       }
     }
   }
   if (Array.isArray(value) && schema.items) {
     for (const [index, item] of value.entries()) {
-      walk(item, schema.items, `${path}[${index}]`, errors);
+      walk(item, schema.items, `${path}[${index}]`, errors, strings);
     }
   }
 };
@@ -127,6 +154,7 @@ const walk = (
  */
 export const validateJson = (
   text: string,
+  strings: ValidationStrings,
   schema?: ValidationSchema,
   root = "body"
 ): string[] => {
@@ -135,11 +163,10 @@ export const validateJson = (
   try {
     value = JSON.parse(text);
   } catch (error) {
-    return [
-      `Invalid JSON: ${error instanceof Error ? error.message : String(error)}`,
-    ];
+    const detail = error instanceof Error ? error.message : String(error);
+    return [strings.invalidJson.replaceAll("{error}", () => detail)];
   }
   const errors: string[] = [];
-  walk(value, schema, root, errors);
+  walk(value, schema, root, errors, strings);
   return errors;
 };

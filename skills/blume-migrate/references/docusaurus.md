@@ -20,7 +20,7 @@ Read `themeConfig`, `presets`, and `plugins`:
 | `themeConfig.navbar.items` (doc items) | `navigation.tabs` (for section links) |
 | `themeConfig.navbar.items` (external/utility links — Blog, Discord…) | **`navigation.actions`** (`[{ label, href }]`, plain header links) to keep them in the header, or **`navigation.featured`** (`{ label, href, icon? }`, pinned above the sidebar on every route) if they should survive on phones; the GitHub link → the `github` config instead (it renders in the footer) |
 | `themeConfig.navbar.items` (a `className`-styled button — "Get started", "Sign up") | **`navigation.cta`** (`{ label, href }`, the header's one filled button; a route the docs don't serve must be an absolute URL) |
-| `themeConfig.colorMode.defaultMode` | `theme.mode` (`respectPrefersColorScheme: true` → `"system"`) |
+| `themeConfig.colorMode.defaultMode` | `theme.mode` (`respectPrefersColorScheme: true` → `"system"`); `colorMode.disableSwitch: true` → `theme.toggle: false` |
 | `themeConfig.prism.theme` / `.darkTheme` | `markdown.code.theme: { light, dark }` (map Prism theme names to Shiki themes, e.g. `github`/`github-dark`) |
 | `themeConfig.metadata` / `themeConfig.image` | per-page `seo` frontmatter / `seo.og`; report what doesn't fit |
 | `url` + `baseUrl` | **`url` → `deployment.site`**, unless the target host is Vercel or Netlify, which Blume auto-detects (see SKILL.md — GitHub Pages, a common Docusaurus host, is not one of them); `baseUrl` (when not `/`) → `deployment: { base: "/…" }`, or the `base` option of a host adapter (`vercel({ base })`) when the site also needs one |

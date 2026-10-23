@@ -70,7 +70,7 @@ Read the whole config, including the modules it imports. VuePress sites often ke
 | `nextLinks: false` **and** `prevLinks: false` (v1) | `pagination: false` on every page: there's no site-wide switch. Only one of them → drop (report) |
 | `search: false` | `search: false` |
 | `algolia` (`apiKey`, `indexName`, `appId`), in `themeConfig` or, in v1, any `themeConfig.locales[path]` | omit `search` (Orama) and report the credentials. A v1 `algolia` block is almost always **DocSearch**: Algolia's crawler fills the index (the app is `BH4D9OD16A` when `appId` is missing, and `algoliaOptions.facetFilters` often marks a shared index). Its records aren't Blume's, and Blume's sync, given an admin key, replaces the whole index on every build. Never point `algolia()` at it; a new index of your own is a separate opt-in |
-| **v2** `colorMode: 'dark'` / `'light'` | `theme.mode`. `colorModeSwitch: false` → report: Blume always shows the toggle |
+| **v2** `colorMode: 'dark'` / `'light'` | `theme.mode`. `colorModeSwitch: false` → `theme.toggle: false` |
 | **v2** `hostname` | `deployment.site`, unless the target host is Vercel or Netlify |
 | `locales` | see "i18n" |
 | `smoothScroll`, `searchMaxSuggestions`, `searchPlaceholder`, `repoLabel`, `editLinkText`, **v2** `contributors`, `externalLinkIcon`, `home`, `notFound`, `backToHome`, and the other UI labels | drop. A translated UI string → `i18n.ui` |

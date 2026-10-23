@@ -1,7 +1,9 @@
 ---
+import data from "blume:data";
 import specs from "blume:openapi";
 
 import { specAddresses, specOf } from "../../openapi/model.ts";
+import { referenceStrings } from "./strings.ts";
 
 // The spec-level metadata block (version + base URLs) at the top of an API
 // overview page. The tag sections that follow are emitted by `overviewMdx` as
@@ -14,9 +16,15 @@ interface Props {
 
 const { source } = Astro.props;
 const spec = specOf(specs, source);
-const { addresses, label: addressLabel } = spec
-  ? specAddresses(spec)
-  : { addresses: [], label: "" };
+const { addresses } = spec ? specAddresses(spec) : { addresses: [] };
+const strings = referenceStrings(data, Astro.currentLocale);
+// What `specAddresses` calls the list, worded in the page's language.
+const addressLabel =
+  spec?.kind === "graphql"
+    ? strings.endpoint
+    : spec?.kind === "asyncapi"
+      ? strings.servers
+      : strings.baseUrl;
 ---
 
 {
@@ -24,7 +32,7 @@ const { addresses, label: addressLabel } = spec
     <div>
       {spec.version && (
         <div class="not-prose mb-4 text-muted-foreground text-sm">
-          Version {spec.version}
+          {strings.version.replaceAll("{version}", () => spec.version)}
         </div>
       )}
       {addresses.length > 0 && (

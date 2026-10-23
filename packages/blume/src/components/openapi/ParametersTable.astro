@@ -1,4 +1,6 @@
 ---
+import data from "blume:data";
+
 import Description from "./Description.astro";
 import {
   constraints,
@@ -7,6 +9,7 @@ import {
   type SchemaLike,
   typeLabel,
 } from "./helpers.ts";
+import { referenceStrings } from "./strings.ts";
 
 interface ParamLike {
   name?: string;
@@ -25,14 +28,15 @@ interface Props {
 }
 
 const { parameters, schemas, level = 2 } = Astro.props;
+const strings = referenceStrings(data, Astro.currentLocale);
 
 const SECTIONS: { in: string; title: string }[] = [
-  { in: "path", title: "Path parameters" },
-  { in: "query", title: "Query parameters" },
-  { in: "header", title: "Header parameters" },
-  { in: "cookie", title: "Cookie parameters" },
+  { in: "path", title: strings.pathParameters },
+  { in: "query", title: strings.queryParameters },
+  { in: "header", title: strings.headerParameters },
+  { in: "cookie", title: strings.cookieParameters },
   // AsyncAPI channel address parameters.
-  { in: "channel", title: "Channel parameters" },
+  { in: "channel", title: strings.channelParameters },
 ];
 
 const groups = SECTIONS.map((section) => ({
@@ -55,7 +59,7 @@ const groups = SECTIONS.map((section) => ({
         {group.items.map((param) => {
           const resolved = resolveSchema(schemas, param.schema ?? {});
           const type = param.schema ? typeLabel(param.schema) : "string";
-          const limits = constraints(resolved);
+          const limits = constraints(resolved, strings);
           const enumValues = Array.isArray(resolved.enum) ? resolved.enum : null;
           const description = parameterDescription(param, schemas);
           return (
@@ -65,12 +69,12 @@ const groups = SECTIONS.map((section) => ({
                 <span class="text-muted-foreground text-xs">{type}</span>
                 {param.required && (
                   <span class="font-medium text-[0.625rem] text-red-600 uppercase tracking-wide dark:text-red-400">
-                    required
+                    {strings.required}
                   </span>
                 )}
                 {param.deprecated && (
                   <span class="font-medium text-[0.625rem] text-muted-foreground uppercase tracking-wide line-through">
-                    deprecated
+                    {strings.deprecated}
                   </span>
                 )}
               </div>
@@ -84,7 +88,7 @@ const groups = SECTIONS.map((section) => ({
               )}
               {enumValues && (
                 <div class="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
-                  <span class="text-muted-foreground">Allowed:</span>
+                  <span class="text-muted-foreground">{strings.allowed}</span>
                   {enumValues.map((value) => (
                     <code class="rounded bg-muted px-1 py-0.5 text-foreground">
                       {String(value)}

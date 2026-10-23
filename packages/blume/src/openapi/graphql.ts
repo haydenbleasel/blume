@@ -1,3 +1,4 @@
+import type { UIStrings } from "../core/i18n-ui.ts";
 import type { ApiOperationRef, ExtractedOperations } from "./model.ts";
 import { operationCollector, operationKey } from "./model.ts";
 
@@ -35,7 +36,10 @@ export type GraphqlTypeKind = (typeof GRAPHQL_TYPE_KINDS)[number];
 /** Everything a GraphQL operation ref's `method` can carry. */
 export type GraphqlMember = GraphqlOperationKind | GraphqlTypeKind;
 
-/** Sidebar/overview group label for each member kind. */
+/**
+ * Sidebar/overview group name for each member kind: the group's slug, and its
+ * label unless the site's language words it (see {@link GRAPHQL_GROUP_KEYS}).
+ */
 export const GRAPHQL_GROUP_LABELS = {
   enum: "Enums",
   input: "Input Objects",
@@ -47,6 +51,25 @@ export const GRAPHQL_GROUP_LABELS = {
   subscription: "Subscriptions",
   union: "Unions",
 } satisfies Record<GraphqlMember, string>;
+
+/** The dictionary key that words each kind's group label. */
+const GRAPHQL_GROUP_KEYS = {
+  enum: "graphqlEnums",
+  input: "graphqlInputs",
+  interface: "graphqlInterfaces",
+  mutation: "graphqlMutations",
+  object: "graphqlObjects",
+  query: "graphqlQueries",
+  scalar: "graphqlScalars",
+  subscription: "graphqlSubscriptions",
+  union: "graphqlUnions",
+} as const satisfies Record<GraphqlMember, keyof UIStrings["reference"]>;
+
+/** The site's words for the group labels. */
+export type GraphqlGroupStrings = Pick<
+  UIStrings["reference"],
+  (typeof GRAPHQL_GROUP_KEYS)[GraphqlMember]
+>;
 
 /**
  * A type expression as it appears in the schema: the rendered display form
@@ -177,13 +200,23 @@ const byName = (a: GraphqlTypeDef, b: GraphqlTypeDef): number =>
  * as Queries/Mutations/Subscriptions; every other named type becomes a type
  * page grouped by kind (Objects, Input Objects, …). Spec-defined scalars and
  * the root types themselves get no page — the roots' fields ARE the operation
- * pages, and `String`/`Int`/… document nothing.
+ * pages, and `String`/`Int`/… document nothing. `strings` labels the groups in
+ * the site's language; without it they keep their English names.
  */
 export const extractGraphqlOperations = (
   document: GraphqlDocument,
-  baseRoute: string
+  baseRoute: string,
+  strings?: GraphqlGroupStrings
 ): ExtractedOperations => {
-  const collector = operationCollector(baseRoute, new Map());
+  const names = new Map<string, string>(
+    strings
+      ? [...GRAPHQL_OPERATION_KINDS, ...GRAPHQL_TYPE_KINDS].map((kind) => [
+          GRAPHQL_GROUP_LABELS[kind],
+          strings[GRAPHQL_GROUP_KEYS[kind]],
+        ])
+      : []
+  );
+  const collector = operationCollector(baseRoute, new Map(), names);
   const rootNames = new Set(Object.values(document.roots));
 
   for (const kind of GRAPHQL_OPERATION_KINDS) {

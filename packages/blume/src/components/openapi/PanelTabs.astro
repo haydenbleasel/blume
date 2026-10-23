@@ -1,4 +1,8 @@
 ---
+import data from "blume:data";
+
+import { referenceStrings } from "./strings.ts";
+
 /**
  * The tabbed code-panel chrome shared by the request/response rail (OpenAPI)
  * and the sample/message rail (AsyncAPI): a heading, a tab per panel, an
@@ -29,14 +33,16 @@ interface Props {
   /** Render tab labels in a monospace face (status codes). */
   mono?: boolean;
   /**
-   * Names this tab set in its element ids, for a heading that repeats on
-   * the page (a callback's request body examples). Defaults to the heading.
+   * Names this tab set in its element ids. Fixed rather than the heading,
+   * which is translated (a script with no Latin letters would reduce every
+   * set's ids to the same dashes), and unique per set: a callback's request
+   * body examples each name their own.
    */
-  name?: string;
+  name: string;
 }
 
-const { heading, panels, copy = false, mono = false, name = heading } =
-  Astro.props;
+const { heading, panels, copy = false, mono = false, name } = Astro.props;
+const strings = referenceStrings(data, Astro.currentLocale);
 
 // A stable per-instance id prefix so tab/tabpanel pairs can reference each
 // other without colliding across the multiple PanelTabs on one page (the
@@ -88,13 +94,14 @@ const TAB_CLASS =
           </div>
           {copy && (
             <button
-              aria-label={`Copy ${heading.toLowerCase()}`}
+              aria-label={strings.copyPanel.replaceAll("{name}", () => heading)}
               class="group shrink-0 cursor-pointer rounded px-1.5 py-1 text-muted-foreground text-xs hover:text-foreground"
+              data-copied-label={strings.copied}
               data-panel-copy
               type="button"
             >
-              <span class="group-data-[copied]:hidden">Copy</span>
-              <span class="hidden group-data-[copied]:inline">Copied</span>
+              <span class="group-data-[copied]:hidden">{strings.copy}</span>
+              <span class="hidden group-data-[copied]:inline">{strings.copied}</span>
             </button>
           )}
         </div>

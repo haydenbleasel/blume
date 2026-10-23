@@ -24,74 +24,76 @@ import {
 } from "./request.ts";
 import { fetchRefusesMethod, sampleLanguages } from "./snippets.ts";
 import type { RequestSample } from "./snippets.ts";
+import type { ReferenceStrings } from "./strings.ts";
 import { validateJson } from "./validate-json.ts";
+import type { ValidationStrings } from "./validate-json.ts";
 
-const OPENAPI_PROXY_SETTING =
-  "`playground: { proxy: true }` on the `openapi()` reference";
+/**
+ * The panel's messages, in the page's language: Playground.astro renders them
+ * as JSON beside the model, so this lazily loaded module carries no
+ * dictionaries of its own.
+ */
+export type PlaygroundStrings = Pick<
+  ReferenceStrings,
+  | "cookieBlocked"
+  | "cors"
+  | "requestFailed"
+  | "sending"
+  | "serverUrl"
+  | "traceBlocked"
+  | "unreachable"
+> &
+  ValidationStrings;
+
+const OPENAPI_PROXY_SETTING = "`openapi({ playground: { proxy: true } })`";
 
 /**
  * The Blume config setting that turns on the proxy for a panel, keyed by the
  * `data-proxy-config` the rendering surface stamps on it: an `openapi()` or
  * `graphql()` reference's `playground` option, or `api.playground` for
- * hand-written API pages.
+ * hand-written API pages. Code, so it reads the same in every language.
  */
 const PROXY_SETTINGS = new Map([
   ["api", "`api: { playground: { proxy: true } }`"],
-  ["graphql", "`playground: { proxy: true }` on the `graphql()` reference"],
+  ["graphql", "`graphql({ playground: { proxy: true } })`"],
   ["openapi", OPENAPI_PROXY_SETTING],
 ]);
 
 /**
  * A failed fetch surfaces as a TypeError with no status — almost always the
- * browser's CORS wall, not the API being down — so the message explains the
- * one fix docs authors control instead of parroting "failed to fetch", naming
- * the setting for the surface this panel is on and the server output the
- * built-in proxy needs.
+ * browser's CORS wall, not the API being down — so the message (`cors`)
+ * explains the one fix docs authors control instead of parroting "failed to
+ * fetch", naming the setting for the surface this panel is on and the server
+ * output the built-in proxy needs.
  */
-const corsMessage = (config: string): string =>
-  "The browser blocked this request before it reached the API — the API " +
-  "likely does not allow cross-origin requests from this docs site. Set " +
-  `${PROXY_SETTINGS.get(config) ?? OPENAPI_PROXY_SETTING} in the Blume ` +
-  "config to route playground requests through the docs server instead. " +
-  "The proxy needs server output: a host adapter in `deployment`.";
+const corsMessage = (strings: PlaygroundStrings, config: string): string =>
+  strings.cors.replaceAll(
+    "{setting}",
+    () => PROXY_SETTINGS.get(config) ?? OPENAPI_PROXY_SETTING
+  );
 
-/**
- * `Cookie` is a forbidden header name: a page cannot set it, so a credential
- * the spec carries in a cookie can never ride a live send — the request would
- * simply arrive unauthenticated. The samples DO carry it, so the message points
- * at them rather than pretending the panel can.
- */
-const COOKIE_MESSAGE =
-  "Browsers don't allow a page to set a `Cookie` header, so this panel can't " +
-  "send the cookie credential you entered. Copy the sample above and run it " +
-  "from a terminal instead.";
+/** A send that failed for a reason the browser names (`requestFailed`). */
+const failureMessage = (strings: PlaygroundStrings, detail: string): string =>
+  strings.requestFailed.replaceAll("{error}", () => detail);
 
-/**
- * fetch refuses the TRACE method outright, proxied or not: the browser throws
- * before anything is sent, which the send's catch would misdiagnose as the
- * CORS wall or an unreachable host. The cURL and Python samples can send it.
+/*
+ * The other refusals, each worded by the dictionary:
+ *
+ * - `cookieBlocked`: `Cookie` is a forbidden header name, so a credential the
+ *   spec carries in a cookie can never ride a live send — the request would
+ *   simply arrive unauthenticated. The samples DO carry it, so the message
+ *   points at them rather than pretending the panel can.
+ * - `traceBlocked`: fetch refuses the TRACE method outright, proxied or not:
+ *   the browser throws before anything is sent, which the send's catch would
+ *   misdiagnose as the CORS wall or an unreachable host. The cURL and Python
+ *   samples can send it.
+ * - `unreachable`: a fetch that fails before any response when the API
+ *   couldn't be reached at all — a mistyped host, a refused connection, no
+ *   network — rather than answering behind the CORS wall.
+ * - `serverUrl`: a server the send can't target, a bare relative value like
+ *   `api.example.com` or `v1`, which fetch would resolve against the docs site
+ *   itself.
  */
-const TRACE_MESSAGE =
-  "Browsers don't allow a page to send a `TRACE` request, so this panel " +
-  "can't send it. Run the cURL or Python sample above from a terminal " +
-  "instead.";
-
-/**
- * A fetch that fails before any response when the API couldn't be reached at
- * all — a mistyped host, a refused connection, no network — rather than
- * answering behind the CORS wall.
- */
-const UNREACHABLE_MESSAGE =
-  "Couldn't reach the API. Check the server URL, and that the API is up and " +
-  "reachable from this network.";
-
-/**
- * A server the send can't target: a bare relative value like `api.example.com`
- * or `v1`, which fetch would resolve against the docs site itself.
- */
-const SERVER_URL_MESSAGE =
-  "Enter the server as an absolute URL, like https://api.example.com, or a " +
-  "path on this site, like /api.";
 
 /**
  * How long a live send waits before giving up. Without a deadline a request
@@ -337,6 +339,11 @@ export const initPlayground = (root: HTMLElement): void => {
   // SAFETY: the script tag is rendered by Playground.astro, which serializes
   // exactly the `PlaygroundModel` that `operationModel` produced at build time.
   const model = JSON.parse(modelScript.textContent ?? "") as PlaygroundModel;
+  // SAFETY: rendered beside the model by Playground.astro, from the page's
+  // resolved dictionary, so every `PlaygroundStrings` key is present.
+  const strings = JSON.parse(
+    root.querySelector("script[data-playground-strings]")?.textContent ?? "{}"
+  ) as PlaygroundStrings;
 
   // The sample panes live in the sibling RequestPanel, so they are looked up
   // from the shared operation-panel wrapper rather than this element.
@@ -470,7 +477,7 @@ export const initPlayground = (root: HTMLElement): void => {
     const errors =
       raw || bodyArea.value.trim() === ""
         ? []
-        : validateJson(bodyArea.value, model.body?.schema);
+        : validateJson(bodyArea.value, strings, model.body?.schema);
     bodyErrors.textContent = "";
     for (const error of errors) {
       bodyErrors.append(line(ERROR_TEXT, error));
@@ -536,7 +543,7 @@ export const initPlayground = (root: HTMLElement): void => {
     }
     if (fetchRefusesMethod(model.method)) {
       response.textContent = "";
-      response.append(line(ERROR_TEXT, TRACE_MESSAGE));
+      response.append(line(ERROR_TEXT, strings.traceBlocked));
       return;
     }
     if (validateBody().length > 0) {
@@ -554,7 +561,7 @@ export const initPlayground = (root: HTMLElement): void => {
       )
     ) {
       response.textContent = "";
-      response.append(line(ERROR_TEXT, COOKIE_MESSAGE));
+      response.append(line(ERROR_TEXT, strings.cookieBlocked));
       return;
     }
     // An auth input the reader left empty must not ride the wire:
@@ -590,17 +597,17 @@ export const initPlayground = (root: HTMLElement): void => {
       void new URL(url, "http://localhost/");
     } catch (error) {
       response.textContent = "";
-      response.append(line(ERROR_TEXT, `Request failed: ${String(error)}`));
+      response.append(line(ERROR_TEXT, failureMessage(strings, String(error))));
       return;
     }
     if (!isSendableUrl(sample.url)) {
       response.textContent = "";
-      response.append(line(ERROR_TEXT, SERVER_URL_MESSAGE));
+      response.append(line(ERROR_TEXT, strings.serverUrl));
       serverCustom?.setAttribute("aria-invalid", "true");
       return;
     }
     serverCustom?.removeAttribute("aria-invalid");
-    response.textContent = "Sending\u2026";
+    response.textContent = strings.sending;
     sending = true;
     if (sendButton) {
       sendButton.disabled = true;
@@ -621,13 +628,13 @@ export const initPlayground = (root: HTMLElement): void => {
       // A pre-response TypeError is the CORS wall only for a cross-origin
       // send to a host that answers: a proxied or same-site request never
       // meets CORS, and a host that doesn't answer isn't blocked, just down.
-      let message = `Request failed: ${String(error)}`;
+      let message = failureMessage(strings, String(error));
       if (error instanceof TypeError) {
         const crossOrigin = !proxy && !sample.url.startsWith("/");
         message =
           crossOrigin && (await reachable(sample.url))
-            ? corsMessage(proxyConfig)
-            : UNREACHABLE_MESSAGE;
+            ? corsMessage(strings, proxyConfig)
+            : strings.unreachable;
       }
       response.textContent = "";
       response.append(line(ERROR_TEXT, message));

@@ -3,6 +3,7 @@ import { join } from "pathe";
 import { blumeReferences } from "../../openapi/references.ts";
 import { openApiSource } from "../../openapi/source.ts";
 import type { ContentSourceAdapter } from "../../sources/registry.ts";
+import { EN_UI, resolveUIStrings } from "../i18n-ui.ts";
 import type { ResolvedConfig } from "../schema.ts";
 import { trimChar } from "../trim.ts";
 import type { ProjectContext } from "../types.ts";
@@ -218,8 +219,21 @@ export const resolveSources = (
 
   const references = blumeReferences(config);
   if (references.length > 0) {
+    // The reference publishes in the default locale (other locales show it as
+    // a fallback), so that locale names what it adds to the sidebar.
+    const { i18n } = config;
+    const ui = i18n
+      ? resolveUIStrings(i18n.defaultLocale, {
+          defaultLocale: i18n.defaultLocale,
+          overrides: i18n.ui,
+        })
+      : EN_UI;
     sources.push(
-      openApiSource(references, sourceContext(context, "openapi", runtime))
+      openApiSource(
+        references,
+        sourceContext(context, "openapi", runtime),
+        ui.reference
+      )
     );
   }
 

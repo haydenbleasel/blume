@@ -7,6 +7,15 @@ import {
   pageMetaSchema,
 } from "../src/core/schema.ts";
 
+describe("theme.toggle", () => {
+  it("shows the toggle unless a site turns it off", () => {
+    expect(blumeConfigSchema.parse({}).theme.toggle).toBe(true);
+    expect(
+      blumeConfigSchema.parse({ theme: { mode: "dark", toggle: false } }).theme
+    ).toMatchObject({ mode: "dark", toggle: false });
+  });
+});
+
 describe("dateSchema normalization", () => {
   it("passes a string date through unchanged", () => {
     const meta = pageMetaSchema.parse({ date: "2026-01-01" });

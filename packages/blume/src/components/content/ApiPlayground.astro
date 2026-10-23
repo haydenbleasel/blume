@@ -15,6 +15,7 @@ import {
   DEFAULT_SAMPLE_LANGUAGES,
   sampleLanguages,
 } from "../openapi/snippets.ts";
+import { referenceStrings } from "../openapi/strings.ts";
 import {
   endpointBody,
   endpointParameters,
@@ -39,6 +40,7 @@ const model = operationModel({
   schemas: {},
   security: endpointSecurity(spec.authMethod, api.auth),
   servers,
+  strings: referenceStrings(data, Astro.currentLocale),
 });
 const tryIt = spec.playground !== "simple" && api.playground.enabled;
 ---

@@ -4,7 +4,6 @@
 // and its migration pull request, and the Lighthouse scores are oRPC's own
 // runs.
 import { NEW_TAB_ATTRS } from "blume/core/new-tab.ts";
-import Quote from "../_customers/Quote.astro";
 import StoryPage from "../_customers/StoryPage.astro";
 import { storyById } from "../_customers/customers.ts";
 ---
@@ -31,9 +30,9 @@ import { storyById } from "../_customers/customers.ts";
     package there, built against 14 of oRPC's own packages from the
     workspace, so every Twoslash example checks against the code in the repo,
     including changes that haven't been released yet. That ruled out hosted
-    platforms like Mintlify, which build docs on their own servers rather than
-    in the repo. The team wanted Mintlify's polish, but the docs had to stay
-    next to the packages.
+    platforms, which build docs on their own servers rather than in the repo.
+    The team wanted a hosted platform's polish, but the docs had to stay next
+    to the packages.
   </p>
   <p>
     VitePress handled that well. But Twoslash, Mermaid diagrams, and llms.txt
@@ -52,9 +51,6 @@ import { storyById } from "../_customers/customers.ts";
     >.
   </p>
 
-  <Quote name="Định Lê" role="Maintainer, oRPC">
-    Blume gives us Mintlify-level docs inside our own repo.
-  </Quote>
   <p>
     All 96 pages moved to MDX, and none changed its URL. VitePress's
     containers became Blume's <code>:::</code> directives, code groups became

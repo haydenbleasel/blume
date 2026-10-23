@@ -85,6 +85,8 @@ const mediaPanels = (
 export const responsePanels = (
   responses: Record<string, ResponseLike>,
   schemas: Record<string, SchemaLike>,
+  /** A panel's text when its response has no description or example. */
+  empty: string,
   components?: ComponentsLike
 ): ExamplePanel[] =>
   Object.entries(responses).flatMap(([status, response]) => {
@@ -93,7 +95,7 @@ export const responsePanels = (
       status,
       type,
       media,
-      response.description || "No example response.",
+      response.description || empty,
       schemas,
       components
     );
@@ -103,8 +105,10 @@ export const responsePanels = (
 export const payloadPanels = (
   payload: Record<string, MediaLike> | undefined,
   schemas: Record<string, SchemaLike>,
+  /** A panel's text when its media type has no example. */
+  empty: string,
   components?: ComponentsLike
 ): ExamplePanel[] =>
   Object.entries(payload ?? {}).flatMap(([type, media]) =>
-    mediaPanels(type, type, media, "No example payload.", schemas, components)
+    mediaPanels(type, type, media, empty, schemas, components)
   );

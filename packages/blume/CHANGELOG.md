@@ -1,5 +1,13 @@
 # blume
 
+## 2.2.4
+
+### Patch Changes
+
+- b89bbc6: update Astro Vercel adapter to v11.0.14
+- 22cf754: Ship the license notices for the Lucide and Feather icons Blume includes, in a new `THIRD-PARTY-NOTICES.md`.
+- 90b974f: A site can now ship a single color scheme. `theme: { mode: "dark", toggle: false }` drops the light/dark toggle from the header and renders every page dark, including for readers who picked light before the toggle was removed. Before, `theme.mode` only set the starting scheme: the toggle always showed, and a reader's saved choice outranked it. With `mode: "system"`, `toggle: false` follows each reader's OS setting.
+
 ## 2.2.3
 
 ### Patch Changes

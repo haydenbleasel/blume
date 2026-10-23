@@ -319,16 +319,24 @@ const clickScript = `(()=>{const dr=()=>{const h=document.querySelector("[data-b
         />
       )
     }
-    <button
-      aria-label={n.toggleTheme}
-      class={iconButton}
-      data-blume-theme-toggle
-      data-blume-tooltip={n.toggleTheme}
-      type="button"
-    >
-      <span class="inline-flex dark:hidden"><Icon name="sun" size={18} /></span>
-      <span class="hidden dark:inline-flex"><Icon name="moon" size={18} /></span>
-    </button>
+    {
+      data.config.theme.toggle && (
+        <button
+          aria-label={n.toggleTheme}
+          class={iconButton}
+          data-blume-theme-toggle
+          data-blume-tooltip={n.toggleTheme}
+          type="button"
+        >
+          <span class="inline-flex dark:hidden">
+            <Icon name="sun" size={18} />
+          </span>
+          <span class="hidden dark:inline-flex">
+            <Icon name="moon" size={18} />
+          </span>
+        </button>
+      )
+    }
     {assistantEnabled && <Ask strings={assistantStrings} />}
   </div>
 </header>

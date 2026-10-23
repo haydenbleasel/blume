@@ -7,6 +7,7 @@ import {
   container,
   googleFonts,
   image,
+  subsetFonts,
   text,
 } from "takumi-js/helpers";
 import type { FontSubset, GoogleFontFamily, Node } from "takumi-js/helpers";
@@ -155,35 +156,63 @@ const resolveImages = (
 // so this only avoids rebuilding the list per card.
 const fontSubsetCache = new Map<string, Promise<FontSubset[]>>();
 
+/** Fetch `fonts`' subsets, dropping the cache entry at `key` if that fails. */
+const fetchFonts = async (
+  key: string,
+  fonts: OgGoogleFont[]
+): Promise<FontSubset[]> => {
+  try {
+    // SAFETY: OgFont's weight strings are documented as variable ranges like
+    // "100..900" (GoogleFontFamily's WeightRange); Takumi validates the value
+    // at fetch time and fails the build naming a malformed one.
+    return await googleFonts(fonts as GoogleFontFamily[]);
+  } catch (error) {
+    fontSubsetCache.delete(key);
+    throw error;
+  }
+};
+
 /**
  * Load the configured Google Font families as coverage subsets for `render`'s
  * `fonts` option. `googleFonts` fetches the families from Google Fonts in one
  * css2 request; `render` then registers only the subsets a card's text uses. A
  * fetch failure rejects, failing the build with the cause rather than silently
- * shipping tofu — the same fail-fast the OG accent relies on.
+ * shipping tofu — the same fail-fast the OG accent relies on. The failure is
+ * dropped from the cache, so a long-lived `blume dev` retries on the next card
+ * instead of failing every card until a restart.
  */
 const loadFonts = (fonts: OgGoogleFont[]): Promise<FontSubset[]> => {
   const key = JSON.stringify(fonts);
   let pending = fontSubsetCache.get(key);
   if (!pending) {
-    // SAFETY: OgFont's weight strings are documented as variable ranges like
-    // "100..900" (GoogleFontFamily's WeightRange); Takumi validates the value
-    // at fetch time and fails the build naming a malformed one.
-    pending = googleFonts(fonts as GoogleFontFamily[]);
+    pending = fetchFonts(key, fonts);
     fontSubsetCache.set(key, pending);
   }
   return pending;
 };
 
 /**
- * The code points Takumi's built-in Geist draws: whitespace, printable ASCII,
- * Latin-1 except `µ`, a few Latin extras French needs, and the typographic
- * punctuation English copy leans on. Probed against the renderer, and
- * `og-card.test.ts` renders every one, so a Takumi upgrade that drops a glyph
- * fails there instead of shipping tofu.
+ * The vertical tab, next line, and line and paragraph separators, which Takumi
+ * draws as missing glyphs. It lays a line feed out as a space, so these
+ * become one too.
+ */
+const STRAY_BREAKS = /[\v\u0085\u2028\u2029]/gu;
+
+/** `value` with its {@link STRAY_BREAKS} turned into spaces. */
+const withPlainBreaks = (value: string): string =>
+  value.replaceAll(STRAY_BREAKS, " ");
+
+/**
+ * The code points Takumi's built-in Geist draws: whitespace (not the
+ * {@link STRAY_BREAKS}, which a card turns into spaces first), printable
+ * ASCII, Latin-1 except `µ`, a few Latin extras French needs, and the
+ * typographic punctuation English copy leans on. Probed against the renderer,
+ * and `og-card.test.ts` renders every one, so a Takumi upgrade that drops a
+ * glyph fails there instead of shipping tofu.
  */
 export const BUILT_IN_GLYPHS: [number, number][] = [
-  [0x09, 0x0d],
+  [0x09, 0x0a],
+  [0x0c, 0x0d],
   [0x20, 0x7e],
   [0xa0, 0xb4],
   [0xb6, 0xff],
@@ -196,7 +225,7 @@ export const BUILT_IN_GLYPHS: [number, number][] = [
   [0x20_1c, 0x20_1e],
   [0x20_20, 0x20_22],
   [0x20_26, 0x20_26],
-  [0x20_28, 0x20_30],
+  [0x20_2a, 0x20_30],
   [0x20_32, 0x20_33],
   [0x20_39, 0x20_3a],
   [0x20_44, 0x20_44],
@@ -216,22 +245,27 @@ const drawnWithoutFonts = (codePoint: number): boolean =>
   BUILT_IN_GLYPHS.some(([from, to]) => codePoint >= from && codePoint <= to) ||
   EMOJI.test(String.fromCodePoint(codePoint));
 
-/** Whether `subset` claims `codePoint` (a subset without ranges claims all). */
-const subsetClaims = (subset: FontSubset, codePoint: number): boolean =>
-  subset.ranges.length === 0 ||
-  subset.ranges.some(([from, to]) => codePoint >= from && codePoint <= to);
+/**
+ * The subsets of `subsets` that claim any of `codePoints` (a subset without a
+ * `unicode-range` claims all). Takumi's own `subsetFonts` decides, so Blume
+ * never reads a subset's range field itself.
+ */
+const claiming = (subsets: FontSubset[], codePoints: number[]): FontSubset[] =>
+  subsetFonts({ fonts: subsets, source: String.fromCodePoint(...codePoints) });
 
-/** `family`'s subsets that claim any of `codePoints`. */
-const familySubsets = (
-  subsets: FontSubset[],
-  family: string,
-  codePoints: number[]
-): FontSubset[] =>
-  subsets.filter(
-    (subset) =>
-      subset.subsetOf === family &&
-      codePoints.some((codePoint) => subsetClaims(subset, codePoint))
-  );
+/** `subsets` grouped by family, in the order each family first appears. */
+const byFamily = (subsets: FontSubset[]): FontSubset[][] => {
+  const families = new Map<string, FontSubset[]>();
+  for (const subset of subsets) {
+    const family = families.get(subset.name);
+    if (family) {
+      family.push(subset);
+    } else {
+      families.set(subset.name, [subset]);
+    }
+  }
+  return [...families.values()];
+};
 
 /**
  * The scripts only the CJK families draw. Google slices those fonts by the
@@ -266,17 +300,16 @@ const fallbackSubsets = async (
   if (!fallbacks?.length || missing.length === 0) {
     return [];
   }
-  const subsets = await loadFonts(fallbacks);
   const needed: FontSubset[] = [];
-  for (const family of new Set(subsets.map((subset) => subset.subsetOf))) {
-    const matching = familySubsets(subsets, family, missing);
+  for (const family of byFamily(await loadFonts(fallbacks))) {
+    if (missing.length === 0) {
+      break;
+    }
+    const matching = claiming(family, missing);
     needed.push(...matching);
     missing = missing.filter(
       (codePoint) =>
-        !(
-          claimIsExact(codePoint) &&
-          matching.some((subset) => subsetClaims(subset, codePoint))
-        )
+        !(claimIsExact(codePoint) && claiming(matching, [codePoint]).length)
     );
   }
   return needed;
@@ -448,7 +481,9 @@ export const renderOgImage = async (
   // Slice by code point, not code unit — `charAt(0)` would split a leading
   // surrogate pair (an emoji brand initial) into a lone half that renders blank.
   const initial = brand ? ([...brand][0]?.toUpperCase() ?? "") : "";
-  const description = options.description?.trim();
+  const title = withPlainBreaks(options.title);
+  const description =
+    options.description && withPlainBreaks(options.description).trim();
   const repo = options.repo?.trim();
   const site = options.site?.trim();
   const titleFamily = familyStyle(options.families?.title);
@@ -475,9 +510,9 @@ export const renderOgImage = async (
 
   const body = container({
     children: [
-      text(truncate(options.title, 64), {
+      text(truncate(title, 64), {
         color: foreground,
-        fontSize: titleSize(options.title),
+        fontSize: titleSize(title),
         fontWeight: 600,
         // Matches the theme's heading tracking (entry.ts h1-h6 rule), tuned
         // for Inter since the display default dropped Inter Tight.

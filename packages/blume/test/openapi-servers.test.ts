@@ -19,6 +19,7 @@ import {
   buildRequest,
   defaultValues,
 } from "../src/components/openapi/request.ts";
+import { EN_UI } from "../src/core/i18n-ui.ts";
 import { scanProject } from "../src/core/project-graph.ts";
 import { withServerDefaults } from "../src/openapi/model.ts";
 
@@ -82,6 +83,7 @@ describe("templated servers in the request model", () => {
         { url: "/relative" },
         {},
       ],
+      strings: EN_UI.reference,
     });
     expect(model.servers).toStrictEqual([
       "https://us.api.example.com/v1",

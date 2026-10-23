@@ -10,6 +10,7 @@ import { initPlayground } from "../src/components/openapi/playground-client.ts";
 import type { PlaygroundModel } from "../src/components/openapi/request.ts";
 import { buildRequest } from "../src/components/openapi/request.ts";
 import { sampleLanguages } from "../src/components/openapi/snippets.ts";
+import { EN_UI } from "../src/core/i18n-ui.ts";
 import { asElement, el, fire, installFakeDom } from "./fake-dom.ts";
 
 /**
@@ -50,6 +51,7 @@ const model = (method: string): PlaygroundModel =>
     schemas: {},
     security: { alternatives: [], optional: false },
     servers: [{ url: "https://api.example.com" }],
+    strings: EN_UI.reference,
   });
 
 const sample = (id: string, method: string): string => {
@@ -76,6 +78,11 @@ const send = async (method: string): Promise<string> => {
       "script",
       { "data-playground-model": "", type: "application/json" },
       JSON.stringify(model(method))
+    ),
+    el(
+      "script",
+      { "data-playground-strings": "", type: "application/json" },
+      JSON.stringify(EN_UI.reference)
     )
   );
   const sendButton = el("button", { "data-send": "" });

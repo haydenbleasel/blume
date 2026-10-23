@@ -239,6 +239,242 @@ const uiStringsObject = z.object({
       skipToContent: z.string().default("Skip to content"),
     })
     .prefault({}),
+  // The generated API reference (`openapi()`, `asyncapi()`, `graphql()`) and
+  // hand-written API pages. `overview`, `operations`, `webhooks`, and the
+  // `graphql*` group names label the reference's sidebar, so they come from
+  // the default locale; everything else follows the page's locale. Braced
+  // names are replaced at render time and must stay in the translation.
+  reference: z
+    .object({
+      // Before a parameter's or property's enum values.
+      allowed: z.string().default("Allowed:"),
+      // Before the variants of an `anyOf` schema.
+      anyOf: z.string().default("Any of:"),
+      apiKey: z.string().default("API key"),
+      // A GraphQL field's arguments: the section heading, then the inline
+      // label on a field row.
+      arguments: z.string().default("Arguments"),
+      argumentsInline: z.string().default("Arguments:"),
+      // `{type}` is the item type, set in code.
+      arrayOf: z.string().default("Array of {type}"),
+      asymmetricEncryption: z.string().default("Asymmetric encryption"),
+      // A Basic auth credential's two inputs in Try it; `{label}` is the
+      // scheme's label.
+      authPassword: z.string().default("{label} password"),
+      authUsername: z.string().default("{label} username"),
+      authorization: z.string().default("Authorization"),
+      authorizationOptional: z.string().default("Authorization (optional)"),
+      authorizationOptionalNote: z
+        .string()
+        .default(
+          "Optional — this operation also accepts unauthenticated requests."
+        ),
+      baseUrl: z.string().default("Base URL"),
+      basicAuth: z.string().default("Basic auth"),
+      bearerToken: z.string().default("Bearer token"),
+      body: z.string().default("Body"),
+      callbacks: z.string().default("Callbacks"),
+      channelBindings: z.string().default("Channel bindings"),
+      channelParameters: z.string().default("Channel parameters"),
+      // `{name}` is the schema's name, set in code.
+      circular: z.string().default("Circular reference to {name}."),
+      connect: z.string().default("Connect"),
+      connectFailed: z.string().default("Couldn't connect: {detail}"),
+      connected: z.string().default("Connected to {url}."),
+      connecting: z.string().default("Connecting…"),
+      connection: z.string().default("Connection"),
+      connectionFailed: z
+        .string()
+        .default(
+          "The connection failed. The broker may reject requests from this origin, require credentials the URL doesn't carry, or be unreachable from here."
+        ),
+      cookieBlocked: z
+        .string()
+        .default(
+          "Browsers don't allow a page to set a `Cookie` header, so this panel can't send the cookie credential you entered. Copy the sample above and run it from a terminal instead."
+        ),
+      cookieParameters: z.string().default("Cookie parameters"),
+      copied: z.string().default("Copied"),
+      copy: z.string().default("Copy"),
+      // A code panel's copy button, for screen readers; `{name}` is the
+      // panel's heading.
+      copyPanel: z.string().default("Copy {name}"),
+      // Shown when the browser's CORS check blocks a Try it request;
+      // `{setting}` is the Blume config setting that turns on the proxy.
+      cors: z
+        .string()
+        .default(
+          "The browser blocked this request before it reached the API — the API likely does not allow cross-origin requests from this docs site. Set {setting} in the Blume config to route playground requests through the docs server instead. The proxy needs server output: a host adapter in `deployment`."
+        ),
+      customBaseUrl: z.string().default("Custom base URL"),
+      customBaseUrlHint: z
+        .string()
+        .default("Overrides the selected server when set."),
+      customServerUrl: z.string().default("Custom server URL"),
+      customServerUrlHint: z
+        .string()
+        .default(
+          "Overrides the selected server; the channel address is appended."
+        ),
+      // Before a field's default value.
+      default: z.string().default("Default:"),
+      // A schema row's default value, beside its other limits.
+      defaultValue: z.string().default("default: {value}"),
+      // `{reason}` is the schema's deprecation reason.
+      deprecatedReason: z.string().default("Deprecated: {reason}"),
+      disconnect: z.string().default("Disconnect"),
+      disconnected: z.string().default("Disconnected ({detail})."),
+      endpoint: z.string().default("Endpoint"),
+      endpointChanged: z
+        .string()
+        .default("The endpoint changed. Connect again to use it."),
+      example: z.string().default("Example"),
+      examples: z.string().default("Examples"),
+      fields: z.string().default("Fields"),
+      fillParameters: z
+        .string()
+        .default("Fill in every channel parameter before connecting: {names}."),
+      graphqlEnums: z.string().default("Enums"),
+      graphqlInputs: z.string().default("Input Objects"),
+      graphqlInterfaces: z.string().default("Interfaces"),
+      graphqlMutations: z.string().default("Mutations"),
+      graphqlObjects: z.string().default("Objects"),
+      graphqlQueries: z.string().default("Queries"),
+      graphqlScalars: z.string().default("Scalars"),
+      graphqlSubscriptions: z.string().default("Subscriptions"),
+      graphqlUnions: z.string().default("Unions"),
+      headerParameters: z.string().default("Header parameters"),
+      headers: z.string().default("Headers"),
+      headersFormat: z
+        .string()
+        .default(
+          "The headers use a schema format this reference can't render inline."
+        ),
+      hideProperties: z.string().default("Hide properties"),
+      httpAuth: z.string().default("HTTP auth"),
+      implementedBy: z.string().default("Implemented by"),
+      implements: z.string().default("Implements"),
+      includeInSamples: z.string().default("Include my values in samples"),
+      inputFields: z.string().default("Input fields"),
+      invalidJson: z.string().default("Invalid JSON: {error}"),
+      liveNeedsWebSocket: z
+        .string()
+        .default(
+          "Live sending needs a WebSocket binding — copy the sample above and run it against your broker."
+        ),
+      liveUnsupported: z
+        .string()
+        .default(
+          "Live sending isn't possible for {protocol} from a browser tab — copy the sample above and run it against your broker."
+        ),
+      // A schema row's limits; `{n}` and `{pattern}` are the schema's values.
+      matches: z.string().default("matches {pattern}"),
+      max: z.string().default("max {n}"),
+      maxItems: z.string().default("max items {n}"),
+      maxLength: z.string().default("max length {n}"),
+      memberTypes: z.string().default("Member types"),
+      message: z.string().default("Message"),
+      messageBindings: z.string().default("Message bindings"),
+      // An operation's message heading when it has several; `{name}` is the
+      // message's name.
+      messageNamed: z.string().default("Message: {name}"),
+      messagePayload: z.string().default("Message payload"),
+      min: z.string().default("min {n}"),
+      minItems: z.string().default("min items {n}"),
+      minLength: z.string().default("min length {n}"),
+      mutualTls: z.string().default("Mutual TLS"),
+      noAuthorizationOn: z
+        .string()
+        .default("No authorization needed on {servers}."),
+      noExamplePayload: z.string().default("No example payload."),
+      noExampleResponse: z.string().default("No example response."),
+      // A Try it body or event payload that fails its schema (also
+      // `requiredMissing` and `wrongType`); `{path}` is the value's location
+      // (`body.name`).
+      notAllowed: z.string().default("{path} must be one of: {values}"),
+      notConnected: z.string().default("Not connected."),
+      notConnectedStream: z
+        .string()
+        .default("Not connected. Connect to stream messages as they arrive."),
+      notFound: z.string().default("This API operation could not be found."),
+      oauth2Token: z.string().default("OAuth2 access token"),
+      // A credential that only some servers ask for; `{servers}` lists them.
+      onServers: z.string().default("on {servers}"),
+      // Before the variants of a `oneOf` schema.
+      oneOf: z.string().default("One of:"),
+      openIdConnectToken: z.string().default("OpenID Connect token"),
+      // A GraphQL operation's own code panel.
+      operation: z.string().default("Operation"),
+      operationBindings: z.string().default("Operation bindings"),
+      // The sidebar group of operations that declare no tag.
+      operations: z.string().default("Operations"),
+      // An unnamed `oneOf`/`anyOf` variant; `{n}` is its position.
+      option: z.string().default("Option {n}"),
+      // Between alternative ways to authorize.
+      or: z.string().default("or"),
+      // The sidebar label of a reference's overview page.
+      overview: z.string().default("Overview"),
+      parameters: z.string().default("Parameters"),
+      pathParameters: z.string().default("Path parameters"),
+      payload: z.string().default("Payload"),
+      payloadFormat: z
+        .string()
+        .default(
+          "The payload uses a schema format this reference can't render inline."
+        ),
+      queryParameters: z.string().default("Query parameters"),
+      remember: z.string().default("Remember on this device"),
+      request: z.string().default("Request"),
+      requestBody: z.string().default("Request body"),
+      requestFailed: z.string().default("Request failed: {error}"),
+      required: z.string().default("required"),
+      requiredMissing: z.string().default("{path} is required"),
+      response: z.string().default("Response"),
+      responses: z.string().default("Responses"),
+      returns: z.string().default("Returns"),
+      scopes: z.string().default("Scopes:"),
+      send: z.string().default("Send"),
+      sending: z.string().default("Sending…"),
+      server: z.string().default("Server"),
+      serverUrl: z
+        .string()
+        .default(
+          "Enter the server as an absolute URL, like https://api.example.com, or a path on this site, like /api."
+        ),
+      servers: z.string().default("Servers"),
+      showProperties: z.string().default("Show properties"),
+      // A GraphQL scalar's specification link; `{url}` is the link.
+      specifiedBy: z.string().default("Specified by {url}"),
+      symmetricEncryption: z.string().default("Symmetric encryption"),
+      traceBlocked: z
+        .string()
+        .default(
+          "Browsers don't allow a page to send a `TRACE` request, so this panel can't send it. Run the cURL or Python sample above from a terminal instead."
+        ),
+      tryIt: z.string().default("Try it"),
+      typeNotFound: z.string().default("This GraphQL type could not be found."),
+      unreachable: z
+        .string()
+        .default(
+          "Couldn't reach the API. Check the server URL, and that the API is up and reachable from this network."
+        ),
+      usedBy: z.string().default("Used by"),
+      userPassword: z.string().default("Username & password"),
+      values: z.string().default("Values"),
+      variables: z.string().default("Variables"),
+      // The overview's spec version; `{version}` is the version.
+      version: z.string().default("Version {version}"),
+      // The badge on an operation the API sends.
+      webhook: z.string().default("Webhook"),
+      // The sidebar group of webhooks that declare no tag.
+      webhooks: z.string().default("Webhooks"),
+      // `{expected}` and `{actual}` are JSON types (`string`, `object`).
+      wrongType: z
+        .string()
+        .default("{path} should be {expected}, got {actual}"),
+      x509Certificate: z.string().default("X.509 certificate"),
+    })
+    .prefault({}),
   search: z
     .object({
       all: z.string().default("All"),

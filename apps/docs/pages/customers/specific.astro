@@ -32,9 +32,8 @@ import { storyById } from "../_customers/customers.ts";
     that was a bonus.
   </p>
   <p>
-    Mintlify did both. But it was a closed, hosted product, so the docs were
-    the one part of Specific not running on Specific, and at $500 a month it
-    cost a lot for what the team needed.
+    And since the team runs everything it can on Specific, it wanted the docs
+    running there too.
   </p>
 
   <Quote
@@ -99,41 +98,32 @@ import { storyById } from "../_customers/customers.ts";
 
   <h2>The results</h2>
   <p>
-    On the first Blume deploy, before any tuning, Lighthouse performance went
-    from 87 to 100, and every score is now 96 or above. Both runs were on the
-    same URL on July 14, 2026 (<a
-      href="https://x.com/imanradjavi/status/2077040598721175972"
-      {...NEW_TAB_ATTRS}>before and after</a
-    >).
+    On the first Blume deploy, on July 14, 2026, and before any tuning,
+    Lighthouse performance scored 100, and every score was 96 or above.
   </p>
   <table>
     <thead>
       <tr>
         <th scope="col">Lighthouse</th>
-        <th scope="col">Mintlify</th>
-        <th scope="col">Blume</th>
+        <th scope="col">Score</th>
       </tr>
     </thead>
     <tbody>
-      <tr><th scope="row">Performance</th><td>87</td><td>100</td></tr>
-      <tr><th scope="row">Accessibility</th><td>95</td><td>98</td></tr>
-      <tr><th scope="row">Best Practices</th><td>96</td><td>96</td></tr>
-      <tr><th scope="row">SEO</th><td>100</td><td>100</td></tr>
+      <tr><th scope="row">Performance</th><td>100</td></tr>
+      <tr><th scope="row">Accessibility</th><td>98</td></tr>
+      <tr><th scope="row">Best Practices</th><td>96</td></tr>
+      <tr><th scope="row">SEO</th><td>100</td></tr>
     </tbody>
   </table>
   <p>
-    Docs hosting went from $500 a month to a couple dollars of compute, and the
-    migration took a couple of hours of agent time. Iman{" "}
-    <a
-      href="https://www.linkedin.com/posts/iman-radjavi_we-saved-500-a-month-moving-our-docs-from-share-7503076122100785152-HYWD/"
-      {...NEW_TAB_ATTRS}>announced the move on LinkedIn</a
-    >, and the new docs are live at{" "}
+    The migration took a couple of hours of agent time, the docs run on a
+    couple dollars of compute, and they're live at{" "}
     <a href="https://docs.specific.dev" {...NEW_TAB_ATTRS}>docs.specific.dev</a
     >.
   </p>
   <p>
-    To make the same move, follow the{" "}
-    <a href="/guides/migrate-from-mintlify">Mintlify migration guide</a>, and
-    see <a href="/pricing">what running Blume costs</a> on your own host.
+    To move your own docs, read{" "}
+    <a href="/docs/migrating">Migrate to Blume</a>, and see{" "}
+    <a href="/pricing">what running Blume costs</a> on your own host.
   </p>
 </StoryPage>

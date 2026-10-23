@@ -1,8 +1,11 @@
 ---
+import data from "blume:data";
+
 import { statusColor } from "../colors.ts";
 import Description from "./Description.astro";
 import type { SchemaLike } from "./helpers.ts";
 import SchemaTable from "./SchemaTable.astro";
+import { referenceStrings } from "./strings.ts";
 
 interface MediaTypeLike {
   schema?: SchemaLike;
@@ -22,6 +25,7 @@ interface Props {
 }
 
 const { responses, schemas, expandAll = false, level = 2 } = Astro.props;
+const strings = referenceStrings(data, Astro.currentLocale);
 
 const items = Object.entries(responses);
 ---
@@ -34,7 +38,7 @@ const items = Object.entries(responses);
         class:list={["mb-3 font-semibold text-foreground", level > 2 ? "text-sm" : "text-lg"]}
         role="heading"
       >
-        Responses
+        {strings.responses}
       </div>
       <div class="flex flex-col gap-4">
         {items.map(([status, response]) => {

@@ -15,6 +15,7 @@ theme: {
   accent: "teal",   // a named preset or any CSS color
   radius: "md",     // none | sm | md | lg
   mode: "system",   // system | light | dark
+  toggle: true,     // show the light/dark toggle
   fonts: {          // self-hosted Google Fonts
     display: "inter",
     body: "inter",
@@ -53,6 +54,17 @@ Text auf einer Akzent- oder Aktionsfläche, etwa eine Button-Beschriftung oder e
 - **`light`** / **`dark`** — verwendet standardmäßig ein bestimmtes Schema
 
 Ein Umschalter im Header erlaubt Lesenden jederzeit den Wechsel, und ihre Wahl wird über Besuche hinweg gespeichert. Der dunkle Modus wird über ein Attribut `data-theme="dark"` am `<html>`-Element angewendet.
+
+Um nur ein einziges Schema auszuliefern, setze `toggle: false`. Der Header verzichtet dann auf den Umschalter, und jede Seite wird in `mode` dargestellt — auch für Lesende, die das andere Schema gewählt haben, bevor der Umschalter entfernt wurde:
+
+```ts blume.config.ts lineNumbers
+theme: {
+  mode: "dark",
+  toggle: false,
+}
+```
+
+Mit `mode: "system"` folgt die Website bei `toggle: false` der Betriebssystem-Einstellung jeder Leserin und jedes Lesers, ohne dass sie diese überschreiben können.
 
 ### Schriften [#fonts]
 

@@ -54,7 +54,9 @@ export type SchemaNode =
   | { kind: "array"; itemsLabel: string; items?: SchemaSlot }
   | {
       kind: "branches";
+      /** Which combinator: worded in the page's language by `SchemaTable`. */
       label: "One of" | "Any of";
+      /** Each variant, labeled by its type (`""` when it has none). */
       branches: { label: string; slot: SchemaSlot }[];
       /**
        * Properties the schema declares beside its `oneOf`/`anyOf`, which
@@ -189,8 +191,10 @@ export const schemaTree = (
     const branches = schema.oneOf ?? schema.anyOf;
     if (branches) {
       const node: Extract<SchemaNode, { kind: "branches" }> = {
-        branches: branches.map((branch, index) => ({
-          label: typeLabel(branch) || `Option ${index + 1}`,
+        // An unlabeled variant renders as its position ("Option 2"), worded
+        // in the page's language by `SchemaTable`.
+        branches: branches.map((branch) => ({
+          label: typeLabel(branch),
           slot: table(branch, ancestors),
         })),
         kind: "branches",

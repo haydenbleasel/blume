@@ -1,8 +1,11 @@
 ---
+import data from "blume:data";
+
 import type { GraphqlFieldRow } from "./graphql-helpers.ts";
 import { isOutputField } from "./graphql-helpers.ts";
 import Description from "./Description.astro";
 import GraphqlChip from "./GraphqlChip.astro";
+import { aroundPlaceholder, referenceStrings } from "./strings.ts";
 
 /**
  * The row list shared by every GraphQL member table: a type page's fields or
@@ -18,6 +21,11 @@ interface Props {
 }
 
 const { title, rows, routes } = Astro.props;
+const strings = referenceStrings(data, Astro.currentLocale);
+const [deprecatedBefore, deprecatedAfter] = aroundPlaceholder(
+  strings.deprecatedReason,
+  "{reason}"
+);
 
 /**
  * Whether a value must be supplied by the caller: an argument or input field
@@ -59,12 +67,12 @@ const isRequired = (row: GraphqlFieldRow): boolean =>
                 />
                 {isRequired(row) && (
                   <span class="font-medium text-[0.625rem] text-red-600 uppercase tracking-wide dark:text-red-400">
-                    required
+                    {strings.required}
                   </span>
                 )}
                 {row.deprecationReason !== undefined && (
                   <span class="font-medium text-[0.625rem] text-muted-foreground uppercase tracking-wide line-through">
-                    deprecated
+                    {strings.deprecated}
                   </span>
                 )}
               </div>
@@ -73,7 +81,7 @@ const isRequired = (row: GraphqlFieldRow): boolean =>
               )}
               {"default" in row && row.default !== undefined && (
                 <div class="mt-2 text-muted-foreground text-xs">
-                  Default:{" "}
+                  {strings.default}{" "}
                   <code class="rounded bg-muted px-1 py-0.5 text-foreground">
                     {row.default}
                   </code>
@@ -81,12 +89,12 @@ const isRequired = (row: GraphqlFieldRow): boolean =>
               )}
               {row.deprecationReason && (
                 <div class="mt-2 text-muted-foreground text-xs">
-                  Deprecated: <span set:text={row.deprecationReason} />
+                  {deprecatedBefore}<span set:text={row.deprecationReason} />{deprecatedAfter}
                 </div>
               )}
               {args.length > 0 && (
                 <div class="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-xs">
-                  <span class="text-muted-foreground">Arguments:</span>
+                  <span class="text-muted-foreground">{strings.argumentsInline}</span>
                   {args.map((arg) => (
                     <span class="inline-flex items-baseline gap-1">
                       <code class="rounded bg-muted px-1 py-0.5 text-foreground">

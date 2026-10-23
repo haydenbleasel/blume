@@ -25,6 +25,7 @@ import type {
   EndpointSpec,
 } from "../src/components/content/api-page.ts";
 import { operationModel } from "../src/components/openapi/operation-model.ts";
+import { EN_UI } from "../src/core/i18n-ui.ts";
 import { scanProject } from "../src/core/project-graph.ts";
 import { pageMetaSchema } from "../src/core/schema.ts";
 import { API_RAIL_KEY, apiRailPlugin } from "../src/markdown/api-rail.ts";
@@ -192,6 +193,7 @@ describe("fields as schema", () => {
       schemas: {},
       security: { alternatives: [], optional: false },
       servers: [],
+      strings: EN_UI.reference,
     });
     // An optional field with neither a default nor a placeholder used to go
     // out as the sampler's "string", 0, or true.

@@ -4,6 +4,8 @@ import { toString as mdastToString } from "mdast-util-to-string";
 import stringWidth from "string-width";
 
 import { apiNamePhrase } from "../core/api-name.ts";
+import { EN_UI } from "../core/i18n-ui.ts";
+import type { UIStrings } from "../core/i18n-ui.ts";
 import { unsafeLinkSpans } from "../core/safe-links.ts";
 import { columnsPrefix } from "../core/text-width.ts";
 import type { GraphqlMember } from "./graphql.ts";
@@ -480,7 +482,9 @@ export const overviewMdx = (
   reference?: Pick<
     ReferenceSource,
     "includeInLlms" | "includeInSearch" | "noindex"
-  >
+  >,
+  /** The site's word for the page's sidebar label (the default locale's). */
+  strings: Pick<UIStrings["reference"], "overview"> = EN_UI.reference
 ): RenderedPage => {
   // Tag sections: declared tags in spec order, then any tag an operation
   // references that isn't declared under `tags`. The section headings are
@@ -550,7 +554,7 @@ export const overviewMdx = (
     data: {
       ...flags,
       seo,
-      sidebar: { label: "Overview" },
+      sidebar: { label: strings.overview },
       title: apiName(spec),
     },
   };

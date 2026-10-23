@@ -30,7 +30,11 @@ import type {
   PlaygroundParam,
 } from "./request.ts";
 import { schemeLabel } from "./security.ts";
-import type { OperationSecurity, ResolvedScheme } from "./security.ts";
+import type {
+  OperationSecurity,
+  ResolvedScheme,
+  SchemeStrings,
+} from "./security.ts";
 
 /**
  * Server-side derivation of the playground's request model. This is where the
@@ -258,10 +262,11 @@ const AUTHORIZATION_HEADER = { in: "header", name: "Authorization" } as const;
  * be guessed — both contribute nothing.
  */
 const authInput = (
-  resolved: ResolvedScheme
+  resolved: ResolvedScheme,
+  strings: SchemeStrings
 ): PlaygroundAuthInput | undefined => {
   const { scheme } = resolved;
-  const label = schemeLabel(resolved);
+  const label = schemeLabel(resolved, strings);
   switch (scheme?.type) {
     case "http": {
       const kind = (scheme.scheme ?? "bearer").toLowerCase();
@@ -333,10 +338,11 @@ const authInput = (
  * static samples always showed.
  */
 export const playgroundAuth = (
-  security: OperationSecurity
+  security: OperationSecurity,
+  strings: SchemeStrings
 ): PlaygroundAuthInput[] =>
   (security.alternatives[0] ?? []).flatMap((resolved) => {
-    const input = authInput(resolved);
+    const input = authInput(resolved, strings);
     return input ? [input] : [];
   });
 
@@ -386,9 +392,11 @@ export const operationModel = (args: {
   /** The document's `components`, which `$ref`'d examples resolve against. */
   components?: ComponentsLike;
   security: OperationSecurity;
+  /** The labels the credential inputs are named with. */
+  strings: SchemeStrings;
 }): PlaygroundModel => {
   const model: PlaygroundModel = {
-    auth: playgroundAuth(args.security),
+    auth: playgroundAuth(args.security, args.strings),
     authOptional: args.security.optional,
     body: modelBody(args.requestBody, args.schemas, args.components),
     method: args.method.toUpperCase(),

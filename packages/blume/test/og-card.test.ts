@@ -297,6 +297,34 @@ describe("renderOgImage", () => {
     });
   });
 
+  it("retries the css2 metadata after a failed fetch", async () => {
+    // A long-lived `blume dev` renders cards for as long as it runs, so one
+    // failed request must not fail every later card that needs the same
+    // fonts. Uses a family no other test loads, since `googleFonts` keeps a
+    // process-wide css2 cache.
+    const original = globalThis.fetch;
+    const css2Requests: string[] = [];
+    // SAFETY: the font pipeline only calls fetch(url); fetch's static
+    // properties (e.g. Bun's preconnect) are never touched by the code under
+    // test.
+    globalThis.fetch = ((input: RequestInfo | URL) => {
+      css2Requests.push(String(input));
+      return Promise.resolve(new Response("", { status: 404 }));
+    }) as typeof fetch;
+    try {
+      await expect(
+        renderOgImage({ fonts: ["Noto Sans Thai"], title: "สวัสดี" })
+      ).rejects.toThrow("HTTP 404");
+    } finally {
+      globalThis.fetch = original;
+    }
+    expect(css2Requests).toHaveLength(1);
+    await withStubbedFonts(async (retried) => {
+      await expectPng({ fonts: ["Noto Sans Thai"], title: "สวัสดี" });
+      expect(retried).toHaveLength(1);
+    });
+  });
+
   it("loads a local font file without touching the network", async () => {
     // Local entries are read from disk (a real woff2 shipped by katex), so no
     // fetch stub is needed — any network call here would hit the real fetch
@@ -427,12 +455,18 @@ describe("renderOgImage", () => {
   });
 });
 
-/** A glyph drawn alone, as PNG bytes in base64. */
+/**
+ * A glyph drawn alone in Geist, as PNG bytes in base64. Pinned as cards pin
+ * it: unpinned, Takumi tries fonts earlier tests registered first, so the
+ * result would depend on which tests ran before.
+ */
 const drawGlyph = async (glyph: string): Promise<string> =>
   Buffer.from(
     await render(
       container({
-        children: [text(glyph, { color: "#000", fontSize: 32 })],
+        children: [
+          text(glyph, { color: "#000", fontFamily: '"Geist"', fontSize: 32 }),
+        ],
         style: {
           backgroundColor: "#fff",
           display: "flex",
@@ -474,6 +508,26 @@ describe("renderOgImage script fallbacks", () => {
     });
   });
 
+  it("draws stray line breaks as spaces instead of fetching fallbacks", async () => {
+    // Takumi draws these as missing glyphs, and no fallback font has them
+    // either, so the card lays them out as the space a line feed becomes.
+    await withStubbedFonts(async (css2Requests, files) => {
+      const spaced = await renderOgImage({
+        description: "One two three four five",
+        fallbacks: ["Stub Latin"],
+        title: "Line one two",
+      });
+      const broken = await renderOgImage({
+        description: "One\vtwo\u0085three\u2028four\u2029five",
+        fallbacks: ["Stub Latin"],
+        title: "Line\u2028one\u2029two",
+      });
+      expect(Buffer.from(broken).equals(Buffer.from(spaced))).toBe(true);
+      expect(css2Requests).toEqual([]);
+      expect(files).toEqual([]);
+    });
+  });
+
   it("fetches nothing for emoji, which render as images", async () => {
     await withStubbedGlyphFetch(async (urls) => {
       await expectPng({ fallbacks: ["Stub Emoji"], title: "Ship it 🚀✨" });
@@ -483,10 +537,12 @@ describe("renderOgImage script fallbacks", () => {
 
   it("loads a CJK character from the first family that claims it", async () => {
     // Google slices CJK fonts by the glyphs each really has, so the later
-    // families' slices for the same characters are never downloaded. A
-    // family claiming none of a card's glyphs loads nothing.
+    // families' slices for the same characters are never downloaded, nor is
+    // a slice of the first family claiming none of them. A family claiming
+    // none of a card's glyphs loads nothing.
     const css = [
       face("Stub JP", "jp.woff2", "U+3040-30FF"),
+      face("Stub JP", "jp-han.woff2", "U+4E00-9FFF"),
       face("Stub KR", "kr.woff2", "U+3040-30FF, U+AC00-D7A3"),
       face("Stub Thai", "thai.woff2", "U+0E00-0E7F"),
     ].join("\n");

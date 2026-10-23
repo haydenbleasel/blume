@@ -57,6 +57,22 @@ describe("the header's icon buttons", () => {
     );
     expect(header).not.toContain("repoUrl");
   });
+
+  it("drop the theme toggle when theme.toggle is off", async () => {
+    const [header, ...layouts] = await Promise.all(
+      ["Header", "RootLayout", "PageLayout", "ReferenceLayout"].map((name) =>
+        source(`layout/${name}.astro`)
+      )
+    );
+    expect(header).toContain("data.config.theme.toggle && (");
+    // Every shell also tells the theme script to skip the stored choice, so a
+    // reader's old pick can't outlive the toggle.
+    for (const layout of layouts) {
+      expect(layout).toContain(
+        'data-fixed={data.config.theme.toggle ? undefined : ""}'
+      );
+    }
+  });
 });
 
 describe("the header's tabs", () => {

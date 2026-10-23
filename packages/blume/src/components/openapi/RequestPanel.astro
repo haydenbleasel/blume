@@ -18,6 +18,7 @@ import {
 import { languageSamplePanels } from "./sample-panels.ts";
 import PanelTabs from "./PanelTabs.astro";
 import type { RequestSample, SampleLanguage } from "./snippets.ts";
+import { referenceStrings } from "./strings.ts";
 
 interface Props {
   /** The document's `components`, which `$ref`'d examples resolve against. */
@@ -44,6 +45,7 @@ const {
   responses,
   schemas,
 } = Astro.props;
+const strings = referenceStrings(data, Astro.currentLocale);
 
 /**
  * One example tab, highlighted. A payload that isn't JSON shows a string
@@ -80,7 +82,7 @@ const customPanels = await Promise.all(
   }))
 );
 const payloadPanels = await Promise.all(
-  payloadExamples(payload, schemas, components).map((panel) =>
+  payloadExamples(payload, schemas, strings.noExamplePayload, components).map((panel) =>
     highlightPanel(panel, !panel.type.includes("json"))
   )
 );
@@ -91,14 +93,14 @@ const requestPanels = [
     : []),
 ];
 const responsePanels = await Promise.all(
-  responseExamples(responses, schemas, components).map((panel) =>
+  responseExamples(responses, schemas, strings.noExampleResponse, components).map((panel) =>
     highlightPanel(panel, false)
   )
 );
 ---
 
 <div class="not-prose flex flex-col gap-6">
-  <PanelTabs copy heading="Payload" mono panels={payloadPanels} />
-  <PanelTabs copy heading="Request" panels={requestPanels} />
-  <PanelTabs heading="Response" mono panels={responsePanels} />
+  <PanelTabs copy heading={strings.payload} mono name="payload" panels={payloadPanels} />
+  <PanelTabs copy heading={strings.request} name="request" panels={requestPanels} />
+  <PanelTabs heading={strings.response} mono name="response" panels={responsePanels} />
 </div>

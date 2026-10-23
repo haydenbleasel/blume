@@ -150,7 +150,8 @@ const responsesMarkdown = (
   const sampled = statuses.find(
     ([status]) => status.startsWith("2") && !recorded.has(status)
   )?.[0];
-  const examples = responsePanels(responses, schemas, components).flatMap(
+  // Only panels that carry an example are written, so no empty text shows.
+  const examples = responsePanels(responses, schemas, "", components).flatMap(
     (panel) =>
       (recorded.has(panel.name) || panel.name === sampled) &&
       panel.value !== null &&

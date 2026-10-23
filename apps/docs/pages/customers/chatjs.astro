@@ -26,18 +26,13 @@ import { storyById } from "../_customers/customers.ts";
 
   <h2>Looking for the balance</h2>
   <p>
-    ChatJS's docs started on Mintlify. With the plan up for renewal in a couple
-    of months, Francisco Moretti, ChatJS's creator, reconsidered the setup.
-    Cost was part of it, but he had also run into limits on customizing
-    Mintlify and found himself shaping the docs to fit the platform.
+    Francisco Moretti, ChatJS's creator, wanted polished docs without building
+    a docs platform, and room to change them later. He'd built a docs site of
+    his own with Next.js before, and while the control was great, getting it
+    to feel polished was a project in itself.
   </p>
   <p>
-    He had been at the other end before, too. He'd built a docs site of his own
-    with Next.js, and while the control was great, getting it to feel polished
-    was a project in itself.
-  </p>
-  <p>
-    Blume sat between the two: a docs site that worked from the start, with the
+    Blume offered both: a docs site that worked from the start, with the
     freedom to customize or extend it later. ChatJS's docs were already
     Markdown, written and changed through code, so Blume fit the way Francisco
     already worked.
@@ -61,8 +56,8 @@ import { storyById } from "../_customers/customers.ts";
   <p>
     The content was already in a portable format, so most of the work was
     around it. 71 pages moved, from guides and feature docs to reference pages
-    and cookbook recipes. The navigation moved from Mintlify's{" "}
-    <code>docs.json</code> into <code>blume.config.ts</code>, the callouts and
+    and cookbook recipes. The navigation moved into{" "}
+    <code>blume.config.ts</code>, the callouts and
     accordions were adapted to Blume's, and the icons and images came along.
   </p>
   <p>
@@ -76,11 +71,8 @@ import { storyById } from "../_customers/customers.ts";
   <p>
     Before the switch,{" "}
     <a href="/docs/cli/validate"><code>blume validate</code></a> checked every
-    link, and browser checks covered the rendered pages. The{" "}
-    <a
-      href="https://github.com/FranciscoMoretti/chat-js/pull/230"
-      {...NEW_TAB_ATTRS}>whole move</a
-    > was opened and merged the same day.
+    link, and browser checks covered the rendered pages. The whole move was
+    opened and merged the same day.
   </p>
   <p>
     Checking the migrated pages also turned up outdated examples and links that
@@ -179,7 +171,7 @@ import { storyById } from "../_customers/customers.ts";
     <a
       href="https://github.com/FranciscoMoretti/chat-js/tree/main/apps/docs"
       {...NEW_TAB_ATTRS}>public on GitHub</a
-    >. To make the same move, follow the{" "}
-    <a href="/guides/migrate-from-mintlify">Mintlify migration guide</a>.
+    >. To move your own docs, read{" "}
+    <a href="/docs/migrating">Migrate to Blume</a>.
   </p>
 </StoryPage>

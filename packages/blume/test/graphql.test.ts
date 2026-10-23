@@ -26,6 +26,7 @@ import {
   defaultValues,
 } from "../src/components/openapi/request.ts";
 import type { BlumeConfig } from "../src/core/config-input.ts";
+import { EN_UI } from "../src/core/i18n-ui.ts";
 import { blumeConfigSchema } from "../src/core/schema.ts";
 import { serverFeatures } from "../src/core/server-features.ts";
 import { buildGraphqlDocument } from "../src/openapi/graphql-build.ts";
@@ -987,7 +988,12 @@ describe("graphql-helpers", () => {
   it("builds the shared playground/request model", () => {
     const query = exampleQuery(document, pets, "query");
     const variables = exampleVariables(document, pets);
-    const model = graphqlPlaygroundModel(spec, query, variables);
+    const model = graphqlPlaygroundModel(
+      spec,
+      query,
+      EN_UI.reference,
+      variables
+    );
     expect(model.method).toBe("POST");
     expect(model.servers).toStrictEqual(["https://api.test/graphql"]);
     const sample = buildRequest(model, defaultValues(model));
@@ -999,13 +1005,14 @@ describe("graphql-helpers", () => {
       variables,
     });
     // No endpoint configured: the placeholder keeps samples complete.
-    const bare = graphqlPlaygroundModel(specData(), query);
+    const bare = graphqlPlaygroundModel(specData(), query, EN_UI.reference);
     expect(bare.servers).toStrictEqual([GRAPHQL_ENDPOINT_PLACEHOLDER]);
     expect(JSON.parse(bare.body?.example ?? "")).toStrictEqual({ query });
     // An empty endpoint is as absent as an omitted one — never an empty URL.
     const empty = graphqlPlaygroundModel(
       { ...specData(), endpoint: "" },
-      query
+      query,
+      EN_UI.reference
     );
     expect(empty.servers).toStrictEqual([GRAPHQL_ENDPOINT_PLACEHOLDER]);
     // No `auth`: no credential field, and the section stays off the page.
@@ -1017,7 +1024,8 @@ describe("graphql-helpers", () => {
     const query = exampleQuery(document, pets, "query");
     const bearer = graphqlPlaygroundModel(
       specData({ auth: { method: "bearer" } }),
-      query
+      query,
+      EN_UI.reference
     );
     expect(bearer.auth.map((input) => input.carrier)).toStrictEqual([
       { in: "header", name: "Authorization" },
@@ -1035,7 +1043,8 @@ describe("graphql-helpers", () => {
     // An API key goes in the named header, `x-api-key` by default.
     const key = graphqlPlaygroundModel(
       specData({ auth: { method: "key", name: "X-Api-Token" } }),
-      query
+      query,
+      EN_UI.reference
     );
     expect(buildRequest(key, defaultValues(key)).headers["X-Api-Token"]).toBe(
       "YOUR_API_KEY"

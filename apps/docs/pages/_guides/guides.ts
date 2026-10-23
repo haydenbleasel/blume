@@ -112,31 +112,35 @@ export const guides: Guide[] = [
     author: "hayden",
     docs: [
       { href: "/docs/migrating", label: "Migrating" },
-      { href: "/docs/deployment#redirects", label: "Redirects" },
-      { href: "/compare/mintlify", label: "Blume vs Mintlify" },
+      {
+        href: "/docs/deployment#mount-the-docs-under-a-path",
+        label: "Mount under a path",
+      },
+      { href: "/docs/content/islands", label: "Interactive islands" },
+      { href: "/compare/docusaurus", label: "Blume vs Docusaurus" },
     ],
-    id: "migrate-from-mintlify",
-    image: { src: "/guides/migrate-from-mintlify.webp" },
+    id: "migrate-from-docusaurus",
+    image: { src: "/guides/migrate-from-docusaurus.webp" },
     meta: {
       description:
-        "Move your Mintlify docs to Blume with a coding agent: what carries over, what to review, how to keep your URLs, and how to switch your domain over.",
-      title: "How to migrate from Mintlify to self-hosted documentation",
+        "Move a Docusaurus site's docs to Blume with a coding agent: sidebars, admonitions, versioned docs, and custom React components, plus how to keep your URLs.",
+      title: "How to migrate from Docusaurus to Blume",
     },
     nextStep: {
-      body: "Run it at the root of your Mintlify repository, on a clean branch, then work through the review above.",
-      command: "npx blume migrate mintlify --claude",
+      body: "Run it at the root of your Docusaurus site, on a clean branch, then work through the review above.",
+      command: "npx blume migrate docusaurus --claude",
       link: { href: "/docs/migrating", label: "Read the migration reference" },
       title: "Migrate your docs",
     },
     prerequisites: [
-      "A Mintlify docs repository",
+      "A Docusaurus site's repository",
       "Node.js 22.19 or later",
       "Claude Code or Codex, signed in",
     ],
     published: "2026-09-27",
     summary:
-      "Hand your Mintlify repository to a coding agent, review what it changed, keep your URLs working, and deploy a docs site you host yourself.",
-    title: "Migrate your docs from Mintlify",
+      "Move a Docusaurus site's docs to Blume with a coding agent, and check the sidebars, admonitions, and React components it carries over.",
+    title: "Migrate your docs from Docusaurus",
     topic: "migrate",
   },
   {
@@ -306,35 +310,31 @@ export const guides: Guide[] = [
     author: "hayden",
     docs: [
       { href: "/docs/migrating", label: "Migrating" },
-      {
-        href: "/docs/deployment#mount-the-docs-under-a-path",
-        label: "Mount under a path",
-      },
-      { href: "/docs/content/islands", label: "Interactive islands" },
-      { href: "/compare/docusaurus", label: "Blume vs Docusaurus" },
+      { href: "/docs/deployment#redirects", label: "Redirects" },
+      { href: "/compare/mintlify", label: "Blume vs Mintlify" },
     ],
-    id: "migrate-from-docusaurus",
-    image: { src: "/guides/migrate-from-docusaurus.webp" },
+    id: "migrate-from-mintlify",
+    image: { src: "/guides/migrate-from-mintlify.webp" },
     meta: {
       description:
-        "Move a Docusaurus site's docs to Blume with a coding agent: sidebars, admonitions, versioned docs, and custom React components, plus how to keep your URLs.",
-      title: "How to migrate from Docusaurus to Blume",
+        "Move your Mintlify docs to Blume with a coding agent: what carries over, what to review, how to keep your URLs, and how to switch your domain over.",
+      title: "How to migrate from Mintlify to self-hosted documentation",
     },
     nextStep: {
-      body: "Run it at the root of your Docusaurus site, on a clean branch, then work through the review above.",
-      command: "npx blume migrate docusaurus --claude",
+      body: "Run it at the root of your Mintlify repository, on a clean branch, then work through the review above.",
+      command: "npx blume migrate mintlify --claude",
       link: { href: "/docs/migrating", label: "Read the migration reference" },
       title: "Migrate your docs",
     },
     prerequisites: [
-      "A Docusaurus site's repository",
+      "A Mintlify docs repository",
       "Node.js 22.19 or later",
       "Claude Code or Codex, signed in",
     ],
     published: "2026-09-27",
     summary:
-      "Move a Docusaurus site's docs to Blume with a coding agent, and check the sidebars, admonitions, and React components it carries over.",
-    title: "Migrate your docs from Docusaurus",
+      "Hand your Mintlify repository to a coding agent, review what it changed, keep your URLs working, and deploy a docs site you host yourself.",
+    title: "Migrate your docs from Mintlify",
     topic: "migrate",
   },
   {

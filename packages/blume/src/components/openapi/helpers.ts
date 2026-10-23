@@ -1,5 +1,7 @@
 import { sample } from "openapi-sampler";
 
+import type { ReferenceStrings } from "./strings.ts";
+
 /**
  * Runtime helpers for the OpenAPI components. These operate on the parsed spec
  * behind the `blume:openapi` alias — resolving `$ref`s (kept intact at parse
@@ -260,28 +262,46 @@ export const isNullable = (schema: SchemaLike): boolean =>
   (Array.isArray(schema.type) && schema.type.includes("null")) ||
   [...(schema.oneOf ?? []), ...(schema.anyOf ?? [])].some(isNullType);
 
+/** The labels {@link constraints} words its lines with. */
+export type ConstraintStrings = Pick<
+  ReferenceStrings,
+  | "defaultValue"
+  | "matches"
+  | "max"
+  | "maxItems"
+  | "maxLength"
+  | "min"
+  | "minItems"
+  | "minLength"
+>;
+
 /** Human-readable validation constraints for a schema, in display order. */
-export const constraints = (schema: SchemaLike): string[] => {
+export const constraints = (
+  schema: SchemaLike,
+  strings: ConstraintStrings
+): string[] => {
   const out: string[] = [];
   const numeric: [keyof SchemaLike, string][] = [
-    ["minimum", "min"],
-    ["maximum", "max"],
-    ["minLength", "min length"],
-    ["maxLength", "max length"],
-    ["minItems", "min items"],
-    ["maxItems", "max items"],
+    ["minimum", strings.min],
+    ["maximum", strings.max],
+    ["minLength", strings.minLength],
+    ["maxLength", strings.maxLength],
+    ["minItems", strings.minItems],
+    ["maxItems", strings.maxItems],
   ];
   for (const [key, label] of numeric) {
     const value = schema[key];
     if (isNumber(value)) {
-      out.push(`${label} ${value}`);
+      out.push(label.replaceAll("{n}", () => String(value)));
     }
   }
-  if (isString(schema.pattern)) {
-    out.push(`matches ${schema.pattern}`);
+  const { pattern } = schema;
+  if (isString(pattern)) {
+    out.push(strings.matches.replaceAll("{pattern}", () => pattern));
   }
   if (schema.default !== undefined) {
-    out.push(`default: ${JSON.stringify(schema.default)}`);
+    const value = JSON.stringify(schema.default);
+    out.push(strings.defaultValue.replaceAll("{value}", () => value));
   }
   return out;
 };

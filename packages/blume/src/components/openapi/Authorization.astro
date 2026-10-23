@@ -1,16 +1,20 @@
 ---
+import data from "blume:data";
+
 import Description from "./Description.astro";
 import {
   type OperationSecurity,
   schemeCarrier,
   schemeLabel,
 } from "./security.ts";
+import { referenceStrings } from "./strings.ts";
 
 interface Props {
   security: OperationSecurity;
 }
 
 const { security } = Astro.props;
+const strings = referenceStrings(data, Astro.currentLocale);
 ---
 
 {
@@ -21,25 +25,27 @@ const { security } = Astro.props;
         class="mb-2 font-semibold text-foreground text-sm"
         role="heading"
       >
-        Authorization
+        {strings.authorization}
       </div>
       {security.optional && (
         <p class="mb-2 text-muted-foreground text-sm">
-          Optional — this operation also accepts unauthenticated requests.
+          {strings.authorizationOptionalNote}
         </p>
       )}
       {security.unauthenticatedServers &&
         security.unauthenticatedServers.length > 0 && (
           <p class="mb-2 text-muted-foreground text-sm">
-            No authorization needed on{" "}
-            {security.unauthenticatedServers.join(", ")}.
+            {strings.noAuthorizationOn.replaceAll(
+              "{servers}",
+              () => security.unauthenticatedServers?.join(", ") ?? ""
+            )}
           </p>
         )}
       {security.alternatives.map((alternative, index) => (
         <>
           {index > 0 && (
             <div class="my-2 font-medium text-[0.625rem] text-muted-foreground uppercase tracking-wide">
-              or
+              {strings.or}
             </div>
           )}
           <div class="not-prose rounded-blume border border-border px-4">
@@ -52,15 +58,18 @@ const { security } = Astro.props;
                       {carrier?.name ?? resolved.key}
                     </code>
                     <span class="text-muted-foreground text-xs">
-                      {schemeLabel(resolved)}
+                      {schemeLabel(resolved, strings)}
                       {carrier ? ` · ${carrier.in}` : ""}
                       {resolved.servers
-                        ? ` · on ${resolved.servers.join(", ")}`
+                        ? ` · ${strings.onServers.replaceAll(
+                            "{servers}",
+                            () => resolved.servers?.join(", ") ?? ""
+                          )}`
                         : ""}
                     </span>
                     {!security.optional && (
                       <span class="font-medium text-[0.625rem] text-red-600 uppercase tracking-wide dark:text-red-400">
-                        required
+                        {strings.required}
                       </span>
                     )}
                   </div>
@@ -69,7 +78,7 @@ const { security } = Astro.props;
                   )}
                   {resolved.scopes.length > 0 && (
                     <div class="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
-                      <span class="text-muted-foreground">Scopes:</span>
+                      <span class="text-muted-foreground">{strings.scopes}</span>
                       {resolved.scopes.map((scope) => (
                         <code class="rounded bg-muted px-1 py-0.5 text-foreground">
                           {scope}

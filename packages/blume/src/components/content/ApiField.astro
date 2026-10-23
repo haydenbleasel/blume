@@ -4,6 +4,9 @@
 // the slot, which may hold any MDX, nested fields in an `<Expandable>`
 // included. Styled like the OpenAPI reference's rows, so a hand-written API
 // page reads like a generated one. Narration skips it, as it does type tables.
+import data from "blume:data";
+
+import { referenceStrings } from "../openapi/strings.ts";
 import { defaultLabel, isOn } from "./api-field.ts";
 import type { FieldValue, FlagProp } from "./api-field.ts";
 
@@ -29,6 +32,7 @@ const {
   type,
 } = Astro.props;
 const shownDefault = defaultLabel(value);
+const strings = referenceStrings(data, Astro.currentLocale);
 const labelClass =
   "rounded bg-muted px-1.5 py-0.5 font-medium text-[0.625rem] text-muted-foreground uppercase tracking-wide";
 ---
@@ -47,14 +51,14 @@ const labelClass =
     {
       isOn(required) && (
         <span class="font-medium text-[0.625rem] text-red-600 uppercase tracking-wide dark:text-red-400">
-          required
+          {strings.required}
         </span>
       )
     }
     {
       isOn(deprecated) && (
         <span class="font-medium text-[0.625rem] text-muted-foreground uppercase tracking-wide line-through">
-          deprecated
+          {strings.deprecated}
         </span>
       )
     }
@@ -62,7 +66,7 @@ const labelClass =
   {
     shownDefault !== null && (
       <div class="not-prose mt-2 text-muted-foreground text-xs">
-        Default:{" "}
+        {strings.default}{" "}
         <code class="rounded bg-muted px-1 py-0.5 text-foreground">
           {shownDefault}
         </code>

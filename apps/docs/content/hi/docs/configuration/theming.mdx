@@ -15,6 +15,7 @@ theme: {
   accent: "teal",   // a named preset or any CSS color
   radius: "md",     // none | sm | md | lg
   mode: "system",   // system | light | dark
+  toggle: true,     // show the light/dark toggle
   fonts: {          // self-hosted Google Fonts
     display: "inter",
     body: "inter",
@@ -52,7 +53,18 @@ theme: {
 - **`system`** (डिफ़ॉल्ट) — पाठक की OS प्राथमिकता का अनुसरण करता है
 - **`light`** / **`dark`** — किसी एक स्कीम को डिफ़ॉल्ट बनाता है
 
-हेडर में मौजूद एक टॉगल पाठकों को हमेशा स्विच करने देता है, और उनकी पसंद विज़िट्स के बीच याद रखी जाती है। डार्क मोड `<html>` एलिमेंट पर `data-theme="dark"` एट्रिब्यूट के साथ लागू किया जाता है।
+हेडर में मौजूद एक टॉगल पाठकों को स्विच करने देता है, और उनकी पसंद विज़िट्स के बीच याद रखी जाती है। डार्क मोड `<html>` एलिमेंट पर `data-theme="dark"` एट्रिब्यूट के साथ लागू किया जाता है।
+
+केवल एक स्कीम शिप करने के लिए, `toggle: false` सेट करें। हेडर से टॉगल हट जाता है, और हर पेज `mode` में रेंडर होता है, उन पाठकों के लिए भी जिन्होंने टॉगल हटाए जाने से पहले दूसरी स्कीम चुनी थी:
+
+```ts blume.config.ts lineNumbers
+theme: {
+  mode: "dark",
+  toggle: false,
+}
+```
+
+`mode: "system"` के साथ, `toggle: false` हर पाठक की OS सेटिंग का अनुसरण करता है और उन्हें उसे ओवरराइड करने का कोई तरीका नहीं देता।
 
 ### फ़ॉन्ट्स [#fonts]
 

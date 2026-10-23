@@ -14,7 +14,7 @@ import { endpointSecurity } from "../content/api-page.ts";
 import type { SpecValue } from "./helpers.ts";
 import { playgroundAuth } from "./operation-model.ts";
 import type { PlaygroundModel } from "./request.ts";
-import type { OperationSecurity } from "./security.ts";
+import type { OperationSecurity, SchemeStrings } from "./security.ts";
 
 /**
  * Build-time logic behind the GraphQL reference pages: the generated example
@@ -303,9 +303,10 @@ export const graphqlSecurity = (spec: ApiSpecData): OperationSecurity =>
 export const graphqlPlaygroundModel = (
   spec: ApiSpecData,
   query: string,
+  strings: SchemeStrings,
   variables?: GraphqlSampleObject
 ): PlaygroundModel => ({
-  auth: playgroundAuth(graphqlSecurity(spec)),
+  auth: playgroundAuth(graphqlSecurity(spec), strings),
   authOptional: false,
   body: {
     contentType: "application/json",

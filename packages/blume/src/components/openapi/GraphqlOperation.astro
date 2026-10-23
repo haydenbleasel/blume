@@ -24,6 +24,7 @@ import {
 import { buildRequest, defaultValues } from "./request.ts";
 import { languageSamplePanels } from "./sample-panels.ts";
 import { sampleLanguages } from "./snippets.ts";
+import { aroundPlaceholder, referenceStrings } from "./strings.ts";
 import Authorization from "./Authorization.astro";
 import Description from "./Description.astro";
 import GraphqlChip from "./GraphqlChip.astro";
@@ -50,6 +51,7 @@ interface Props {
 }
 
 const { source, id } = Astro.props;
+const strings = referenceStrings(data, Astro.currentLocale);
 const spec = specOf(specs, source);
 const ref = spec ? operationOf(spec, id) : undefined;
 const document = (spec?.document ?? { roots: {}, types: {} }) as GraphqlDocument;
@@ -69,7 +71,7 @@ const variables = field ? exampleVariables(document, field) : undefined;
 const isSubscription = ref?.method === "subscription";
 const model =
   spec && field && !isSubscription
-    ? graphqlPlaygroundModel(spec, query, variables)
+    ? graphqlPlaygroundModel(spec, query, strings, variables)
     : null;
 const sample = model ? buildRequest(model, defaultValues(model)) : null;
 const languages = sampleLanguages(spec?.codeSamples ?? []);
@@ -82,13 +84,13 @@ const requestPanels = sample
 const operationPanels =
   field && isSubscription
     ? [
-        { html: await highlight(query, "graphql"), key: "operation", label: "Operation" },
+        { html: await highlight(query, "graphql"), key: "operation", label: strings.operation },
         ...(variables
           ? [
               {
                 html: await highlight(JSON.stringify(variables, null, 2), "json"),
                 key: "variables",
-                label: "Variables",
+                label: strings.variables,
               },
             ]
           : []),
@@ -103,20 +105,24 @@ const responsePanels =
             "json"
           ),
           key: "example",
-          label: "Example",
+          label: strings.example,
         },
       ]
     : [];
 
 const returnRoute = field ? routes.get(field.type.name) : undefined;
 const security = spec ? graphqlSecurity(spec) : undefined;
+const [deprecatedBefore, deprecatedAfter] = aroundPlaceholder(
+  strings.deprecatedReason,
+  "{reason}"
+);
 ---
 
 {
   ref && !isOperation ? (
     spec && <GraphqlType refOp={ref} spec={spec} />
   ) : !(spec && ref && field) ? (
-    <div class="text-muted-foreground">This API operation could not be found.</div>
+    <div class="text-muted-foreground">{strings.notFound}</div>
   ) : (
     <div class="not-prose">
       <div class="mb-6 flex flex-wrap items-center gap-3">
@@ -126,7 +132,7 @@ const security = spec ? graphqlSecurity(spec) : undefined;
         </code>
         {field.deprecationReason !== undefined && (
           <span class={DEPRECATED_LABEL_CLASS}>
-            deprecated
+            {strings.deprecated}
           </span>
         )}
       </div>
@@ -134,14 +140,14 @@ const security = spec ? graphqlSecurity(spec) : undefined;
         <div>
           {field.deprecationReason && (
             <p class="mb-4 text-muted-foreground text-sm">
-              Deprecated: <span set:text={field.deprecationReason} />
+              {deprecatedBefore}<span set:text={field.deprecationReason} />{deprecatedAfter}
             </p>
           )}
           {security && <Authorization security={security} />}
           <GraphqlFieldsTable
             routes={routes}
             rows={field.args}
-            title="Arguments"
+            title={strings.arguments}
           />
           <section class="mt-6">
             <div
@@ -149,7 +155,7 @@ const security = spec ? graphqlSecurity(spec) : undefined;
               class="mb-2 font-semibold text-foreground text-sm"
               role="heading"
             >
-              Returns
+              {strings.returns}
             </div>
             <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
               <GraphqlChip
@@ -179,11 +185,11 @@ const security = spec ? graphqlSecurity(spec) : undefined;
             )}
             <div class="not-prose flex flex-col gap-6">
               {isSubscription ? (
-                <PanelTabs copy heading="Operation" panels={operationPanels} />
+                <PanelTabs copy heading={strings.operation} name="operation" panels={operationPanels} />
               ) : (
-                <PanelTabs copy heading="Request" panels={requestPanels} />
+                <PanelTabs copy heading={strings.request} name="request" panels={requestPanels} />
               )}
-              <PanelTabs heading="Response" panels={responsePanels} />
+              <PanelTabs heading={strings.response} name="response" panels={responsePanels} />
             </div>
           </OperationPanel>
         )}

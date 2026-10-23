@@ -1,4 +1,5 @@
 ---
+import data from "blume:data";
 import specs from "blume:openapi";
 import { HTTP_METHODS, operationOf, specOf } from "../../openapi/model.ts";
 import {
@@ -24,6 +25,7 @@ import { DEPRECATED_LABEL_CLASS } from "../colors.ts";
 import { customCodeSamples } from "./code-samples.ts";
 import type { CodeSamplesCarrier } from "./code-samples.ts";
 import { sampleLanguages } from "./snippets.ts";
+import { referenceStrings } from "./strings.ts";
 import AsyncApiOperation from "./AsyncApiOperation.astro";
 import GraphqlOperation from "./GraphqlOperation.astro";
 import Authorization from "./Authorization.astro";
@@ -83,6 +85,7 @@ interface FullOperation extends CodeSamplesCarrier {
 }
 
 const { source, id } = Astro.props;
+const strings = referenceStrings(data, Astro.currentLocale);
 const spec = specOf(specs, source);
 const ref = spec ? operationOf(spec, id) : undefined;
 // The AsyncAPI and GraphQL front-ends render their own bodies; the lookups
@@ -162,6 +165,7 @@ const model =
         responses,
         schemas,
         security,
+        strings,
         // An operation's own `servers` override its path item's, which
         // override the document's.
         servers: effectiveServers(
@@ -244,7 +248,7 @@ const callbackParts = (entry: CallbackEntry) => ({
   ) : isGraphql ? (
     <GraphqlOperation id={id} source={source} />
   ) : !(spec && ref && operation) ? (
-    <div class="text-muted-foreground">This API operation could not be found.</div>
+    <div class="text-muted-foreground">{strings.notFound}</div>
   ) : (
     <div class="not-prose">
       <div class="mb-6 flex flex-wrap items-center gap-3">
@@ -254,12 +258,12 @@ const callbackParts = (entry: CallbackEntry) => ({
         </code>
         {isWebhook && (
           <span class="rounded-md border border-border px-1.5 py-0.5 font-medium text-[0.625rem] text-muted-foreground uppercase tracking-wide">
-            Webhook
+            {strings.webhook}
           </span>
         )}
         {operation.deprecated && (
           <span class={DEPRECATED_LABEL_CLASS}>
-            deprecated
+            {strings.deprecated}
           </span>
         )}
       </div>
@@ -290,7 +294,7 @@ const callbackParts = (entry: CallbackEntry) => ({
                 class="mb-3 font-semibold text-foreground text-lg"
                 role="heading"
               >
-                Callbacks
+                {strings.callbacks}
               </div>
               <div class="flex flex-col gap-6">
                 {callbacks.map((entry) => {

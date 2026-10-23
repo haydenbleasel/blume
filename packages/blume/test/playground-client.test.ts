@@ -2,6 +2,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "bun:test";
 
 import { initPlayground } from "../src/components/openapi/playground-client.ts";
 import type { PlaygroundModel } from "../src/components/openapi/request.ts";
+import { EN_UI } from "../src/core/i18n-ui.ts";
 import {
   asElement,
   el,
@@ -209,6 +210,11 @@ const createFixture = (
       "script",
       { "data-playground-model": "", type: "application/json" },
       JSON.stringify(model)
+    ),
+    el(
+      "script",
+      { "data-playground-strings": "", type: "application/json" },
+      JSON.stringify(EN_UI.reference)
     )
   );
   const server = el("select", { "data-server": "" });
@@ -678,7 +684,7 @@ describe("send + response rendering", () => {
     await clickSend(fixture);
     expect(fixture.response.textContent).toContain("cross-origin");
     expect(fixture.response.textContent).toContain(
-      "`playground: { proxy: true }` on the `openapi()` reference"
+      "`openapi({ playground: { proxy: true } })`"
     );
     expect(must(fetchCalls[1]).url).toBe("https://api.example.com");
     expect(must(fetchCalls[1]).init.mode).toBe("no-cors");
@@ -695,14 +701,14 @@ describe("send + response rendering", () => {
 
   it("names the proxy setting for the surface the panel is on", async () => {
     expect(await corsText("graphql")).toContain(
-      "Set `playground: { proxy: true }` on the `graphql()` reference in the Blume config"
+      "Set `graphql({ playground: { proxy: true } })` in the Blume config"
     );
     expect(await corsText("api")).toContain(
       "Set `api: { playground: { proxy: true } }` in the Blume config"
     );
     const openapi = await corsText("openapi");
     expect(openapi).toContain(
-      "Set `playground: { proxy: true }` on the `openapi()` reference in the Blume config"
+      "Set `openapi({ playground: { proxy: true } })` in the Blume config"
     );
     // The built-in proxy is a server route, so a static site can't use it.
     expect(openapi).toContain(
@@ -921,6 +927,11 @@ describe("degenerate DOM", () => {
         "script",
         { "data-playground-model": "", type: "application/json" },
         JSON.stringify(bearerModel())
+      ),
+      el(
+        "script",
+        { "data-playground-strings": "", type: "application/json" },
+        JSON.stringify(EN_UI.reference)
       )
     );
     const sendButton = el("button", { "data-send": "" });

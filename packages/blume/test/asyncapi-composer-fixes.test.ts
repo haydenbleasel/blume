@@ -13,6 +13,7 @@ import {
 } from "../src/components/openapi/message.ts";
 import { createWsClient } from "../src/components/openapi/ws-client.ts";
 import type { WsState } from "../src/components/openapi/ws-client.ts";
+import { EN_UI } from "../src/core/i18n-ui.ts";
 import { asElement, el, fire, installFakeDom, must } from "./fake-dom.ts";
 
 /**
@@ -158,7 +159,12 @@ describe("a URL the browser refuses to dial", () => {
       };
       const root = el("blume-message-composer");
       root.append(
-        el("script", { "data-composer-model": "" }, JSON.stringify(model))
+        el("script", { "data-composer-model": "" }, JSON.stringify(model)),
+        el(
+          "script",
+          { "data-composer-strings": "", type: "application/json" },
+          JSON.stringify(EN_UI.reference)
+        )
       );
       const connect = el("button", { "data-connect": "" });
       const disconnect = el("button", { "data-disconnect": "" });

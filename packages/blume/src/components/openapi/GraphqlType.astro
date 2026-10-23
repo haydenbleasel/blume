@@ -1,4 +1,6 @@
 ---
+import data from "blume:data";
+
 import { isSafeHref } from "../../core/safe-href.ts";
 import type { GraphqlDocument } from "../../openapi/graphql.ts";
 import { graphqlTypeDef } from "../../openapi/graphql.ts";
@@ -12,6 +14,7 @@ import Description from "./Description.astro";
 import GraphqlChip from "./GraphqlChip.astro";
 import GraphqlFieldsTable from "./GraphqlFieldsTable.astro";
 import MethodBadge from "./MethodBadge.astro";
+import { aroundPlaceholder, referenceStrings } from "./strings.ts";
 
 /**
  * A named-type reference page: the type's fields (or input fields, enum
@@ -25,6 +28,15 @@ interface Props {
 }
 
 const { spec, refOp } = Astro.props;
+const strings = referenceStrings(data, Astro.currentLocale);
+const [specifiedBefore, specifiedAfter] = aroundPlaceholder(
+  strings.specifiedBy,
+  "{url}"
+);
+const [deprecatedBefore, deprecatedAfter] = aroundPlaceholder(
+  strings.deprecatedReason,
+  "{reason}"
+);
 const document = spec.document as GraphqlDocument;
 const type = graphqlTypeDef(document, refOp);
 const routes = graphqlRoutes(spec);
@@ -39,13 +51,13 @@ const sections = type
   ? [
       {
         names: type.kind === "union" ? (type.possibleTypes ?? []) : [],
-        title: "Member types",
+        title: strings.memberTypes,
       },
       {
         names: type.kind === "interface" ? (type.possibleTypes ?? []) : [],
-        title: "Implemented by",
+        title: strings.implementedBy,
       },
-      { names: type.interfaces ?? [], title: "Implements" },
+      { names: type.interfaces ?? [], title: strings.implements },
     ].filter((section) => section.names.length > 0)
   : [];
 
@@ -54,7 +66,7 @@ const SECTION_HEADING = "mb-2 font-semibold text-foreground text-sm";
 
 {
   !(type) ? (
-    <div class="text-muted-foreground">This GraphQL type could not be found.</div>
+    <div class="text-muted-foreground">{strings.typeNotFound}</div>
   ) : (
     <div class="not-prose">
       <div class="mb-6 flex flex-wrap items-center gap-3">
@@ -65,7 +77,7 @@ const SECTION_HEADING = "mb-2 font-semibold text-foreground text-sm";
       </div>
       {type.specifiedByUrl && (
         <div class="mb-4 text-muted-foreground text-sm">
-          Specified by{" "}
+          {specifiedBefore}
           {/* The URL comes from the schema, someone else's content: a
               `javascript:` one would run on the docs origin when clicked, so
               only a safe destination becomes a link. */}
@@ -76,22 +88,23 @@ const SECTION_HEADING = "mb-2 font-semibold text-foreground text-sm";
           ) : (
             <code class="break-all">{type.specifiedByUrl}</code>
           )}
+          {specifiedAfter}
         </div>
       )}
       <GraphqlFieldsTable
         routes={routes}
         rows={type.fields ?? []}
-        title="Fields"
+        title={strings.fields}
       />
       <GraphqlFieldsTable
         routes={routes}
         rows={type.inputFields ?? []}
-        title="Input fields"
+        title={strings.inputFields}
       />
       {(type.enumValues ?? []).length > 0 && (
         <section class="mt-6">
           <div aria-level="2" class={SECTION_HEADING} role="heading">
-            Values
+            {strings.values}
           </div>
           <div class="rounded-blume border border-border px-4">
             {(type.enumValues ?? []).map((value) => (
@@ -102,7 +115,7 @@ const SECTION_HEADING = "mb-2 font-semibold text-foreground text-sm";
                   </code>
                   {value.deprecationReason !== undefined && (
                     <span class="font-medium text-[0.625rem] text-muted-foreground uppercase tracking-wide line-through">
-                      deprecated
+                      {strings.deprecated}
                     </span>
                   )}
                 </div>
@@ -111,7 +124,7 @@ const SECTION_HEADING = "mb-2 font-semibold text-foreground text-sm";
                 )}
                 {value.deprecationReason && (
                   <div class="mt-2 text-muted-foreground text-xs">
-                    Deprecated: <span set:text={value.deprecationReason} />
+                    {deprecatedBefore}<span set:text={value.deprecationReason} />{deprecatedAfter}
                   </div>
                 )}
               </div>
@@ -134,7 +147,7 @@ const SECTION_HEADING = "mb-2 font-semibold text-foreground text-sm";
       {(usage.operations.length > 0 || usage.types.length > 0) && (
         <section class="mt-6">
           <div aria-level="2" class={SECTION_HEADING} role="heading">
-            Used by
+            {strings.usedBy}
           </div>
           <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
             {usage.operations.map((operation) => (

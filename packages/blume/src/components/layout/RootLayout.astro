@@ -692,7 +692,12 @@ const localeRedirect = localeTargets
         <script data-key={bannerKey} is:inline set:html={BANNER_INIT_SCRIPT} />
       )
     }
-    <script data-mode={themeMode} is:inline set:html={THEME_INIT_SCRIPT} />
+    <script
+      data-fixed={data.config.theme.toggle ? undefined : ""}
+      data-mode={themeMode}
+      is:inline
+      set:html={THEME_INIT_SCRIPT}
+    />
     {consent && <ConsentHead consent={consent} />}
     <Analytics analytics={analytics} />
   </head>

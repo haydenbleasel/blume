@@ -48,7 +48,7 @@ Read the whole module and the helpers it imports (sidebars, nav, per-locale conf
 | `rewrites` | **move each file to the path its rewrite produced**, so the URL stays put (`slug` only where moving is impossible). VitePress relative links are already written against the rewritten paths |
 | `srcDir` / `srcExclude` | `content.root` / `content.exclude`, which adds to the defaults `**/_*` and `**/.*` |
 | `outDir`, `assetsDir`, `cacheDir`, `ignoreDeadLinks`, `metaChunk`, `mpa` | drop |
-| `appearance` | `'dark'`/`'force-dark'` → `theme.mode: "dark"`; `false` → `"light"`; `true`/`'force-auto'` → omit. Blume always shows the toggle: report a forced mode |
+| `appearance` | `'dark'` → `theme.mode: "dark"`; `'force-dark'` → `theme: { mode: "dark", toggle: false }`; `false` → `theme: { mode: "light", toggle: false }`; `'force-auto'` → `theme.toggle: false`; `true` → omit |
 | `lastUpdated: true` | `lastModified: "git"` |
 | `sitemap.hostname` | `deployment.site`, unless the host is Vercel or Netlify (auto-detected). `sitemap.transformItems` → drop |
 | `markdown.theme` | `markdown.code.theme: { light, dark }`; VitePress's default (`github-light`/`github-dark`) is Blume's, so omit it unless changed |
@@ -201,4 +201,4 @@ The old URL list is `<old build>/**/*.html` (or the live `sitemap.xml`). Blume s
 
 ## Dropped — report these
 
-`titleTemplate`, the footer `message` (and any link inside `copyright`), forced `appearance`, per-page `outline`/`aside`, one-sided `prev`/`next`, page-level toggles (`editLink`, `footer`, `navbar`, `pageClass`), `head` entries beyond meta tags and analytics, build hooks, Vite and custom markdown-it plugins, unsupported social links, line-number offsets and the site-wide switch, snippet regions and include ranges (now split files), copied out-of-root snippets, data-driven and unregistered theme components (and any content they hid), `VPTeamMembers`, data loaders and dynamic routes, hero styling, the DocSearch index (with its credentials), old-site anchors that were already broken (and any left unpinned under `--only-linked`), version-dropdown links, and `::: note`/`important`/`caution` text that 1.x showed literally.
+`titleTemplate`, the footer `message` (and any link inside `copyright`), per-page `outline`/`aside`, one-sided `prev`/`next`, page-level toggles (`editLink`, `footer`, `navbar`, `pageClass`), `head` entries beyond meta tags and analytics, build hooks, Vite and custom markdown-it plugins, unsupported social links, line-number offsets and the site-wide switch, snippet regions and include ranges (now split files), copied out-of-root snippets, data-driven and unregistered theme components (and any content they hid), `VPTeamMembers`, data loaders and dynamic routes, hero styling, the DocSearch index (with its credentials), old-site anchors that were already broken (and any left unpinned under `--only-linked`), version-dropdown links, and `::: note`/`important`/`caution` text that 1.x showed literally.

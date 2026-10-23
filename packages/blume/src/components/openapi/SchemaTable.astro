@@ -1,4 +1,6 @@
 ---
+import data from "blume:data";
+
 import type { SchemaLike } from "./helpers.ts";
 import {
   type SchemaDirection,
@@ -6,6 +8,7 @@ import {
   schemaTree,
 } from "./schema-tree.ts";
 import SchemaProperty from "./SchemaProperty.astro";
+import { aroundPlaceholder, referenceStrings } from "./strings.ts";
 
 interface Props {
   /** The schema to render, planned here when no `node` is given. */
@@ -29,17 +32,21 @@ const {
 // The whole tree is planned once, at the top-level table, so that which named
 // schemas expand is decided for the tree as a whole (see `schema-tree.ts`).
 const node = planned ?? schemaTree(schema, schemas, direction);
+const strings = referenceStrings(data, Astro.currentLocale);
+const [circularBefore, circularAfter] = aroundPlaceholder(strings.circular, "{name}");
+const [arrayBefore, arrayAfter] = aroundPlaceholder(strings.arrayOf, "{type}");
+const COMBINATORS = { "Any of": strings.anyOf, "One of": strings.oneOf };
 ---
 
 {
   node.kind === "circular" ? (
     <div class="text-muted-foreground text-sm">
-      Circular reference to <code class="text-foreground">{node.name}</code>.
+      {circularBefore}<code class="text-foreground">{node.name}</code>{circularAfter}
     </div>
   ) : node.kind === "array" ? (
     <div>
       <div class="mb-2 text-muted-foreground text-xs">
-        Array of <code class="text-foreground">{node.itemsLabel}</code>
+        {arrayBefore}<code class="text-foreground">{node.itemsLabel}</code>{arrayAfter}
       </div>
       {node.items && (
         <Astro.self node={node.items.node} schemas={schemas} expandAll={expandAll} />
@@ -54,11 +61,12 @@ const node = planned ?? schemaTree(schema, schemas, direction);
           ))}
         </div>
       )}
-      <div class="text-muted-foreground text-xs">{node.label}:</div>
-      {node.branches.map((branch) => (
+      <div class="text-muted-foreground text-xs">{COMBINATORS[node.label]}</div>
+      {node.branches.map((branch, index) => (
         <div class="rounded-blume border border-border p-3">
           <div class="mb-2 font-medium text-foreground text-xs">
-            {branch.label}
+            {branch.label ||
+              strings.option.replaceAll("{n}", () => String(index + 1))}
           </div>
           <Astro.self node={branch.slot.node} schemas={schemas} expandAll={expandAll} />
         </div>

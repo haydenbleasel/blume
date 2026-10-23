@@ -14,6 +14,7 @@ import {
 import PanelTabs from "./PanelTabs.astro";
 import type { SchemaDirection } from "./schema-tree.ts";
 import SchemaTable from "./SchemaTable.astro";
+import { referenceStrings } from "./strings.ts";
 
 interface RequestBodyLike {
   description?: string;
@@ -47,6 +48,7 @@ const {
   direction = "request",
   name = "request-body",
 } = Astro.props;
+const strings = referenceStrings(data, Astro.currentLocale);
 
 const chosen = preferredMedia(requestBody.content);
 const contentType = chosen?.[0] ?? "application/json";
@@ -75,12 +77,12 @@ const examplePanels = await Promise.all(
       class:list={["font-semibold text-foreground", level > 2 ? "text-sm" : "text-lg"]}
       role="heading"
     >
-      Request body
+      {strings.requestBody}
     </div>
     {
       requestBody.required && (
         <span class="font-medium text-[0.625rem] text-red-600 uppercase tracking-wide dark:text-red-400">
-          required
+          {strings.required}
         </span>
       )
     }
@@ -102,7 +104,7 @@ const examplePanels = await Promise.all(
   {
     examplePanels.length > 0 && (
       <div class="not-prose mt-4">
-        <PanelTabs copy heading="Examples" name={`${name}-examples`} panels={examplePanels} />
+        <PanelTabs copy heading={strings.examples} name={`${name}-examples`} panels={examplePanels} />
       </div>
     )
   }

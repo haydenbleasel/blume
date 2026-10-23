@@ -2,7 +2,7 @@
 
 Thanks for your interest in Blume! This guide covers the architecture and the day-to-day workflow.
 
-The repository is a Bun workspace monorepo: `packages/blume` is the published package, `apps/docs` is Blume's own documentation site (built with Blume), and `packages/video` is a private Remotion project for marketing assets.
+The repository is a Bun workspace monorepo: `packages/blume` is the published package, and `apps/docs` is Blume's own documentation site (built with Blume).
 
 ## Prerequisites
 

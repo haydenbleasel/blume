@@ -1,4 +1,6 @@
 ---
+import data from "blume:data";
+
 import Description from "./Description.astro";
 import {
   constraints,
@@ -9,6 +11,7 @@ import {
 } from "./helpers.ts";
 import { rowExpands, type SchemaRow } from "./schema-tree.ts";
 import SchemaTable from "./SchemaTable.astro";
+import { referenceStrings } from "./strings.ts";
 
 interface Props {
   /** One planned row of the parent table (see `schema-tree.ts`). */
@@ -19,6 +22,7 @@ interface Props {
 
 const { row, schemas, expandAll = false } = Astro.props;
 const { name, schema, required } = row;
+const strings = referenceStrings(data, Astro.currentLocale);
 
 const resolved = resolveSchema(schemas, schema);
 
@@ -27,7 +31,7 @@ const description = resolved.description ?? schema.description ?? "";
 const deprecated = resolved.deprecated === true;
 const nullable = isNullable(resolved);
 const enumValues = Array.isArray(resolved.enum) ? resolved.enum : null;
-const limits = constraints(resolved);
+const limits = constraints(resolved, strings);
 
 // Circles and schemas expanded elsewhere in the tree have no disclosure; the
 // type label names them.
@@ -47,14 +51,14 @@ const children = rowExpands(row) ? row.children : undefined;
     {
       required && (
         <span class="font-medium text-[0.625rem] text-red-600 uppercase tracking-wide dark:text-red-400">
-          required
+          {strings.required}
         </span>
       )
     }
     {
       deprecated && (
         <span class="font-medium text-[0.625rem] text-muted-foreground uppercase tracking-wide line-through">
-          deprecated
+          {strings.deprecated}
         </span>
       )
     }
@@ -72,7 +76,7 @@ const children = rowExpands(row) ? row.children : undefined;
   {
     enumValues && (
       <div class="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
-        <span class="text-muted-foreground">Allowed:</span>
+        <span class="text-muted-foreground">{strings.allowed}</span>
         {enumValues.map((value) => (
           <code class="rounded bg-muted px-1 py-0.5 text-foreground">
             {String(value)}
@@ -85,8 +89,8 @@ const children = rowExpands(row) ? row.children : undefined;
     children && (
       <details class="mt-3" open={expandAll}>
         <summary class="cursor-pointer select-none text-accent text-xs hover:underline">
-          <span class="[details[open]>summary_&]:hidden">Show properties</span>
-          <span class="hidden [details[open]>summary_&]:inline">Hide properties</span>
+          <span class="[details[open]>summary_&]:hidden">{strings.showProperties}</span>
+          <span class="hidden [details[open]>summary_&]:inline">{strings.hideProperties}</span>
         </summary>
         <div class="mt-3 border-border border-s ps-4">
           <SchemaTable

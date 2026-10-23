@@ -70,7 +70,7 @@ class BlumePanelTabs extends HTMLElement {
         } else {
           delete copy.dataset.copied;
         }
-      }, "Copied");
+      }, copy.dataset.copiedLabel ?? "Copied");
       copy.addEventListener("click", async () => {
         const active = panels.find(
           (panel) => !panel.classList.contains("hidden")

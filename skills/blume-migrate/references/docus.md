@@ -87,7 +87,7 @@ Read `app/app.config.ts` (`app.config.ts` at the project root on Nuxt 3), `nuxt.
 | `toc.bottom.links` | `navigation.featured` (`to` → `href`). Report the move |
 | `navigation.sub` | `navigation.tabs` (see Navigation). `'aside'` anchors have no Blume form; report |
 | `docus.locale` (not `en`) | a one-locale `i18n` block |
-| `docus.colorMode` | `theme.mode`. Blume always shows the toggle; report |
+| `docus.colorMode` | `theme.mode`. A forced mode also takes `theme.toggle: false` |
 | `assistant.faqQuestions` | `ai.assistant.suggestions` (`[{ label }]`; flatten categories) |
 | `ui.colors.primary` | `theme.accent`. Nuxt UI paints shade 500 in light mode and 400 in dark: a Blume preset of the same name, else `{ light, dark }` with those Tailwind values. **Not declared means Docus's emerald:** the site turns Blume's default color unless you offer `theme.accent: "green"`; report it either way |
 | `--ui-radius: 0` in CSS | `theme.radius: "none"` |
@@ -275,7 +275,6 @@ Report each of these, and anything else you drop:
   - Nuxt UI overrides and theme CSS that doesn't map
   - a custom `seo.titleTemplate`, `seo.schema`, and the TOC title
   - logo extras, and socials with no Blume platform
-  - a forced color mode (the toggle stays)
   - `navigation.sub: 'aside'` anchors
   - a header button that showed only on the landing page (now site-wide)
 - **Navigation:** text-order sorting (`10.` before `2.`), and pages that sorted after a folder.

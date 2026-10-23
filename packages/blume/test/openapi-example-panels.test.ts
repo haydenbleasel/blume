@@ -7,6 +7,7 @@ import {
 } from "../src/components/openapi/example-panels.ts";
 import { namedExamples } from "../src/components/openapi/helpers.ts";
 import type { SchemaLike } from "../src/components/openapi/helpers.ts";
+import { EN_UI } from "../src/core/i18n-ui.ts";
 
 /**
  * Every example a media type names shows, under its name: the Response and
@@ -88,6 +89,7 @@ describe("response tabs", () => {
         "404": { description: "" },
       },
       schemas,
+      EN_UI.reference.noExampleResponse,
       components
     );
     expect(panels).toStrictEqual([
@@ -130,7 +132,8 @@ describe("response tabs", () => {
             description: "Created",
           },
         },
-        schemas
+        schemas,
+        EN_UI.reference.noExampleResponse
       )
     ).toStrictEqual([
       {
@@ -158,14 +161,17 @@ describe("payload tabs", () => {
           },
           "text/plain": { example: "ping" },
         },
-        schemas
+        schemas,
+        EN_UI.reference.noExamplePayload
       ).map((panel) => [panel.key, panel.label, panel.value])
     ).toStrictEqual([
       ["application/json-created", "application/json · created", { name: "a" }],
       ["application/json-deleted", "application/json · deleted", { name: "b" }],
       ["text/plain", "text/plain", "ping"],
     ]);
-    expect(payloadPanels(undefined, schemas)).toStrictEqual([]);
+    expect(
+      payloadPanels(undefined, schemas, EN_UI.reference.noExamplePayload)
+    ).toStrictEqual([]);
   });
 
   it("picks a body's JSON media type, else its first", () => {

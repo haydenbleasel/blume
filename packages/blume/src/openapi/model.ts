@@ -1,5 +1,6 @@
 import type { Document, OperationObject } from "@scalar/openapi-types/3.2";
 
+import type { UIStrings } from "../core/i18n-ui.ts";
 import type { GraphqlAuthOptions } from "../reference/options.ts";
 import type {
   AsyncApiAction,
@@ -59,6 +60,15 @@ const UNTAGGED = "Operations";
 
 /** Group used for webhooks that declare no tag. */
 const UNTAGGED_WEBHOOKS = "Webhooks";
+
+/**
+ * The site's words for those two groups. Their slugs stay the English names
+ * above, so a translation never moves a page.
+ */
+export type UntaggedStrings = Pick<
+  UIStrings["reference"],
+  "operations" | "webhooks"
+>;
 
 /** A lower-case letter or digit followed by a capital: `addPet`, `v2List`. */
 const CASE_BOUNDARY = /(?<before>[\p{Ll}\p{N}])(?<capital>\p{Lu})/gu;
@@ -409,10 +419,15 @@ export interface ExtractedOperations extends CollectedOperations {
  * releases de-duplicated the route like the key, and slugged tags without
  * splitting their words; each route those rules gave differently is
  * reported in `moved`.
+ *
+ * `names` labels the groups Blume names itself (untagged operations,
+ * GraphQL's kinds) in the site's language; like `x-displayName`, it changes
+ * only the label, so their slugs, and routes, stay the same in every language.
  */
 export const operationCollector = (
   baseRoute: string,
-  tagMeta: ReadonlyMap<string, ApiTagMeta>
+  tagMeta: ReadonlyMap<string, ApiTagMeta>,
+  names: ReadonlyMap<string, string> = new Map()
 ): OperationCollector => {
   const operations: ApiOperationRef[] = [];
   const moved: MovedRoute[] = [];
@@ -426,7 +441,7 @@ export const operationCollector = (
   // A root-mounted reference (`route: "/"`) must not emit `//tag/key`.
   const base = baseRoute === "/" ? "" : baseRoute;
   const label = (name: string): string =>
-    tagMeta.get(name)?.displayName ?? name;
+    tagMeta.get(name)?.displayName ?? names.get(name) ?? name;
 
   const add = (entry: CollectedOperation): ApiOperationRef => {
     const tagSlug = slugForTag(entry.tag);
@@ -521,15 +536,27 @@ const declaredTags = (document: ApiDocument): Map<string, ApiTagMeta> =>
  * Operations come out in the spec's order: paths as listed, and each path's
  * methods as written. They're keyed in the method order earlier releases
  * walked (`HTTP_METHODS`), so a repeated id resolves to the same key, and
- * the same route, it always did.
+ * the same route, it always did. `strings` labels the untagged groups in the
+ * site's language; without it they keep their English names.
  */
 export const extractOperations = (
   document: ApiDocument,
-  baseRoute: string
+  baseRoute: string,
+  strings?: UntaggedStrings
 ): ExtractedApiOperations => {
   const warnings: string[] = [];
   const issues: SpecIssue[] = [];
-  const collector = operationCollector(baseRoute, declaredTags(document));
+  const tags = declaredTags(document);
+  // The untagged groups take the site's words; a tag the spec declares keeps
+  // the name it was given, even one called `Operations`.
+  const names = new Map<string, string>();
+  if (strings && !tags.has(UNTAGGED)) {
+    names.set(UNTAGGED, strings.operations);
+  }
+  if (strings && !tags.has(UNTAGGED_WEBHOOKS)) {
+    names.set(UNTAGGED_WEBHOOKS, strings.webhooks);
+  }
+  const collector = operationCollector(baseRoute, tags, names);
   // Each operation's place in the spec, and the first operation to declare
   // each operationId.
   const position = new Map<ApiOperationRef, number>();

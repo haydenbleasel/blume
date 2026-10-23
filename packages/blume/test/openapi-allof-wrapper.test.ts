@@ -13,6 +13,7 @@ import {
   schemaTree,
 } from "../src/components/openapi/schema-tree.ts";
 import type { SchemaNode } from "../src/components/openapi/schema-tree.ts";
+import { EN_UI } from "../src/core/i18n-ui.ts";
 
 /**
  * An `allOf` with one member wraps a `$ref` so the property can carry
@@ -151,6 +152,7 @@ describe("a single-member allOf", () => {
       schemas: SCHEMAS,
       security: { alternatives: [], optional: false },
       servers: [{ url: "https://api.test" }],
+      strings: EN_UI.reference,
     });
     expect(model.params[0]?.enum).toStrictEqual(["draft", "live"]);
     expect(model.body?.fields?.[0]).toMatchObject({
