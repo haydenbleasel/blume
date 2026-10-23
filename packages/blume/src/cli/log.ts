@@ -76,16 +76,12 @@ export const reportDiagnostics = (
   return hasErrors(diagnostics);
 };
 
-/** What makes two diagnostics the same report: where, what, and how bad. */
-const diagnosticKey = (diagnostic: Diagnostic): string =>
-  [
-    diagnostic.severity,
-    diagnostic.code,
-    diagnostic.file ?? "",
-    diagnostic.line ?? "",
-    diagnostic.column ?? "",
-    diagnostic.message,
-  ].join("\u0000");
+/**
+ * What makes two diagnostics the same report: their severity and exactly the
+ * lines {@link reportDiagnostics} prints for them, enrichment included.
+ */
+const diagnosticKey = (diagnostic: Diagnostic, root: string): string =>
+  `${diagnostic.severity}\u0000${formatDiagnostic(enrichDiagnostic(diagnostic), root)}`;
 
 /**
  * {@link reportDiagnostics}, but silent when `diagnostics` repeats the batch
@@ -98,8 +94,8 @@ export const reportDiagnosticsUnlessRepeated = (
 ): void => {
   if (
     printed &&
-    JSON.stringify(printed.map(diagnosticKey)) ===
-      JSON.stringify(diagnostics.map(diagnosticKey))
+    JSON.stringify(printed.map((d) => diagnosticKey(d, root))) ===
+      JSON.stringify(diagnostics.map((d) => diagnosticKey(d, root)))
   ) {
     return;
   }

@@ -67,10 +67,26 @@ describe("reportDiagnosticsUnlessRepeated", () => {
     expect(output).toContain("1 error(s), 1 warning(s)");
 
     output = "";
-    reportDiagnosticsUnlessRepeated([{ ...warning, line: 3 }], "/root", [
-      warning,
+    const located = { ...warning, file: "/root/docs/a.md", line: 2 };
+    reportDiagnosticsUnlessRepeated([{ ...located, line: 3 }], "/root", [
+      located,
     ]);
     expect(output).toContain("a warning");
+  });
+
+  it("prints a batch whose url, suggestion, or docs link changed", () => {
+    // These lines are part of what the terminal shows, so a change to any of
+    // them alone is a new report, not a repeat.
+    const printed = { ...warning, suggestion: "old fix" };
+    for (const changed of [
+      { ...printed, suggestion: "new fix" },
+      { ...printed, url: "/docs/page" },
+      { ...printed, docsUrl: "https://example.com/docs" },
+    ]) {
+      output = "";
+      reportDiagnosticsUnlessRepeated([changed], "/root", [printed]);
+      expect(output).toContain("a warning");
+    }
   });
 
   it("always prints when nothing was printed before", () => {
