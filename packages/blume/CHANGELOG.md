@@ -1,5 +1,14 @@
 # blume
 
+## 2.2.5
+
+### Patch Changes
+
+- 92d4ef7: Every `blume` entry point and deep import (`blume/core/project-graph.ts`, `blume/components/layout/locale-redirect.ts`, `blume/sources/sanity.ts`, `blume/hooks`, and the rest) now types from the declarations shipped in `dist/types` instead of Blume's `.ts` source. Before, a project's own `tsc` followed those imports into `node_modules/blume/src` and checked that source under the project's compiler options, so `exactOptionalPropertyTypes` reported hundreds of errors that `skipLibCheck` couldn't hide. The declarations Blume generates for its virtual modules pulled the same source into every project, and typed `blume:search-index` documents as `any`; they now resolve to declarations too.
+- a7678cd: `blume dev` no longer prints the same content diagnostics twice when the dev server starts on another port because the requested one is taken. With `deployment.site` configured, it also skips the rescan that port change used to trigger, since the site doesn't depend on the port.
+- dba0f79: The API reference now follows the site's language instead of always showing English. An operation page's headings, parameter and schema tables, authorization, Try it panel and its error messages, and the AsyncAPI message composer follow the page's locale, as do the fields of hand-written API pages. The labels the reference adds to the sidebar (its Overview page, and the Operations, Webhooks, and GraphQL kind groups) use the default locale's words. They're the new `reference` UI strings, translated in every built-in language pack and overridable under `i18n.ui`. Only the labels change: the reference's URLs stay the same in every language.
+- 8d8b098: Fix `blume build` failing in `renderOgImage` with `TypeError: Cannot read properties of undefined (reading 'length')` once a project's lock file resolved takumi-js to 2.16 or newer, which changed the shape of the Google Fonts subsets Blume reads. Blume now pins takumi-js to 2.17.1, so a later Takumi release can't break published versions or change cached cards without a Blume release. A vertical tab, next line, or line or paragraph separator in a title or description now draws as a space, where Takumi 2.17 would draw a missing-glyph box. A font fetch that fails during `blume dev` is now retried on the next card instead of failing every card until the server restarts.
+
 ## 2.2.4
 
 ### Patch Changes
