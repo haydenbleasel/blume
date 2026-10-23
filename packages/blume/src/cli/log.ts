@@ -75,3 +75,33 @@ export const reportDiagnostics = (
 
   return hasErrors(diagnostics);
 };
+
+/** What makes two diagnostics the same report: where, what, and how bad. */
+const diagnosticKey = (diagnostic: Diagnostic): string =>
+  [
+    diagnostic.severity,
+    diagnostic.code,
+    diagnostic.file ?? "",
+    diagnostic.line ?? "",
+    diagnostic.column ?? "",
+    diagnostic.message,
+  ].join("\u0000");
+
+/**
+ * {@link reportDiagnostics}, but silent when `diagnostics` repeats the batch
+ * `printed` already showed. Without `printed` it always reports.
+ */
+export const reportDiagnosticsUnlessRepeated = (
+  diagnostics: Diagnostic[],
+  root: string,
+  printed?: Diagnostic[]
+): void => {
+  if (
+    printed &&
+    JSON.stringify(printed.map(diagnosticKey)) ===
+      JSON.stringify(diagnostics.map(diagnosticKey))
+  ) {
+    return;
+  }
+  reportDiagnostics(diagnostics, root);
+};

@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test";
 import {
   flushStdout,
   reportDiagnostics,
+  reportDiagnosticsUnlessRepeated,
   reportDiagnosticsJson,
 } from "../src/cli/log.ts";
 import type { Diagnostic } from "../src/core/types.ts";
@@ -50,6 +51,31 @@ describe("reportDiagnostics", () => {
     const hadErrors = reportDiagnostics([error, warning]);
     expect(hadErrors).toBe(true);
     expect(output).toContain("1 error(s), 1 warning(s)");
+  });
+});
+
+describe("reportDiagnosticsUnlessRepeated", () => {
+  it("stays quiet when the batch repeats the one already printed", () => {
+    // `blume dev` prints the startup batch, then regenerates once when Vite
+    // bumps the port; that unchanged batch must not print a second time.
+    reportDiagnosticsUnlessRepeated([{ ...warning }], "/root", [warning]);
+    expect(output).toBe("");
+  });
+
+  it("prints a batch that differs from the one already printed", () => {
+    reportDiagnosticsUnlessRepeated([warning, error], "/root", [warning]);
+    expect(output).toContain("1 error(s), 1 warning(s)");
+
+    output = "";
+    reportDiagnosticsUnlessRepeated([{ ...warning, line: 3 }], "/root", [
+      warning,
+    ]);
+    expect(output).toContain("a warning");
+  });
+
+  it("always prints when nothing was printed before", () => {
+    reportDiagnosticsUnlessRepeated([warning], "/root");
+    expect(output).toContain("a warning");
   });
 });
 

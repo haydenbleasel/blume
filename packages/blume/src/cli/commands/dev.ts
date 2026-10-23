@@ -23,7 +23,11 @@ import {
 } from "../dev-lock.ts";
 import { refuseIfEjected } from "../eject-scripts.ts";
 import { normalizeHost } from "../host-args.ts";
-import { logger, reportDiagnostics } from "../log.ts";
+import {
+  logger,
+  reportDiagnostics,
+  reportDiagnosticsUnlessRepeated,
+} from "../log.ts";
 import { prepareProject } from "../prepare.ts";
 
 /**
@@ -172,6 +176,10 @@ export const devCommand = defineCommand({
     showBlumeErrorOverlay(project.diagnostics);
 
     let lastSignature = routeSignature(project.manifest.routes);
+    // The startup diagnostics `prepareProject` printed, held only for the
+    // port-bump regeneration below so it doesn't print them a second time.
+    // Watch-triggered rescans always report.
+    let printedAtStartup: typeof project.diagnostics | undefined;
 
     // Watch user inputs and regenerate the runtime data on change. A body edit
     // hot-reloads via Vite (fast path). A route-set change also needs Astro's
@@ -192,6 +200,8 @@ export const devCommand = defineCommand({
     // library re-invokes it from an unhandled .finally), so the body catches
     // its own errors and always resolves.
     const regenerate = debounce(async () => {
+      const printed = printedAtStartup;
+      printedAtStartup = undefined;
       try {
         const next = await scanProject(root, {
           devServerUrl,
@@ -216,7 +226,7 @@ export const devCommand = defineCommand({
         // overlay. The terminal report is not redundant: the overlay only
         // shows once the browser has connected, and it clears on the next HMR
         // update.
-        reportDiagnostics(next.diagnostics, root);
+        reportDiagnosticsUnlessRepeated(next.diagnostics, root, printed);
         showBlumeErrorOverlay(next.diagnostics);
       } catch (error) {
         // A config error the generator raised (an unplannable `components.ts`
@@ -238,6 +248,7 @@ export const devCommand = defineCommand({
     // fallback; if Vite bumped it, regenerate so OG images, canonicals, and
     // other site-gated URLs point at the port actually serving.
     if (boundPort !== port) {
+      printedAtStartup = project.diagnostics;
       void regenerate();
     }
 
