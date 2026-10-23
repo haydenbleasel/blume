@@ -1,4 +1,5 @@
 import { jsonSchema, tool } from "ai";
+import type { Tool } from "ai";
 
 import { normalizeRoute } from "../core/base-path.ts";
 import { queryOramaIndex } from "../search/orama-index.ts";
@@ -107,11 +108,20 @@ export const readPage = (
   return block(doc, text);
 };
 
+/** The assistant's docs tools for one request, keyed by the name the model calls. */
+// oxlint-disable-next-line typescript/consistent-type-definitions -- interface loses the implicit index signature `streamText`'s ToolSet needs
+export type AskTools = {
+  read_page: Tool<{ route: string }, string>;
+  search_docs: Tool<{ query: string }, string>;
+};
+
 /**
  * The tools for one request, given the page the reader is on. Built per
  * request because the search scope follows the reader's locale and version.
  */
-export const createAskTools = (data: AskData) => {
+export const createAskTools = (
+  data: AskData
+): ((page?: AskPage) => AskTools) => {
   const byRoute = new Map(data.documents.map((doc) => [doc.route, doc]));
   return (page?: AskPage) => {
     const scope = readerScope(data, byRoute, page);

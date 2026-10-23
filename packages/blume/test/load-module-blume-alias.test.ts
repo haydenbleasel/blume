@@ -49,6 +49,14 @@ describe("blumeModuleAliases", () => {
     // carries over (`blume/sources/*` maps under `src/core/sources/`).
     expect(aliases["blume/sources/"]).toBe(join(root, "src/core/sources/"));
     expect(aliases["blume/core/"]).toBe(join(root, "src/core/"));
+    // A `.ts`-only wildcard (`./search/*.ts`) aliases the same prefix, and
+    // no alias keeps a literal `*` that jiti could never match.
+    expect(aliases["blume/search/"]).toBe(join(root, "src/search/"));
+    expect(
+      Object.entries(aliases).filter(([alias, target]) =>
+        `${alias}${target}`.includes("*")
+      )
+    ).toEqual([]);
   });
 
   it("reads the package manifest once", () => {

@@ -32,8 +32,9 @@ let aliases: Record<string, string> | undefined;
  * under a content root outside the project (`content.root: "../docs"`, a
  * sibling workspace package) or a file `blume.config.ts` imports from beside
  * the project can't find the `blume` installed in the project. A wildcard
- * export (`./core/*`) becomes a prefix alias (`blume/core/`), which jiti
- * extends with the rest of the specifier.
+ * export (`./core/*`, or `./core/*.ts` with its `types`) becomes a prefix
+ * alias of everything before its `*` (`blume/core/`), which jiti extends with
+ * the rest of the specifier.
  */
 export const blumeModuleAliases = (): Record<string, string> => {
   if (!aliases) {
@@ -43,8 +44,8 @@ export const blumeModuleAliases = (): Record<string, string> => {
     );
     aliases = Object.fromEntries(
       Object.entries(exports).map(([subpath, target]) => [
-        join("blume", subpath).replace(/\*$/u, ""),
-        join(root, target).replace(/\*$/u, ""),
+        join("blume", subpath).replace(/\*.*$/u, ""),
+        join(root, target).replace(/\*.*$/u, ""),
       ])
     );
   }

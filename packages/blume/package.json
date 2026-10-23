@@ -50,6 +50,10 @@
       "types": "./dist/types/ai/index.d.ts",
       "default": "./src/ai/index.ts"
     },
+    "./ai/*.ts": {
+      "types": "./dist/types/ai/*.d.ts",
+      "default": "./src/ai/*.ts"
+    },
     "./ai/*": "./src/ai/*",
     "./analytics": {
       "types": "./dist/types/analytics/index.d.ts",
@@ -58,6 +62,10 @@
     "./captcha": {
       "types": "./dist/types/captcha/index.d.ts",
       "default": "./src/captcha/index.ts"
+    },
+    "./captcha/*.ts": {
+      "types": "./dist/types/captcha/*.d.ts",
+      "default": "./src/captcha/*.ts"
     },
     "./captcha/*": "./src/captcha/*",
     "./consent": {
@@ -72,6 +80,10 @@
       "types": "./dist/types/ratelimit/index.d.ts",
       "default": "./src/ratelimit/index.ts"
     },
+    "./ratelimit/*.ts": {
+      "types": "./dist/types/ratelimit/*.d.ts",
+      "default": "./src/ratelimit/*.ts"
+    },
     "./ratelimit/*": "./src/ratelimit/*",
     "./reference": {
       "types": "./dist/types/reference/index.d.ts",
@@ -85,15 +97,41 @@
       "types": "./dist/types/search/adapters/index.d.ts",
       "default": "./src/search/adapters/index.ts"
     },
-    "./runtime": "./src/runtime/index.ts",
-    "./hooks": "./src/components/islands/hooks.ts",
-    "./astro": "./src/astro/index.ts",
-    "./og": "./src/og/index.ts",
-    "./markdown": "./src/markdown/index.ts",
-    "./components": "./src/components/index.ts",
+    "./search/*.ts": {
+      "types": "./dist/types/search/*.d.ts",
+      "default": "./src/search/*.ts"
+    },
+    "./runtime": {
+      "types": "./dist/types/runtime/index.d.ts",
+      "default": "./src/runtime/index.ts"
+    },
+    "./hooks": {
+      "types": "./dist/types/components/islands/hooks.d.ts",
+      "default": "./src/components/islands/hooks.ts"
+    },
+    "./astro": {
+      "types": "./dist/types/astro/index.d.ts",
+      "default": "./src/astro/index.ts"
+    },
+    "./og": {
+      "types": "./dist/types/og/index.d.ts",
+      "default": "./src/og/index.ts"
+    },
+    "./markdown": {
+      "types": "./dist/types/markdown/index.d.ts",
+      "default": "./src/markdown/index.ts"
+    },
+    "./components": {
+      "types": "./dist/types/components/index.d.ts",
+      "default": "./src/components/index.ts"
+    },
     "./components/*.ts": {
       "types": "./dist/types/components/*.d.ts",
       "default": "./src/components/*.ts"
+    },
+    "./components/*.tsx": {
+      "types": "./dist/types/components/*.d.ts",
+      "default": "./src/components/*.tsx"
     },
     "./components/*": "./src/components/*",
     "./core/*.ts": {
@@ -101,12 +139,24 @@
       "default": "./src/core/*.ts"
     },
     "./core/*": "./src/core/*",
+    "./openapi/*.ts": {
+      "types": "./dist/types/openapi/*.d.ts",
+      "default": "./src/openapi/*.ts"
+    },
     "./openapi/*": "./src/openapi/*",
     "./sources": {
       "types": "./dist/types/sources/index.d.ts",
       "default": "./src/sources/index.ts"
     },
+    "./sources/*.ts": {
+      "types": "./dist/types/core/sources/*.d.ts",
+      "default": "./src/core/sources/*.ts"
+    },
     "./sources/*": "./src/core/sources/*",
+    "./theme/*.ts": {
+      "types": "./dist/types/theme/*.d.ts",
+      "default": "./src/theme/*.ts"
+    },
     "./theme/*": "./src/theme/*",
     "./package.json": "./package.json"
   },
