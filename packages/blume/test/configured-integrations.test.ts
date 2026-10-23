@@ -14,6 +14,7 @@ import type { AddressInfo } from "node:net";
 
 import { dirname, join } from "pathe";
 
+import { readDevLock } from "../src/cli/dev-lock.ts";
 import { packageRoot } from "../src/core/package-root.ts";
 
 const PACKAGE_ROOT = packageRoot();
@@ -317,8 +318,8 @@ const waitForDevServer = async (
   );
 };
 
-const startDev = async (root: string) => {
-  const port = await availablePort();
+const startDev = async (root: string, requestedPort?: number) => {
+  const port = requestedPort ?? (await availablePort());
   const proc = Bun.spawn(
     ["bun", CLI, "dev", "--host", "127.0.0.1", "--port", String(port)],
     {
@@ -330,13 +331,22 @@ const startDev = async (root: string) => {
   );
   // Vite's startup banner names the bound address; see `waitForDevServer`.
   let listening = false;
+  let stderr = "";
   const output = Promise.all([
     collectOutput(proc.stdout, (text) => {
       listening ||= text.includes(`http://127.0.0.1:${port}/`);
     }),
-    collectOutput(proc.stderr, () => {}),
+    collectOutput(proc.stderr, (text) => {
+      stderr = text;
+    }),
   ]);
-  return { isListening: () => listening, output, port, proc };
+  return {
+    isListening: () => listening,
+    output,
+    port,
+    proc,
+    stderr: () => stderr,
+  };
 };
 
 const stopDev = async (
@@ -830,3 +840,74 @@ it("serves deferred sidebar fragments for an unprefixed default locale in dev", 
     throw new Error(`${String(failure)}\n${stdout}\n${stderr}`);
   }
 }, 180_000);
+
+it("prints startup diagnostics once when dev moves off a taken port, and still reports edits", async () => {
+  // Vite moves to the next free port when the requested one is taken, and
+  // dev then rescans so the site fallback names the port actually serving.
+  // That rescan finds what startup already printed, so it stays quiet.
+  const root = await writeProject({
+    "blume.config.ts": `export default { ${offlineFontsSource} };\n`,
+    "docs/index.md": "# Home\n\n<include>./missing-first.md</include>\n",
+  });
+  const taken = createServer();
+  taken.listen(0, "127.0.0.1");
+  await once(taken, "listening");
+  const address = taken.address();
+  if (!isAddressInfo(address)) {
+    throw new Error("Could not hold a port for the dev server to skip.");
+  }
+  const { output, proc, stderr } = await startDev(root, address.port);
+  let failure: unknown;
+  try {
+    // Dev records the port it bound in its lock once the server listens.
+    let boundPort = address.port;
+    await waitUntil(
+      () => {
+        boundPort = readDevLock(join(root, ".blume"))?.port ?? address.port;
+        return boundPort !== address.port;
+      },
+      "Timed out waiting for dev to move off the taken port.",
+      90_000
+    );
+    await waitForDevServer({ isListening: () => true, port: boundPort });
+    // The page's site URLs name the bound port once the rescan published.
+    await waitUntil(
+      async () => {
+        try {
+          const response = await fetch(`http://127.0.0.1:${boundPort}/`, {
+            signal: AbortSignal.timeout(5000),
+          });
+          const body = await response.text();
+          return body.includes(`localhost:${boundPort}/`);
+        } catch {
+          return false;
+        }
+      },
+      "Timed out waiting for the port-bump rescan to publish.",
+      60_000
+    );
+    await writeFile(
+      join(root, "docs/index.md"),
+      "# Home\n\n<include>./missing-first.md</include>\n\n<include>./missing-second.md</include>\n"
+    );
+    await waitUntil(
+      () => stderr().includes("missing-second.md"),
+      "Timed out waiting for the edit's report.",
+      60_000
+    );
+  } catch (error) {
+    failure = error;
+  } finally {
+    await stopDev(proc);
+    taken.close();
+  }
+  const [stdout] = await drainOutput(output);
+  if (failure) {
+    throw new Error(`${String(failure)}\n${stdout}\n${stderr()}`);
+  }
+  // Startup and the edit each print it; the port-bump rescan between them
+  // doesn't.
+  expect(
+    stderr().match(/Include target \.\/missing-first\.md was not found/gu) ?? []
+  ).toHaveLength(2);
+}, 240_000);

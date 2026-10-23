@@ -103,7 +103,8 @@ export const devCommand = defineCommand({
     // (OG images, canonicals, sitemap) work locally without configuring a site.
     const explicitPort = parsePort(args.port);
     const port = explicitPort ?? 4321;
-    let devServerUrl = `http://localhost:${port}`;
+    const requestedUrl = `http://localhost:${port}`;
+    let devServerUrl = requestedUrl;
 
     // Claim the shared `.blume` dir BEFORE preparing: `prepareProject`
     // regenerates the runtime, so even a refused second dev server would
@@ -178,7 +179,7 @@ export const devCommand = defineCommand({
     let lastSignature = routeSignature(project.manifest.routes);
     // The startup diagnostics `prepareProject` printed, held only for the
     // port-bump regeneration below so it doesn't print them a second time.
-    // Watch-triggered rescans always report.
+    // A watch event clears it (see `onChange`), so an edit always reports.
     let printedAtStartup: typeof project.diagnostics | undefined;
 
     // Watch user inputs and regenerate the runtime data on change. A body edit
@@ -225,7 +226,8 @@ export const devCommand = defineCommand({
         // Surface any content/config errors in the terminal AND the browser
         // overlay. The terminal report is not redundant: the overlay only
         // shows once the browser has connected, and it clears on the next HMR
-        // update.
+        // update. Only the port-bump regeneration can stay quiet, when it
+        // found exactly what startup already printed.
         reportDiagnosticsUnlessRepeated(next.diagnostics, root, printed);
         showBlumeErrorOverlay(next.diagnostics);
       } catch (error) {
@@ -246,11 +248,23 @@ export const devCommand = defineCommand({
 
     // The runtime prepared above baked the *requested* port into the site
     // fallback; if Vite bumped it, regenerate so OG images, canonicals, and
-    // other site-gated URLs point at the port actually serving.
-    if (boundPort !== port) {
+    // other site-gated URLs point at the port actually serving. A configured
+    // or platform-provided site never falls back to the dev URL, so that
+    // runtime is already right and a rescan would only repeat startup.
+    if (
+      boundPort !== port &&
+      project.config.deployment.options.site === requestedUrl
+    ) {
       printedAtStartup = project.diagnostics;
       void regenerate();
     }
+
+    // An edit's rescan always reports, even one that lands in the port-bump
+    // regeneration's debounce window and merges into that run.
+    const onChange = () => {
+      printedAtStartup = undefined;
+      void regenerate();
+    };
 
     // Content is watched per source (filesystem uses fs.watch; remote sources
     // are frozen for the session). The remaining project inputs — user pages,
@@ -272,9 +286,9 @@ export const devCommand = defineCommand({
     // an inode-tracking fs.watch watcher after the first write.
     const projectWatcher = watch([...dirTargets, ...fileTargets], {
       ignoreInitial: true,
-    }).on("all", regenerate);
+    }).on("all", onChange);
     const disposers = [
-      ...project.sources.map((source) => source.watch?.(regenerate)),
+      ...project.sources.map((source) => source.watch?.(onChange)),
       () => {
         void projectWatcher.close();
       },

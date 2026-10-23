@@ -58,12 +58,28 @@ describe("reportDiagnosticsUnlessRepeated", () => {
   it("stays quiet when the batch repeats the one already printed", () => {
     // `blume dev` prints the startup batch, then regenerates once when Vite
     // bumps the port; that unchanged batch must not print a second time.
-    reportDiagnosticsUnlessRepeated([{ ...warning }], "/root", [warning]);
+    expect(
+      reportDiagnosticsUnlessRepeated([{ ...warning }], "/root", [warning])
+    ).toBe(false);
+    expect(output).toBe("");
+  });
+
+  it("stays quiet when the repeat lists the same diagnostics in another order", () => {
+    // A rescan collects include errors as their file reads finish, so the
+    // same batch can come back reordered. It still reports its errors.
+    expect(
+      reportDiagnosticsUnlessRepeated([error, warning], "/root", [
+        warning,
+        error,
+      ])
+    ).toBe(true);
     expect(output).toBe("");
   });
 
   it("prints a batch that differs from the one already printed", () => {
-    reportDiagnosticsUnlessRepeated([warning, error], "/root", [warning]);
+    expect(
+      reportDiagnosticsUnlessRepeated([warning, error], "/root", [warning])
+    ).toBe(true);
     expect(output).toContain("1 error(s), 1 warning(s)");
 
     output = "";
@@ -87,6 +103,17 @@ describe("reportDiagnosticsUnlessRepeated", () => {
       reportDiagnosticsUnlessRepeated([changed], "/root", [printed]);
       expect(output).toContain("a warning");
     }
+  });
+
+  it("prints a batch where only a severity changed", () => {
+    // Without colors the printed lines don't name the severity, so the key
+    // has to: a warning that became an error is a new report.
+    reportDiagnosticsUnlessRepeated(
+      [{ ...warning, severity: "error" }],
+      "/root",
+      [warning]
+    );
+    expect(output).toContain("1 error(s)");
   });
 
   it("always prints when nothing was printed before", () => {
