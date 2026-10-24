@@ -1,10 +1,10 @@
 ---
 // WebMCP: expose the docs' tools (search, page Markdown, the docs index,
-// agent skills, navigation) to agentic browsers via the page's model context. Rendered by
-// PageLayout on every page; the marker element below both gates the script
-// (absent when `agents.webmcp` is off, so it returns immediately) and carries the
-// config flags the client needs — importing `blume:data` from the client
-// script would drag the whole navigation snapshot into the bundle.
+// agent skills, navigation) to agentic browsers via the page's model context.
+// Rendered by PageLayout on every page; the marker element below both gates
+// the script (absent when `agents.webmcp` is off, so it returns immediately)
+// and carries the config flags the client needs — importing `blume:data` from
+// the client script would drag the whole navigation snapshot into the bundle.
 import data from "blume:data";
 
 const { search, webmcp } = data.config;
@@ -22,6 +22,8 @@ const { search, webmcp } = data.config;
 }
 
 <script>
+  import { navigate } from "astro:transitions/client";
+
   import type { ModelContext } from "../islands/webmcp.ts";
   import { buildWebMcpTools, registerWebMcpTools } from "../islands/webmcp.ts";
 
@@ -41,6 +43,9 @@ const { search, webmcp } = data.config;
           llms: marker.dataset.llms === "true",
           loadSearch: async () =>
             (await import("blume:search-client")).createSearch(),
+          // The client router keeps what persists across pages (an open
+          // Ask AI conversation); it full-loads pages without the router.
+          navigate,
           search: marker.dataset.search === "true",
           skills: marker.dataset.skills === "true",
         }),

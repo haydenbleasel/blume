@@ -1,7 +1,12 @@
 import { unescape } from "html-escaper";
 
 import type { SearchFn } from "../layout/search/types.ts";
-import { joinBase, mountBase, prefixBase } from "./base-path.ts";
+import {
+  isRootRelative,
+  joinBase,
+  mountBase,
+  prefixBase,
+} from "./base-path.ts";
 
 /**
  * WebMCP (W3C Web Machine Learning CG): in-page tools an agentic browser can
@@ -81,31 +86,55 @@ const isCallable = <T extends (...args: never[]) => void>(
   value: T | undefined
 ): value is T => typeof value === "function";
 
-const PROBE_ORIGIN = "http://blume.invalid";
-
-/**
- * A root-relative route that stays on this origin. Resolved with the URL
- * parser itself rather than matched by pattern: browsers strip tabs and
- * newlines and read `\` as `/`, so `/\t/host` or `/\\host` becomes `//host`.
- */
-const isLocalRoute = (route: string): boolean =>
-  route.startsWith("/") &&
-  URL.parse(route, PROBE_ORIGIN)?.origin === PROBE_ORIGIN;
+/** A JSON object as an agent or the skills index may supply it. */
+const isJsonObject = (
+  value: WebMcpJsonValue | undefined
+): value is { [key: string]: WebMcpJsonValue } =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
 
 /** One entry of the Agent Skills discovery index (`index.json`). */
 interface SkillsIndexEntry {
-  description?: string;
+  description: string;
+  /** `sha256:{hex}` of the artifact, when the index publishes one. */
+  digest: string | undefined;
   name: string;
-  type?: string;
-  url?: string;
+  type: "archive" | "skill-md";
+  /** The artifact, resolved against the index; always on the index's origin. */
+  url: URL;
 }
 
-/** An index entry with at least a name; anything else is skipped. */
-const isSkillEntry = (value: unknown): value is SkillsIndexEntry =>
-  typeof value === "object" &&
-  value !== null &&
-  "name" in value &&
-  typeof value.name === "string";
+/**
+ * An index entry the tool can hand over, or null to skip it: a string `name`,
+ * a `type` the discovery RFC defines, and a `url` that resolves (against the
+ * index, as the RFC specifies) to this site. Every listed skill is readable,
+ * and the tool never fetches off-site.
+ */
+const toSkillEntry = (
+  value: WebMcpJsonValue,
+  index: URL
+): SkillsIndexEntry | null => {
+  if (!isJsonObject(value)) {
+    return null;
+  }
+  const { description, digest, name, type, url } = value;
+  if (
+    !(isString(name) && isString(url)) ||
+    (type !== "archive" && type !== "skill-md")
+  ) {
+    return null;
+  }
+  const resolved = URL.parse(url, index);
+  if (resolved?.origin !== index.origin) {
+    return null;
+  }
+  return {
+    description: isString(description) ? description : "",
+    digest: isString(digest) ? digest : undefined,
+    name,
+    type,
+    url: resolved,
+  };
+};
 
 const TAG = /<[^>]*>?/gu;
 
@@ -139,8 +168,16 @@ export interface WebMcpToolOptions {
   loadSearch: () => Promise<SearchFn>;
   /** Whether the site publishes llms.txt (gates the list tool). */
   llms: boolean;
-  /** Injectable for tests; defaults to `location.assign`. */
+  /**
+   * Opens a URL in the reader's tab. The page passes the client router's
+   * `navigate`; defaults to `location.assign` (and is injectable for tests).
+   */
   navigate?: (url: string) => void;
+  /**
+   * The page's origin, which skill artifacts must share. Injectable for
+   * tests; defaults to `location.origin`.
+   */
+  origin?: string;
   /** Whether site search is configured (gates the search tool). */
   search: boolean;
   /** Whether the site serves a skills discovery index (gates `read_skill`). */
@@ -202,7 +239,7 @@ export const buildWebMcpTools = (options: WebMcpToolOptions): WebMcpTool[] => {
       "Fetch a page of this site as plain Markdown. Pass the page's root-relative route, e.g. `/quickstart`.",
     async execute(input) {
       const route = isString(input.route) ? input.route : "";
-      if (!isLocalRoute(route)) {
+      if (!isRootRelative(route)) {
         return text("Pass a root-relative route, e.g. `/quickstart`.", true);
       }
       const trimmed = route.length > 1 ? route.replace(/\/+$/u, "") : route;
@@ -250,34 +287,38 @@ export const buildWebMcpTools = (options: WebMcpToolOptions): WebMcpTool[] => {
   }
 
   if (options.skills) {
-    const indexUrl = joinBase(
-      options.base,
-      ".well-known/agent-skills/index.json"
+    const index = new URL(
+      joinBase(options.base, ".well-known/agent-skills/index.json"),
+      options.origin ?? window.location.origin
     );
-    /** The published skills; none when the index is missing or malformed. */
-    const loadSkills = async (): Promise<SkillsIndexEntry[]> => {
+    /** The published skills, or null when the index is missing or malformed. */
+    const fetchSkills = async (): Promise<SkillsIndexEntry[] | null> => {
       try {
-        const response = await fetchFn(indexUrl);
+        const response = await fetchFn(index.pathname);
         if (!response.ok) {
-          return [];
+          return null;
         }
-        // SAFETY: only `skills` is read, and it's checked to be an array
-        // before use; entry fields are each read defensively.
-        const { skills } = (await response.json()) as { skills?: unknown };
-        return Array.isArray(skills) ? skills.filter(isSkillEntry) : [];
-      } catch {
-        return [];
-      }
-    };
-    /** A skill's `SKILL.md`, or null when it can't be fetched. */
-    const loadSkillMd = async (url: string): Promise<string | null> => {
-      try {
-        const index = new URL(indexUrl, window.location.href);
-        const response = await fetchFn(new URL(url, index).href);
-        return response.ok ? await response.text() : null;
+        // SAFETY: parsed JSON is always a WebMcpJsonValue; its shape is
+        // checked field by field below.
+        const body = (await response.json()) as WebMcpJsonValue;
+        const skills = isJsonObject(body) ? body.skills : undefined;
+        return Array.isArray(skills)
+          ? skills.flatMap((entry) => toSkillEntry(entry, index) ?? [])
+          : null;
       } catch {
         return null;
       }
+    };
+    // One index fetch per page; a failed one retries on the next call rather
+    // than latching "no skills".
+    let skillsIndex: Promise<SkillsIndexEntry[] | null> | null = null;
+    const loadSkills = async (): Promise<SkillsIndexEntry[]> => {
+      skillsIndex ??= fetchSkills();
+      const skills = await skillsIndex;
+      if (skills === null) {
+        skillsIndex = null;
+      }
+      return skills ?? [];
     };
     tools.push({
       annotations: readOnly,
@@ -292,27 +333,36 @@ export const buildWebMcpTools = (options: WebMcpToolOptions): WebMcpTool[] => {
         if (!name) {
           return text(
             skills
-              .map((skill) => `${skill.name} — ${skill.description ?? ""}`)
+              .map((skill) =>
+                skill.description
+                  ? `${skill.name} — ${skill.description}`
+                  : skill.name
+              )
               .join("\n")
           );
         }
         const skill = skills.find((entry) => entry.name === name);
-        if (!skill?.url) {
+        if (!skill) {
           return text(
             `No skill named "${name}". Available: ${skills.map((entry) => entry.name).join(", ")}.`,
             true
           );
         }
-        if (skill.type !== "skill-md") {
+        if (skill.type === "archive") {
           // Skills with supporting files ship as a .tar.gz the agent must
           // download and unpack; there's no single Markdown file to return.
-          return text(`"${name}" is an archive skill: download ${skill.url}`);
+          const digest = skill.digest ? ` Its digest is ${skill.digest}.` : "";
+          return text(
+            `"${name}" is an archive skill: download ${skill.url.href} and unpack it.${digest}`
+          );
         }
-        const markdown = await loadSkillMd(skill.url);
-        if (markdown === null) {
+        const response = await fetchFn(
+          `${skill.url.pathname}${skill.url.search}`
+        ).catch(() => null);
+        if (!response?.ok) {
           return text(`The "${name}" skill is unavailable.`, true);
         }
-        return text(markdown);
+        return text(await response.text());
       },
       inputSchema: {
         properties: {
@@ -333,22 +383,27 @@ export const buildWebMcpTools = (options: WebMcpToolOptions): WebMcpTool[] => {
     // Not read-only: it moves the user's tab, though never off-site.
     annotations: { openWorldHint: false, readOnlyHint: false },
     description:
-      "Open a page of this site in the current browser tab. Pass the page's root-relative route, e.g. `/quickstart`, optionally with a `#heading` fragment.",
+      "Open a page of this site in the current browser tab. Pass the page's path as `search_docs` returns it, e.g. `/quickstart`, optionally with a `#heading` fragment.",
     execute(input) {
       const route = isString(input.route) ? input.route : "";
-      if (!isLocalRoute(route)) {
+      if (!isRootRelative(route)) {
         return Promise.resolve(
           text("Pass a root-relative route, e.g. `/quickstart`.", true)
         );
       }
+      // Like `get_page`, a path already under the base (the served URL
+      // `search_docs` returns) keeps it.
       const url = prefixBase(options.base, route);
-      navigate(url);
+      // Navigate once the result is handed back, so the host receives it
+      // before the page starts to unload.
+      setTimeout(() => navigate(url), 0);
       return Promise.resolve(text(`Navigating to ${url}.`));
     },
     inputSchema: {
       properties: {
         route: {
-          description: "Root-relative page route, e.g. `/quickstart`.",
+          description:
+            "The page's path as `search_docs` returns it, e.g. `/quickstart`.",
           type: "string",
         },
       },

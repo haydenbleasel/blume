@@ -16,8 +16,9 @@ import SectionHeading from "../_home/SectionHeading.astro";
 import TextLink from "../_home/TextLink.astro";
 import { glyph, icons, sampleBrand } from "../_home/shared.ts";
 
-// The same read-only surface over three transports: the MCP server's tools,
-// the subset WebMCP registers in the page, and the JSON API's endpoints.
+// The docs' tools over three transports: the MCP server's, the ones WebMCP
+// registers in the page (which add skills and navigation), and the JSON API's
+// endpoints.
 const surfaces = [
   {
     icon: glyph("wrench"),
@@ -27,7 +28,13 @@ const surfaces = [
   {
     icon: glyph("wrench"),
     label: "WebMCP",
-    rows: ["search_docs", "get_page", "list_pages"],
+    rows: [
+      "search_docs",
+      "get_page",
+      "list_pages",
+      "read_skill",
+      "navigate_page",
+    ],
   },
   {
     icon: glyph("braces"),
@@ -198,7 +205,7 @@ const bentoScript = `(() => {
       </div>
     </BentoCard>
 
-    <!-- Tools: the same read-only tools over MCP, WebMCP, and the JSON API -->
+    <!-- Tools: the docs' tools over MCP, WebMCP, and the JSON API -->
     <BentoCard
       body="An opt-in MCP server, WebMCP tools in every page, and a JSON API described by OpenAPI let agents search and read your docs directly."
       title="Tools, not scraping."

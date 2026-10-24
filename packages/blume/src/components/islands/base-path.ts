@@ -13,9 +13,19 @@ export const withTrailingSlash = (base: string): string =>
 export const joinBase = (base: string, path: string): string =>
   `${withTrailingSlash(base)}${path}`;
 
-/** A root-relative internal target (`/x`) — never `//host` or a URL. */
-const isRootRelative = (route: string): boolean =>
-  route.startsWith("/") && !route.startsWith("//");
+/**
+ * A second slash after the leading one, as the URL parser reads it: it drops
+ * tabs and newlines and takes `\` for `/`, so `/\host` and `/<tab>/host`
+ * resolve to `//host` just like the literal form.
+ */
+const AUTHORITY = /^\/[\t\n\r]*[/\\]/u;
+
+/**
+ * A root-relative internal target (`/x`) — never a URL or anything a browser
+ * resolves to another host (`//host`, `/\host`).
+ */
+export const isRootRelative = (route: string): boolean =>
+  route.startsWith("/") && !AUTHORITY.test(route);
 
 /** A target's path, without its `?query` or `#fragment`. */
 const pathOf = (route: string): string => {

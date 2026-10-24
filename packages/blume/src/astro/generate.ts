@@ -27,7 +27,7 @@ import type { RawMarkdownEntry } from "../ai/markdown.ts";
 import { buildMcpData } from "../ai/mcp/data.ts";
 import type { McpData } from "../ai/mcp/data.ts";
 import { buildMcpDiscovery, buildMcpServerCard } from "../ai/mcp/discovery.ts";
-import { servesSkillsIndex } from "../ai/skills.ts";
+import { AGENT_SKILLS_INDEX_PATH, servesSkillsIndex } from "../ai/skills.ts";
 import { captchaSettings } from "../captcha/schema.ts";
 import { parseApiEndpoint } from "../components/content/api-page.ts";
 import {
@@ -1125,6 +1125,15 @@ const resolveAssistant = (
 };
 
 /** Serialize the content graph into the data module the runtime consumes. */
+/**
+ * Whether WebMCP offers `read_skill`. Skills are collected at the end of the
+ * build, after the runtime data is written, so this follows the config — or
+ * an index the site ships itself in `public/`.
+ */
+const offersSkillsTool = ({ config, context }: BlumeProject): boolean =>
+  servesSkillsIndex(config) ||
+  existsSync(join(context.root, "public", AGENT_SKILLS_INDEX_PATH.slice(1)));
+
 export const buildRuntimeData = (project: BlumeProject): string => {
   const { config, context, graph, manifest } = project;
   const { github } = config;
@@ -1320,7 +1329,7 @@ export const buildRuntimeData = (project: BlumeProject): string => {
       webmcp: {
         enabled: config.agents.webmcp,
         llms: config.agents.llmsTxt.enabled,
-        skills: servesSkillsIndex(config),
+        skills: offersSkillsTool(project),
       },
       x: config.seo.x,
     },

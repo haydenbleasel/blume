@@ -379,7 +379,39 @@ describe("buildRuntimeData — navigation.repo", () => {
   });
 });
 
+/** Whether a project with these files offers WebMCP's `read_skill`. */
+const offersSkills = async (files: Record<string, string>): Promise<boolean> =>
+  JSON.parse(
+    buildRuntimeData(
+      await scanProject(
+        await writeProject({ "docs/index.md": "# Home\n", ...files })
+      )
+    )
+  ).config.webmcp.skills;
+
 describe("buildRuntimeData", () => {
+  it("offers read_skill when the build serves a skills index", async () => {
+    // No `agents.skills`, and no site for the generated skill's links.
+    expect(await offersSkills({})).toBe(false);
+    expect(
+      await offersSkills({
+        "blume.config.ts": 'export default { agents: { skills: "skills" } };\n',
+      })
+    ).toBe(true);
+    expect(
+      await offersSkills({
+        "blume.config.ts":
+          'export default { deployment: { site: "https://docs.test" } };\n',
+      })
+    ).toBe(true);
+    // An index the site ships in public/ owns the surface.
+    expect(
+      await offersSkills({
+        "public/.well-known/agent-skills/index.json": '{"skills":[]}\n',
+      })
+    ).toBe(true);
+  });
+
   it("tells the player whether the build generates narration audio", async () => {
     const off = await scanProject(
       await writeProject({ "docs/index.md": "# Home\n" })

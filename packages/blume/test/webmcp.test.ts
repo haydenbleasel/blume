@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { setTimeout as sleep } from "node:timers/promises";
 
 import type { WebMcpTool } from "../src/components/islands/webmcp.ts";
 import {
@@ -17,6 +18,7 @@ const toolsWith = (
     base: "/base/",
     llms: true,
     loadSearch: noSearch,
+    origin: "https://docs.test",
     search: true,
     skills: true,
     ...overrides,
@@ -230,21 +232,47 @@ describe("buildWebMcpTools", () => {
         },
         {
           description: "Migrate.",
+          digest: "sha256:abc",
           name: "migrate",
           type: "archive",
           url: "/base/.well-known/agent-skills/migrate.tar.gz",
         },
+        // Relative URLs resolve against the index, absolute same-origin
+        // ones are kept.
+        { name: "relative", type: "archive", url: "relative.tar.gz" },
+        {
+          name: "absolute",
+          type: "skill-md",
+          url: "https://docs.test/base/absolute.md",
+        },
         { name: "broken", type: "skill-md", url: "/base/missing.md" },
         { name: "offline", type: "skill-md", url: "/base/offline.md" },
+        // Skipped: nothing the tool can hand over, or off this site.
         null,
+        ["docs"],
         { description: "No name." },
+        { description: "No URL.", name: "no-url", type: "skill-md" },
+        { name: "no-type", url: "/base/no-type.md" },
+        { name: "odd-type", type: "zip", url: "/base/odd.zip" },
+        { name: "odd-url", type: "skill-md", url: { href: "/base/a.md" } },
+        { name: "off-site", type: "skill-md", url: "https://evil.test/a.md" },
+        { name: "sneaky", type: "skill-md", url: "/\\evil.test/a.md" },
+        {
+          description: { en: "x" },
+          name: "odd-description",
+          type: "skill-md",
+          url: "/base/odd.md",
+        },
       ],
     });
     const files = new Map([
       ["/base/.well-known/agent-skills/index.json", index],
       ["/base/.well-known/agent-skills/docs/SKILL.md", "# Docs skill\n"],
+      ["/base/absolute.md", "# Absolute skill\n"],
     ]);
+    const fetched: string[] = [];
     const fetchFn = asFetch((url) => {
+      fetched.push(url);
       if (url === "/base/offline.md") {
         return Promise.reject(new Error("offline"));
       }
@@ -257,30 +285,55 @@ describe("buildWebMcpTools", () => {
     });
     const read = tool(toolsWith({ fetchFn }), "read_skill");
 
-    const [listed, docs, archive, unknown, broken, offline] = await Promise.all(
+    const [
+      listed,
+      docs,
+      archive,
+      relative,
+      absolute,
+      unknown,
+      noUrl,
+      broken,
+      offline,
+    ] = await Promise.all(
       [
         {},
         { name: "docs" },
         { name: "migrate" },
+        { name: "relative" },
+        { name: "absolute" },
         { name: "nope" },
+        { name: "no-url" },
         { name: "broken" },
         { name: "offline" },
       ].map((input) => read.execute(input))
     );
     expect(listed?.isError).toBeUndefined();
     expect(listed?.content[0]?.text).toBe(
-      "docs — Use the docs.\nmigrate — Migrate.\nbroken — \noffline — "
+      "docs — Use the docs.\nmigrate — Migrate.\nrelative\nabsolute\nbroken\noffline\nodd-description"
     );
     expect(docs?.content[0]?.text).toBe("# Docs skill\n");
-    // An archive isn't an error: the agent gets the URL to download.
+    expect(absolute?.content[0]?.text).toBe("# Absolute skill\n");
+    // An archive isn't an error: the agent gets the absolute URL to download
+    // and the digest to check it against.
     expect(archive?.isError).toBeUndefined();
-    expect(archive?.content[0]?.text).toContain(
-      "/base/.well-known/agent-skills/migrate.tar.gz"
+    expect(archive?.content[0]?.text).toBe(
+      '"migrate" is an archive skill: download https://docs.test/base/.well-known/agent-skills/migrate.tar.gz and unpack it. Its digest is sha256:abc.'
+    );
+    expect(relative?.content[0]?.text).toBe(
+      '"relative" is an archive skill: download https://docs.test/base/.well-known/agent-skills/relative.tar.gz and unpack it.'
     );
     expect(unknown?.isError).toBe(true);
-    expect(unknown?.content[0]?.text).toContain("docs, migrate, broken");
+    expect(unknown?.content[0]?.text).toBe(
+      'No skill named "nope". Available: docs, migrate, relative, absolute, broken, offline, odd-description.'
+    );
+    // A skipped entry is neither listed nor readable.
+    expect(noUrl?.isError).toBe(true);
     expect(broken?.isError).toBe(true);
     expect(offline?.isError).toBe(true);
+    // The index was fetched once for all nine calls, and nothing off-site.
+    expect(fetched.filter((url) => url.endsWith("index.json"))).toHaveLength(1);
+    expect(fetched.every((url) => url.startsWith("/base/"))).toBe(true);
   });
 
   it("read_skill reports no skills when the index is missing or malformed", async () => {
@@ -289,6 +342,8 @@ describe("buildWebMcpTools", () => {
       new Response("", { status: 404 }),
       okResponse("not json"),
       okResponse('{"skills":"docs"}'),
+      okResponse('["docs"]'),
+      okResponse('{"skills":[]}'),
     ];
     const results = await Promise.all(
       responses.map((response) =>
@@ -312,6 +367,32 @@ describe("buildWebMcpTools", () => {
     }
   });
 
+  it("read_skill refetches an index that failed to load", async () => {
+    let calls = 0;
+    const read = tool(
+      toolsWith({
+        fetchFn: asFetch(() => {
+          calls += 1;
+          return calls === 1
+            ? Promise.reject(new Error("offline"))
+            : Promise.resolve(
+                okResponse(
+                  '{"skills":[{"name":"docs","type":"skill-md","url":"docs/SKILL.md"}]}'
+                )
+              );
+        }),
+      }),
+      "read_skill"
+    );
+
+    const failed = await read.execute({});
+    expect(failed.isError).toBe(true);
+    const [retried, cached] = [await read.execute({}), await read.execute({})];
+    expect(retried.content[0]?.text).toBe("docs");
+    expect(cached.content[0]?.text).toBe("docs");
+    expect(calls).toBe(2);
+  });
+
   it("navigate_page opens based routes and refuses off-site targets", async () => {
     const visited: string[] = [];
     const go = tool(
@@ -321,6 +402,13 @@ describe("buildWebMcpTools", () => {
 
     const result = await go.execute({ route: "/quickstart#install" });
     expect(result.isError).toBeUndefined();
+    expect(result.content[0]?.text).toBe(
+      "Navigating to /base/quickstart#install."
+    );
+    // A served URL `search_docs` returned keeps its base.
+    await go.execute({ route: "/base/guide" });
+    // The result is handed back before the tab starts to move.
+    expect(visited).toEqual([]);
     const refused = await Promise.all(
       [
         "//evil.test",
@@ -339,21 +427,46 @@ describe("buildWebMcpTools", () => {
       true,
       true,
     ]);
-    expect(visited).toEqual(["/base/quickstart#install"]);
+    // Let the deferred navigation (`setTimeout(…, 0)`) run.
+    await sleep(0);
+    expect(visited).toEqual(["/base/quickstart#install", "/base/guide"]);
   });
 
-  it("navigate_page defaults to the page's location.assign", async () => {
+  it("defaults to the page's location for navigation and the skills origin", async () => {
     const assigned: string[] = [];
+    const fetched: string[] = [];
     Object.defineProperty(globalThis, "window", {
       configurable: true,
-      value: { location: { assign: (url: string) => assigned.push(url) } },
+      value: {
+        location: {
+          assign: (url: string) => assigned.push(url),
+          origin: "https://docs.test",
+        },
+      },
     });
     try {
-      await tool(toolsWith(), "navigate_page").execute({ route: "/a" });
+      const tools = toolsWith({
+        fetchFn: asFetch((url) => {
+          fetched.push(url);
+          return Promise.resolve(
+            okResponse(
+              '{"skills":[{"name":"docs","type":"archive","url":"https://docs.test/docs.tar.gz"},{"name":"other","type":"archive","url":"https://other.test/x.tar.gz"}]}'
+            )
+          );
+        }),
+        navigate: undefined,
+        origin: undefined,
+      });
+      await tool(tools, "navigate_page").execute({ route: "/a" });
+      await sleep(0);
+      const listed = await tool(tools, "read_skill").execute({});
+      // The other origin's archive is skipped against the page's own origin.
+      expect(listed.content[0]?.text).toBe("docs");
     } finally {
       Reflect.deleteProperty(globalThis, "window");
     }
     expect(assigned).toEqual(["/base/a"]);
+    expect(fetched).toEqual(["/base/.well-known/agent-skills/index.json"]);
   });
 });
 

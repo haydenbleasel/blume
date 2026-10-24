@@ -1,7 +1,10 @@
 import { describe, expect, it } from "bun:test";
 
 import {
+  isRootRelative,
   joinBase,
+  mountBase,
+  prefixBase,
   stripBase,
   withTrailingSlash,
 } from "../src/components/islands/base-path.ts";
@@ -31,5 +34,27 @@ describe("island base-path helpers", () => {
     expect(stripBase("/docs", "/docs")).toBe("/");
     // Unrelated paths pass through untouched.
     expect(stripBase("/docs", "/other")).toBe("/other");
+  });
+
+  it("treats every form a browser resolves to another host as external", () => {
+    expect(isRootRelative("/guide")).toBe(true);
+    expect(isRootRelative("/")).toBe(true);
+    expect(isRootRelative("/a//b")).toBe(true);
+    // Browsers drop tabs and newlines and read `\` as `/`, so each of these
+    // is `//evil.test`.
+    for (const route of [
+      "//evil.test",
+      "/\\evil.test",
+      "/\t/evil.test",
+      "/\n\\evil.test",
+      "/\r\n/evil.test",
+      "https://evil.test",
+      "guide",
+    ]) {
+      expect(isRootRelative(route)).toBe(false);
+      expect(prefixBase("/", route)).toBe(route);
+      expect(prefixBase("/docs", route)).toBe(route);
+      expect(mountBase("/docs", route)).toBe(route);
+    }
   });
 });
