@@ -96,8 +96,11 @@ describe(rewriteCardImages, () => {
       '<Card img="https://x.dev/c.png" />',
     ].join("\n");
     expect(
-      rewriteCardImages(text, (target) =>
-        target.startsWith("./") ? `/served/${target.slice(2)}` : null
+      rewriteCardImages(
+        text,
+        (target) =>
+          target.startsWith("./") ? `/served/${target.slice(2)}` : null,
+        null
       )
     ).toBe(
       [
@@ -109,7 +112,7 @@ describe(rewriteCardImages, () => {
         '<Card img="https://x.dev/c.png" />',
       ].join("\n")
     );
-    expect(rewriteCardImages("No cards.", () => "x")).toBe("No cards.");
+    expect(rewriteCardImages("No cards.", () => "x", null)).toBe("No cards.");
   });
 
   it("is read as an image embed by link extraction", () => {
@@ -158,6 +161,7 @@ describe("<Card img> through the content pipeline", () => {
     expect(
       rewriteRelativeAssets({
         deployBase: "/base",
+        format: "mdx",
         projectRoot: root,
         source: '<Card img="./here.png" />',
         sourcePath: page,

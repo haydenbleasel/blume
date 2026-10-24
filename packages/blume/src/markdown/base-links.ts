@@ -136,7 +136,13 @@ export const baseLinksPlugin = (
   };
 
   const rebaseHtml = (node: HtmlNode, ctx: MdastUrlContext): void => {
-    const next = rewriteElementUrls(node.value, ({ value }) => based(value));
+    // An HTML node's value is raw HTML: it holds no Markdown code, and a
+    // comment in it renders nothing whether it's rewritten or not.
+    const next = rewriteElementUrls(
+      node.value,
+      ({ value }) => based(value),
+      null
+    );
     if (next !== node.value) {
       ctx.setProperty(node, "value", next);
     }

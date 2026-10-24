@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "pathe";
 
 import { buildAskData } from "../src/ai/ask-data.ts";
+import { buildLlmsFiles } from "../src/ai/llms.ts";
 import { buildRawMarkdown, markdownRoutePaths } from "../src/ai/markdown.ts";
 import { scanProject } from "../src/core/project-graph.ts";
 import type { BlumeProject } from "../src/core/project-graph.ts";
@@ -100,6 +101,11 @@ describe("the generated changelog index mirror", () => {
     expect(raw["/whats-new"]?.md).toContain(
       "- [v2.0](https://docs.example.com/sub/changelog/v2) — 2026-09-24"
     );
+    // Written as llms.txt writes a page's URL, so the parenthesis can't
+    // split the link there either.
+    expect(raw["/whats-new"]?.md).toContain(
+      "- [Old notes](https://docs.example.com/sub/changelog/notes%20%28old%29) — 2025-01-15"
+    );
     const { documents } = await buildAskData(project);
     expect(
       documents.find((doc) => doc.route === "/whats-new")?.content
@@ -115,12 +121,24 @@ describe("the generated changelog index mirror", () => {
       "docs/changelog/long.md": entry(
         "title: >\n  A release whose title\n  wraps\ndate: 2026-02-03"
       ),
+      "docs/changelog/split.md": entry(
+        "title: |\n  Split\n  release\ndate: 2026-01-02",
+        "# Split release"
+      ),
       "docs/index.md": "# Home\n",
     });
     const raw = await buildRawMarkdown(project);
     expect(raw["/changelog"]?.mdx).toContain(
       "- [A release whose title wraps](/changelog/long) — 2026-02-03"
     );
+    // The title is one line wherever it's shown: llms-full.txt opens each
+    // section with it, and drops the page's own heading that matches it.
+    const { full } = await buildLlmsFiles(project);
+    expect(full).toContain(
+      "# A release whose title wraps\nSource: /changelog/long"
+    );
+    expect(full).toContain("# Split release\nSource: /changelog/split\n\n");
+    expect(full.match(/# Split release/gu)).toHaveLength(1);
   });
 
   it("lists only the default locale's releases, in its own words", async () => {

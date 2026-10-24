@@ -603,7 +603,34 @@ describe(validateLinks, () => {
             version: "v1.0",
           }),
         ]),
-        { i18n, publicDir: null }
+        { contentRoot: "/abs", i18n, publicDir: null }
+      );
+      expect(diagnostics).toHaveLength(0);
+    });
+
+    it("reads an untranslated sibling in another version's folder as the rendered link does", async () => {
+      // The link climbs out of the locale folder into an archived version's,
+      // which doesn't have the French page either: the rendered page lands on
+      // that version's default-tree file, so the check does too.
+      const diagnostics = await validateLinks(
+        makeGraph([
+          makePage({
+            id: "fr/guides/leaf.mdx",
+            links: [link("../../v1.0/fr/guides/setup.mdx#archived")],
+            locale: "fr",
+            navPath: "guides/leaf.mdx",
+            route: "/fr/guides/leaf",
+          }),
+          makePage({
+            headings: [heading("Archived", "archived")],
+            id: "v1.0/guides/setup.mdx",
+            locale: "en",
+            navPath: "guides/setup.mdx",
+            route: "/v1.0/guides/setup",
+            version: "v1.0",
+          }),
+        ]),
+        { contentRoot: "/abs", i18n, publicDir: null }
       );
       expect(diagnostics).toHaveLength(0);
     });
@@ -1641,7 +1668,7 @@ describe("validateLinks — relative file links", () => {
           sourcePath: "/abs/guides/setup.mdx",
         }),
       ]),
-      { i18n, publicDir: null }
+      { contentRoot: "/abs", i18n, publicDir: null }
     );
     expect(diagnostics).toHaveLength(0);
   });

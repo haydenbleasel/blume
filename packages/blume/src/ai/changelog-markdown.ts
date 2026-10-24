@@ -1,4 +1,4 @@
-import { mountBasePath, normalizeBasePath } from "../core/base-path.ts";
+import { normalizeBasePath } from "../core/base-path.ts";
 import { withChangelogIndexText } from "../core/changelog-index.ts";
 import {
   compareChangelogDates,
@@ -7,9 +7,8 @@ import {
 } from "../core/changelog-list.ts";
 import { EN_UI, resolveUIStrings } from "../core/i18n-ui.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
-import { absoluteUrl } from "../core/site-url.ts";
 import type { PageRecord } from "../core/types.ts";
-import { linkText, routeTarget } from "./link-text.ts";
+import { linkText, pageUrl, routeTarget } from "./link-text.ts";
 
 /**
  * The generated `/changelog` index as Markdown, for its `/changelog.md`
@@ -43,8 +42,7 @@ const entryUrl = (
     return routeTarget(route);
   }
   const { base, site } = project.config.deployment.options;
-  const path = mountBasePath(normalizeBasePath(base), route);
-  return encodeURI(site ? absoluteUrl(site, path) : path);
+  return pageUrl(route, site, normalizeBasePath(base));
 };
 
 const rowLine = (

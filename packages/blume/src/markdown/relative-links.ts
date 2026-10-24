@@ -4,11 +4,12 @@ import { dirname, normalize, relative, resolve } from "pathe";
 
 import { mountBasePath } from "../core/base-path.ts";
 import {
+  defaultTreePath,
   isIndexFileName,
   resolveRelativeHref,
   resolveRootFileHref,
 } from "../core/links.ts";
-import type { RelativeLinkBase } from "../core/links.ts";
+import type { DefaultTreeFolders, RelativeLinkBase } from "../core/links.ts";
 import type { MdastNode, MdastValue } from "./mdast.ts";
 import { routeSnapshotReader } from "./route-snapshot.ts";
 
@@ -53,18 +54,17 @@ interface RouteData {
   }[];
 }
 
-/** What the plugin knows about where content files publish. */
-interface RouteIndex {
+/**
+ * What the plugin knows about where content files publish, and the folders
+ * a file's default tree is read past (see `defaultTreePath`).
+ */
+interface RouteIndex extends DefaultTreeFolders {
   /** `collection` + NUL + `entryId` → the route that entry publishes at. */
   routes: Map<string, string>;
   /** Every route the site serves, fallback copies included. */
   paths: Set<string>;
   /** Tokens an index file name may carry before its extension. */
   localeTokens: string[];
-  /** The locale folders beside the default tree (every locale but the default). */
-  localeFolders: string[];
-  /** The archived versions' folders, which hold their own locale folders. */
-  versionFolders: string[];
 }
 
 /** A content file, located: its page, and how to find the files beside it. */
@@ -120,30 +120,6 @@ const indexRoutes = (data: RouteData): RouteIndex => {
     versionFolders:
       data.config.versions?.archived.map((version) => version.id) ?? [],
   };
-};
-
-/**
- * The same entry path in the default tree: a page in a locale folder that
- * links a sibling not translated yet (`fr/guides/setup.mdx` missing) means
- * the default tree's file (`guides/setup.mdx`), whose route — its own `slug`
- * included — moves into the reader's locale afterwards, onto the fallback
- * copy (see `LocaleLinks.astro`). An archived version keeps its locale
- * folders inside its own (`v1.0/fr/guides/setup.mdx`), so its default tree is
- * that version's (`v1.0/guides/setup.mdx`).
- */
-const defaultTreePath = (
-  entryId: string,
-  index: Pick<RouteIndex, "localeFolders" | "versionFolders">
-): string | undefined => {
-  const [first = "", second = "", ...rest] = entryId.split("/");
-  if (index.localeFolders.includes(first) && second !== "") {
-    return [second, ...rest].join("/");
-  }
-  return index.versionFolders.includes(first) &&
-    index.localeFolders.includes(second) &&
-    rest.length > 0
-    ? [first, ...rest].join("/")
-    : undefined;
 };
 
 export interface RelativeLinksPluginOptions {

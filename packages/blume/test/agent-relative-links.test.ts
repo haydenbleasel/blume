@@ -226,6 +226,24 @@ describe("relative page links on the agent surfaces", () => {
     );
   });
 
+  it("reads a link into another version's untranslated page as the rendered page does", async () => {
+    // The link climbs out of the locale folder into an archived version's,
+    // which hasn't translated the page either: the rendered page lands on
+    // that version's default-tree file, then moves it into the locale.
+    const project = await scanFixture({
+      "blume.config.ts":
+        'export default { i18n: { defaultLocale: "en", locales: [{ code: "en", label: "English" }, { code: "fr", label: "Français" }] }, versions: { archived: [{ id: "v1.0" }], current: { label: "v2.0" } } };',
+      "docs/fr/guides/leaf.md":
+        "# Feuille\n\nVoir [Setup 1.0](../../v1.0/fr/guides/setup.md).\n",
+      "docs/guides/leaf.md": "# Leaf\n",
+      "docs/v1.0/guides/setup.md": "---\nslug: configure\n---\n# Setup 1.0\n",
+    });
+    const raw = await buildRawMarkdown(project);
+    expect(raw["/fr/guides/leaf"]?.mdx).toContain(
+      "Voir [Setup 1.0](/fr/v1.0/configure)."
+    );
+  });
+
   it("percent-encodes a route a link destination can't hold as written", async () => {
     // `my page.md` publishes at `/guides/my page`, and a space or a
     // parenthesis would end or split the link.
@@ -451,6 +469,40 @@ describe("relative page links on the agent surfaces", () => {
     );
   });
 
+  it("maps a fallback link with a trailing slash onto the page the snapshot holds", async () => {
+    // `read_page` reads `/fr/guides/setup/` as `/fr/guides/setup`, a copy the
+    // snapshot doesn't hold; other root links need no change.
+    const project = await scanFixture({
+      "blume.config.ts":
+        'export default { i18n: { defaultLocale: "en", locales: [{ code: "en", label: "English" }, { code: "fr", label: "Français" }] } };',
+      "docs/guides/leaf.md":
+        "# Leaf\n\nSee [Setup](/fr/guides/setup/#run), [French](/fr) and [Other](/guides/setup/).\n",
+      "docs/guides/setup.md": "# Setup\n",
+    });
+    const { documents } = await buildAskData(project);
+    expect(
+      documents.find((doc) => doc.route === "/guides/leaf")?.content
+    ).toContain(
+      "See [Setup](/guides/setup#run), [French](/fr) and [Other](/guides/setup/)."
+    );
+  });
+
+  it("takes the deployment base off an image in the assistant's snapshot", async () => {
+    // The chat panel mounts every link and image under the base, so one
+    // written with it would carry it twice.
+    const project = await scanFixture({
+      ...FILES,
+      "docs/guides/leaf.md":
+        "# Leaf\n\n![logo](/sub/logo.png) ![mark](/mark.png) ![far](/sub//cdn.example/x.png)\n",
+    });
+    const { documents } = await buildAskData(project);
+    expect(
+      documents.find((doc) => doc.route === "/guides/leaf")?.content
+    ).toContain(
+      "![logo](/logo.png) ![mark](/mark.png) ![far](/sub//cdn.example/x.png)"
+    );
+  });
+
   it("reads a raw `<a href>` the way the browser does", async () => {
     // The rendered page ships it as written, so it resolves against the
     // page's slashless URL: an index page's parent folder, and a `.md`
@@ -474,6 +526,24 @@ describe("relative page links on the agent surfaces", () => {
     expect(content("/guides")).toContain('<a href="/install">Install</a>');
     expect(content("/guides/leaf")).toContain(
       '<a href="/guides/setup.md#run">Copy</a>'
+    );
+  });
+
+  it("never moves a raw relative `<a href>` into the page's locale", async () => {
+    // The browser resolves it from the French page's URL, and nothing
+    // localizes a relative href, so it leaves the locale where it climbs out.
+    const project = await scanFixture({
+      "blume.config.ts":
+        'export default { i18n: { defaultLocale: "en", locales: [{ code: "en", label: "English" }, { code: "fr", label: "Français" }] } };',
+      "docs/fr/guides/leaf.md":
+        '# Feuille\n\n<a href="../../guides/setup">English</a> <a href="./setup">Français</a> [Lien](../../guides/setup.md)\n',
+      "docs/fr/guides/setup.md": "# Configurer\n",
+      "docs/guides/leaf.md": "# Leaf\n",
+      "docs/guides/setup.md": "# Setup\n",
+    });
+    const raw = await buildRawMarkdown(project);
+    expect(raw["/fr/guides/leaf"]?.mdx).toContain(
+      '<a href="/guides/setup">English</a> <a href="/fr/guides/setup">Français</a> [Lien](/fr/guides/setup)'
     );
   });
 

@@ -419,11 +419,12 @@ const linkText = (value: string): string =>
   value.replaceAll(/[[\]]/gu, String.raw`\$&`);
 
 /**
- * A link destination. Whitespace ends one, and a `)` ends one unless it is
- * part of a balanced pair — so an href carrying either goes in the angle
- * bracket form, where only `<` and `>` are special.
+ * An authored href as a link destination, kept as written. Whitespace ends
+ * one, and a `)` ends one unless it is part of a balanced pair — so an href
+ * carrying either goes in the angle bracket form, where only `<` and `>` are
+ * special. A route Blume generates is written with `routeTarget` instead.
  */
-export const linkDestination = (href: string): string =>
+const linkDestination = (href: string): string =>
   /[\s()<>]/u.test(href)
     ? `<${href.replaceAll(/[<>]/gu, String.raw`\$&`)}>`
     : href;

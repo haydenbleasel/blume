@@ -2,7 +2,12 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 
 import { basename, dirname, join, normalize, relative, resolve } from "pathe";
 
-import { isInternalPath, stripBasePath, withBasePath } from "./base-path.ts";
+import {
+  isInternalPath,
+  splitHref,
+  stripBasePath,
+  withBasePath,
+} from "./base-path.ts";
 import { locatePath } from "./diagnostics.ts";
 import type { LocaleRouting } from "./i18n.ts";
 import { localizeLinkPath } from "./locale-links.ts";
@@ -244,9 +249,7 @@ export const resolveRelativeHref = (
   if (href === "" || NOT_RELATIVE.test(href)) {
     return undefined;
   }
-  const suffixAt = href.search(/[?#]/u);
-  const path = suffixAt === -1 ? href : href.slice(0, suffixAt);
-  const suffix = suffixAt === -1 ? "" : href.slice(suffixAt);
+  const { path, suffix } = splitHref(href);
   if (FILE_EXT.test(path) && !DOC_EXT.test(path)) {
     const route = toRoute(resolveRelative(from.route, path, from.isIndex));
     return hasRoute?.(decodePercent(route)) ? `${route}${suffix}` : undefined;
@@ -276,8 +279,7 @@ export const resolveRawRelativeHref = (
   if (href === "" || NOT_RELATIVE.test(href)) {
     return undefined;
   }
-  const suffixAt = href.search(/[?#]/u);
-  const path = suffixAt === -1 ? href : href.slice(0, suffixAt);
+  const { path, suffix } = splitHref(href);
   const resolved = resolveRelative(route, path, false);
   if (
     isOffSitePath(resolved) ||
@@ -287,7 +289,7 @@ export const resolveRawRelativeHref = (
   ) {
     return undefined;
   }
-  return `${resolved}${suffixAt === -1 ? "" : href.slice(suffixAt)}`;
+  return `${resolved}${suffix}`;
 };
 
 /**
@@ -313,8 +315,7 @@ export const resolveRootFileHref = (
   if (!isInternalPath(href)) {
     return undefined;
   }
-  const suffixAt = href.search(/[?#]/u);
-  const path = suffixAt === -1 ? href : href.slice(0, suffixAt);
+  const { path, suffix } = splitHref(href);
   if (!DOC_EXT.test(path)) {
     return undefined;
   }
@@ -324,9 +325,7 @@ export const resolveRootFileHref = (
       stripBasePath(options.deployBase, decodePercent(path))
     )
   );
-  return route === undefined
-    ? undefined
-    : `${route}${suffixAt === -1 ? "" : href.slice(suffixAt)}`;
+  return route === undefined ? undefined : `${route}${suffix}`;
 };
 
 /**
@@ -673,41 +672,60 @@ export interface FileRouteIndex {
    */
   bySource: Map<string, string>;
   /**
-   * A default-locale page's locale-stripped path (`navPath`), within its docs
-   * version, → its route. A page in a locale folder that links a sibling not
-   * translated yet (`fr/guides/setup.mdx` missing) means the default tree's
-   * file (`guides/setup.mdx`) of its own version, whose route — its own `slug`
-   * included — then moves into the reader's locale onto the fallback copy.
-   * Keyed by {@link defaultTreeKey}: an archived version's `navPath` drops its
-   * version folder, so it alone would name the current page's file too.
-   */
-  byDefaultNavPath: Map<string, string>;
-  /**
    * A staged page's entry id (`<source>/<ref>`) → its route. A remote
    * source's files have no path on disk, so a file link between two of them
    * (`./02-errors.mdx`) resolves by entry id, as the rendered link does.
    */
   byEntryId: Map<string, string>;
+  /**
+   * Where the `docs` collection's default tree is read from, for a link to a
+   * locale folder's file that isn't translated yet (see
+   * {@link defaultTreePath}); absent when the content root isn't known.
+   */
+  defaultTree?: DefaultTreeFolders & { contentRoot: string };
 }
 
-/** The linking side of a file link: where the page's source lives. */
-export interface FileLinkBase {
-  navPath: string;
-  sourcePath: string;
-  /** The page's docs version: `""` for the current docs. */
-  version: string;
+/** The folders a content path's default tree is read past. */
+export interface DefaultTreeFolders {
+  /** The locale folders beside the default tree (every locale but the default). */
+  localeFolders: readonly string[];
+  /** The archived versions' folders, which hold their own locale folders. */
+  versionFolders: readonly string[];
 }
 
-/** A default-tree file by its docs version and locale-stripped path. */
-const defaultTreeKey = (version: string, navPath: string): string =>
-  `${version}\0${normalize(navPath)}`;
+/**
+ * The same content path in the default tree: a page in a locale folder that
+ * links a sibling not translated yet (`fr/guides/setup.mdx` missing) means
+ * the default tree's file (`guides/setup.mdx`), whose route — its own `slug`
+ * included — moves into the reader's locale afterwards, onto the fallback
+ * copy (see `LocaleLinks.astro`). An archived version keeps its locale
+ * folders inside its own (`v1.0/fr/guides/setup.mdx`), so its default tree is
+ * that version's (`v1.0/guides/setup.mdx`). The rendered link
+ * (`markdown/relative-links.ts`) and {@link routeOfLinkedFile} both read it,
+ * so the page, the agent surfaces, and `blume validate` land on one page.
+ */
+export const defaultTreePath = (
+  entryId: string,
+  folders: DefaultTreeFolders
+): string | undefined => {
+  const [first = "", second = "", ...rest] = entryId.split("/");
+  if (folders.localeFolders.includes(first) && second !== "") {
+    return [second, ...rest].join("/");
+  }
+  return folders.versionFolders.includes(first) &&
+    folders.localeFolders.includes(second) &&
+    rest.length > 0
+    ? [first, ...rest].join("/")
+    : undefined;
+};
 
 export const buildFileRouteIndex = (
   pages: readonly PageRecord[],
-  i18n: LocaleRouting | null
+  i18n: LocaleRouting | null,
+  /** The `docs` collection's content root, which the default tree sits in. */
+  contentRoot?: string
 ): FileRouteIndex => {
   const bySource = new Map<string, string>();
-  const byDefaultNavPath = new Map<string, string>();
   const byEntryId = new Map<string, string>();
   for (const page of pages) {
     const { entryId, sourcePath } = page;
@@ -724,30 +742,50 @@ export const buildFileRouteIndex = (
     if (!bySource.has(sourcePath) || isDefault) {
       bySource.set(sourcePath, page.route);
     }
-    if (isDefault) {
-      byDefaultNavPath.set(
-        defaultTreeKey(page.version, page.navPath),
-        page.route
-      );
-    }
   }
-  return { byDefaultNavPath, byEntryId, bySource };
+  const defaultTree =
+    i18n && contentRoot !== undefined
+      ? {
+          contentRoot,
+          localeFolders: i18n.locales
+            .map((locale) => locale.code)
+            .filter((code) => code !== i18n.defaultLocale),
+          versionFolders: [
+            ...new Set(
+              pages
+                .map((page) => page.version)
+                .filter((version) => version !== "")
+            ),
+          ],
+        }
+      : undefined;
+  return { byEntryId, bySource, defaultTree };
 };
 
 /**
- * The route a file link written on `from` lands on: the linked file's own
- * route, or — when a locale folder doesn't have that file yet — the default
- * tree's file at the same place, in the same docs version.
+ * The route a file link written on the page at `sourcePath` lands on: the
+ * linked file's own route, or — when a locale folder doesn't have that file
+ * yet — its default tree's (see {@link defaultTreePath}).
  */
 export const routeOfLinkedFile = (
   index: FileRouteIndex,
-  from: FileLinkBase,
+  sourcePath: string,
   path: string
-): string | undefined =>
-  index.bySource.get(resolve(dirname(from.sourcePath), path)) ??
-  index.byDefaultNavPath.get(
-    defaultTreeKey(from.version, join(dirname(from.navPath), path))
+): string | undefined => {
+  const file = resolve(dirname(sourcePath), path);
+  const own = index.bySource.get(file);
+  if (own !== undefined || index.defaultTree === undefined) {
+    return own;
+  }
+  const { contentRoot } = index.defaultTree;
+  const inDefaultTree = defaultTreePath(
+    relative(contentRoot, file),
+    index.defaultTree
   );
+  return inDefaultTree === undefined
+    ? undefined
+    : index.bySource.get(resolve(contentRoot, inDefaultTree));
+};
 
 /**
  * The route a file link written on a staged page lands on: the linked
@@ -774,11 +812,10 @@ const relativeTarget = (
   ctx: LinkContext
 ): string => {
   const base = { isIndex: isIndexPage(page), route: page.route };
-  const { entryId, navPath, sourcePath, version } = page;
+  const { entryId, sourcePath } = page;
   let resolveFile: ((path: string) => string | undefined) | undefined;
   if (sourcePath) {
-    resolveFile = (path) =>
-      routeOfLinkedFile(ctx.fileRoutes, { navPath, sourcePath, version }, path);
+    resolveFile = (path) => routeOfLinkedFile(ctx.fileRoutes, sourcePath, path);
   } else if (entryId) {
     resolveFile = (path) => routeOfLinkedEntry(ctx.fileRoutes, entryId, path);
   }
@@ -1029,8 +1066,12 @@ export const validateLinks = async (
   }
 ): Promise<Diagnostic[]> => {
   const basePath = options.basePath ?? "";
-  const fileRoutes = buildFileRouteIndex(graph.pages, options.i18n ?? null);
   const { contentRoot } = options;
+  const fileRoutes = buildFileRouteIndex(
+    graph.pages,
+    options.i18n ?? null,
+    contentRoot
+  );
   const ctx: LinkContext = {
     anchors: buildAnchorIndex(graph.pages),
     basePath,

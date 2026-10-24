@@ -12,7 +12,7 @@ import {
   linkDefinitions,
   rewriteCardImages,
   rewriteElementUrls,
-  rewriteImageTargets,
+  rewriteImageEmbeds,
   rewriteLinkTargets,
 } from "./sources/normalize.ts";
 import type { LinkDefinition } from "./sources/normalize.ts";
@@ -412,46 +412,43 @@ const rebaseFileTarget = (
 };
 
 /**
- * Rebase every relative image target in expanded lines, skipping fences, from
- * the included file's directory to the including file's, so a partial's
- * colocated `![](./diagram.png)` still resolves once its markdown lives in
- * the includer. Every destination form is read and written back in its own
- * form (`![](<./a b.png> "Title")`; see `rewriteImageTargets`). A link,
- * a reference definition, or an element URL naming a file beside the partial
+ * Rebase every relative image target in expanded lines, from the included
+ * file's directory to the including file's, so a partial's colocated
+ * `![](./diagram.png)` still resolves once its markdown lives in the
+ * includer. Every destination form is read and written back in its own form
+ * (`![](<./a b.png> "Title")`; see `rewriteImageEmbeds`). A link, a
+ * reference definition, or an element URL naming a file beside the partial
  * moves with it too, the way the build publishes such a file (see
- * `core/content-assets.ts`).
+ * `core/content-assets.ts`). The lines are read in the including page's
+ * `format`, as the render reads them, so code and comments stay as written.
  */
 const rebaseImages = (
   lines: string[],
   fromDir: string,
-  toDir: string
+  toDir: string,
+  format: "md" | "mdx"
 ): string[] => {
   if (fromDir === toDir) {
     return lines;
   }
-  let fence: FenceState = null;
-  const rebased = lines.map((line) => {
-    const next = nextFenceState(line, fence);
-    const inFence = fence !== null || next !== null;
-    fence = next;
-    return inFence
-      ? line
-      : rewriteImageTargets(line, (target) =>
-          rebaseImageTarget(target, fromDir, toDir)
-        );
-  });
-  // A `<Card img>` is an image embed too, and its tag may wrap onto later
-  // lines, so it's rebased over the whole text, as are links and elements.
+  const toImage = (target: string): string | null =>
+    rebaseImageTarget(target, fromDir, toDir);
   const toFile = (target: string): string | null =>
     rebaseFileTarget(target, fromDir, toDir);
+  // A `<Card img>` is an image embed too, and its tag may wrap onto later
+  // lines, so it's rebased over the whole text, as are links and elements.
   return rewriteElementUrls(
     rewriteLinkTargets(
-      rewriteCardImages(rebased.join("\n"), (target) =>
-        rebaseImageTarget(target, fromDir, toDir)
+      rewriteCardImages(
+        rewriteImageEmbeds(lines.join("\n"), toImage, format),
+        toImage,
+        format
       ),
-      toFile
+      toFile,
+      format
     ),
-    (url) => (isLinkElementUrl(url) ? toFile(url.value) : null)
+    (url) => (isLinkElementUrl(url) ? toFile(url.value) : null),
+    format
   ).split("\n");
 };
 
@@ -622,17 +619,21 @@ const expandStatement = async (
   // Props replace their `{{name}}` references line by line, so every line
   // keeps its origin; they reach the file's own nested includes too.
   const { props } = statement.attributes;
-  const rebased = rebaseImages(
-    props ? lines.map((text) => substituteVariables(text, props)) : lines,
-    dirname(path),
-    dirname(filePath)
-  );
+  const substituted = props
+    ? lines.map((text) => substituteVariables(text, props))
+    : lines;
+  // The partial reads in the page's format, so a `.md` one's comments become
+  // the `.mdx` page's before its files are rebased around them.
+  const format = extname(filePath).toLowerCase() === ".mdx" ? "mdx" : "md";
   return {
-    lines:
-      extname(path).toLowerCase() === ".md" &&
-      extname(filePath).toLowerCase() === ".mdx"
-        ? htmlCommentsAsMdx(rebased)
-        : rebased,
+    lines: rebaseImages(
+      extname(path).toLowerCase() === ".md" && format === "mdx"
+        ? htmlCommentsAsMdx(substituted)
+        : substituted,
+      dirname(path),
+      dirname(filePath),
+      format
+    ),
     origins,
   };
 };

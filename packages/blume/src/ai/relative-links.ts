@@ -5,6 +5,8 @@ import {
   isInternalPath,
   mountBasePath,
   normalizeBasePath,
+  normalizePath,
+  splitHref,
   stripBasePath,
   withAuthoredBasePath,
   withBasePath,
@@ -26,7 +28,7 @@ import type { LocalizeHrefOptions } from "../core/locale-links.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
 import { resolveDocsCollection } from "../core/sources/collection.ts";
 import { extractLinks } from "../core/sources/normalize.ts";
-import { encodeTargetChars } from "./link-text.ts";
+import { hrefTarget } from "./link-text.ts";
 
 /**
  * Page links on the agent surfaces — the `.md`/`.mdx` mirrors,
@@ -45,7 +47,8 @@ import { encodeTargetChars } from "./link-text.ts";
  * `deployment.base` alone, and, on a page in a prefixed locale, a page link
  * that locale's copy of the route when it is served
  * (`components/layout/LocaleLinks.astro`), as a resolved relative link does
- * there too. A root-relative link to a content file (`/guide/new.md`) lands
+ * there too (a raw relative `<a href>`, which the browser resolves, never
+ * moves). A root-relative link to a content file (`/guide/new.md`) lands
  * on that file's page, as on the rendered page (`resolveRootFileHref`).
  * Inline links, images, component `href`s, and reference definitions are
  * rewritten; fenced and inline code (indented too, on a `.md` page),
@@ -78,7 +81,7 @@ export interface RelativeLinkOptions {
    * page link lands on the route the snapshot keys that page by: without the
    * `deployment.base`, since the chat panel mounts every link it renders
    * under it, and a locale's fallback copy as the page it renders, since the
-   * snapshot holds that page instead. Images stay as written.
+   * snapshot holds that page instead. Images lose the base too.
    */
   assistant?: boolean;
 }
@@ -152,7 +155,7 @@ const collectSplices = (
         // A route can hold a space, a parenthesis or a quote (`my page.md`
         // publishes at `/my page`), which would end or split the link or the
         // attribute it's written in.
-        text: encodeTargetChars(route, /[\s"'()<>]/gu),
+        text: hrefTarget(route),
       });
     }
   }
@@ -161,10 +164,10 @@ const collectSplices = (
 
 /** What a project's links resolve through, whoever reads them. */
 interface LinkIndex {
+  /** The `docs` collection's content root. */
+  contentRoot: string;
   fileRoutes: FileRouteIndex;
   localeByRoute: Map<string, string>;
-  /** A page's source file → where it sits for a default-tree lookup. */
-  fileBySource: Map<string | undefined, { navPath: string; version: string }>;
   routes: Set<string>;
 }
 
@@ -182,14 +185,17 @@ const linkIndex = (project: BlumeProject): LinkIndex => {
   let index = linkIndexes.get(project);
   if (!index) {
     const { config, graph, manifest } = project;
+    const contentRoot = resolveDocsCollection(
+      config,
+      project.context.root
+    ).base;
     index = {
-      fileBySource: new Map(
-        graph.pages.map((page) => [
-          page.sourcePath,
-          { navPath: page.navPath, version: page.version },
-        ])
+      contentRoot,
+      fileRoutes: buildFileRouteIndex(
+        graph.pages,
+        config.i18n ?? null,
+        contentRoot
       ),
-      fileRoutes: buildFileRouteIndex(graph.pages, config.i18n ?? null),
       localeByRoute: new Map(
         manifest.routes.map((route) => [route.path, route.locale])
       ),
@@ -201,14 +207,14 @@ const linkIndex = (project: BlumeProject): LinkIndex => {
 };
 
 /**
- * A resolved route as the assistant's snapshot keys it. A locale's fallback
- * copy (`/fr/guides/install` with no French page there) renders another
- * locale's page, which the snapshot holds in its place, so the route becomes
- * that page's; every other route is kept, `?query#hash` and all. The copy is
- * looked up decoded, so a link that percent-encodes it (`/fr/my%20page`) is
- * found too.
+ * A resolved page path as the assistant's snapshot keys it. A locale's
+ * fallback copy (`/fr/guides/install` with no French page there) renders
+ * another locale's page, which the snapshot holds in its place, so the path
+ * becomes that page's route; every other path is kept. The copy is looked up
+ * as routes are kept, decoded and without a trailing slash, so a link that
+ * percent-encodes it (`/fr/my%20page`) or ends in a slash is found too.
  */
-const snapshotRoute = (project: BlumeProject): ((route: string) => string) => {
+const snapshotPath = (project: BlumeProject): ((path: string) => string) => {
   const pageRoutes = new Map(
     project.graph.pages.map((page) => [page.id, page.route])
   );
@@ -219,11 +225,9 @@ const snapshotRoute = (project: BlumeProject): ((route: string) => string) => {
       rendered.set(route.path, page);
     }
   }
-  return (route) => {
-    const suffixAt = route.search(/[?#]/u);
-    const path = suffixAt === -1 ? route : route.slice(0, suffixAt);
-    const page = rendered.get(decodedPath(path));
-    return page === undefined ? route : `${page}${route.slice(path.length)}`;
+  return (path) => {
+    const page = rendered.get(normalizePath(decodedPath(path)));
+    return page ?? path;
   };
 };
 
@@ -239,25 +243,13 @@ export const relativeLinkRewriter = (
   // Links are read under the real deployment base whoever reads them, so a
   // root link to a content file that carries it is still recognized.
   const deployBase = normalizeBasePath(deployment.options.base);
-  const contentRoot = resolveDocsCollection(
-    project.config,
-    project.context.root
-  ).base;
   const localeTokens = i18n
     ? ["$", ...i18n.locales.map((locale) => locale.code)]
     : [];
-  const { fileBySource, fileRoutes, localeByRoute, routes } =
-    linkIndex(project);
+  const { contentRoot, fileRoutes, localeByRoute, routes } = linkIndex(project);
   const hasRoute = (path: string): boolean => routes.has(path);
 
-  const toSnapshot = options.assistant ? snapshotRoute(project) : undefined;
-
-  /** An href without the deployment base, `?query#hash` kept. */
-  const unmounted = (href: string): string => {
-    const suffixAt = href.search(/[?#]/u);
-    const path = suffixAt === -1 ? href : href.slice(0, suffixAt);
-    return `${stripBasePath(deployBase, path)}${suffixAt === -1 ? "" : href.slice(suffixAt)}`;
-  };
+  const toSnapshot = options.assistant ? snapshotPath(project) : undefined;
 
   /**
    * Where a link lands for its reader, from the href the rendered page serves
@@ -267,45 +259,61 @@ export const relativeLinkRewriter = (
    * assistant's snapshot without the base, a fallback copy read as the page
    * it renders.
    */
-  const landOn = (
-    href: string,
-    localize: LocalizeHrefOptions | undefined
-  ): string => {
+  const landOn = (href: string, localize?: LocalizeHrefOptions): string => {
     const localized = localize ? localizeHref(href, localize) : href;
     if (!toSnapshot) {
       return localized;
     }
+    const { path, suffix } = splitHref(localized);
+    const route = stripBasePath(deployBase, path);
     // A link that carries the base over an off-site path (`/sub//host`)
     // would read as another site's without it; it stays as it is.
-    const route = unmounted(localized);
-    return isOffSitePath(route) ? localized : toSnapshot(route);
+    return isOffSitePath(route) ? localized : `${toSnapshot(route)}${suffix}`;
   };
 
   // In the snapshot, a link to a fallback copy reads as the page it renders,
-  // from whichever page links it.
-  const mapsCopies =
-    toSnapshot !== undefined &&
-    project.manifest.routes.some((route) => route.fallback);
+  // from whichever page links it. Where no base or locale moves a page's root
+  // links, only one under a copy's locale prefix (`/fr/…`) can change.
+  const copyPrefixes = new Set(
+    toSnapshot && i18n
+      ? project.manifest.routes.flatMap((route) =>
+          route.fallback
+            ? [
+                localePrefix(route.locale, i18n).replaceAll(
+                  /[$()*+.?[\\\]^{|}]/gu,
+                  String.raw`\$&`
+                ),
+              ]
+            : []
+        )
+      : []
+  );
+  const maybeCopyLink =
+    copyPrefixes.size > 0
+      ? new RegExp(
+          String.raw`(?:\]\(|\]:|\shref=["'])[\t ]*<?(?:${[...copyPrefixes].join("|")})(?=[\s"'#)/>?]|$)`,
+          "iu"
+        )
+      : undefined;
 
   /**
-   * How a page's root-relative links change, if they do: when the site is
-   * mounted under a prefix, the page reads in a prefixed locale, whose copy
-   * of a route they move to, or the snapshot maps fallback copies.
+   * How a page's root-relative links change, if they do, and the test a text
+   * that could hold one passes: any root link when the site is mounted under
+   * a prefix or the page reads in a prefixed locale, whose copy of a route
+   * they move to; one to a fallback copy when only the snapshot maps them.
    */
   const rootLinksOf = (
     route: string
-  ): { localize?: LocalizeHrefOptions } | undefined => {
+  ): { localize?: LocalizeHrefOptions; maybe: RegExp } | undefined => {
     const locale = localeByRoute.get(route);
     const localize =
       i18n && locale !== undefined && localePrefix(locale, i18n) !== ""
         ? { basePath, deployBase, i18n, locale, routes }
         : undefined;
-    return deployBase !== "" ||
-      basePath !== "" ||
-      localize !== undefined ||
-      mapsCopies
-      ? { localize }
-      : undefined;
+    if (deployBase !== "" || basePath !== "" || localize !== undefined) {
+      return { localize, maybe: MAYBE_PAGE_LINK };
+    }
+    return maybeCopyLink ? { maybe: maybeCopyLink } : undefined;
   };
 
   /**
@@ -326,17 +334,9 @@ export const relativeLinkRewriter = (
     };
     // A staged page (a remote or CMS source) has no file on disk: it
     // resolves a sibling by its entry id, as `blume validate` does.
-    let resolveFile: (path: string) => string | undefined;
-    if (sourcePath) {
-      const { navPath, version } = fileBySource.get(sourcePath) ?? {
-        navPath: basename(sourcePath),
-        version: "",
-      };
-      resolveFile = (path) =>
-        routeOfLinkedFile(fileRoutes, { navPath, sourcePath, version }, path);
-    } else {
-      resolveFile = (path) => routeOfLinkedEntry(fileRoutes, file, path);
-    }
+    const resolveFile = sourcePath
+      ? (path: string) => routeOfLinkedFile(fileRoutes, sourcePath, path)
+      : (path: string) => routeOfLinkedEntry(fileRoutes, file, path);
     return (target) => resolveRelativeHref(target, from, resolveFile, hasRoute);
   };
 
@@ -349,7 +349,8 @@ export const relativeLinkRewriter = (
     if (
       !(page.sourcePath || page.entryId || rootLinks) ||
       !(
-        (rootLinks ? MAYBE_PAGE_LINK : MAYBE_RELATIVE).test(text) ||
+        rootLinks?.maybe.test(text) ||
+        MAYBE_RELATIVE.test(text) ||
         MAYBE_ROOT_FILE.test(text)
       )
     ) {
@@ -384,23 +385,24 @@ export const relativeLinkRewriter = (
         const route = raw
           ? resolveRawRelativeHref(target, page.route, hasRoute)
           : relative?.(target);
+        // A raw `<a href>` ships as written, so the browser resolves it from
+        // the page's URL, and a relative href never moves into a locale.
+        const moveTo = raw ? undefined : localize;
         return route === undefined
           ? undefined
-          : landOn(mountBasePath(deployBase, route), localize);
+          : landOn(mountBasePath(deployBase, route), moveTo);
       }
       const file = raw ? undefined : rootFile(target);
       return file ?? (rootLinks ? rooted(target) : undefined);
     };
     // An image is always a file: `public/` (or a generated asset endpoint),
-    // served under the deployment base but never `basePath`. A relative one
-    // is left to `core/content-assets.ts`, and the assistant's snapshot
-    // leaves them all as written.
+    // served under the deployment base but never `basePath`, and never in a
+    // locale. A relative one is left to `core/content-assets.ts`.
     const imaged = (target: string): string | undefined => {
-      const based =
-        rootLinks && !options.assistant
-          ? withBasePath(deployBase, target)
-          : target;
-      return based === target ? undefined : based;
+      const href = rootLinks
+        ? landOn(withBasePath(deployBase, target))
+        : target;
+      return href === target ? undefined : href;
     };
 
     const lines = text.split("\n");

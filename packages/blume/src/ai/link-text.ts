@@ -1,3 +1,6 @@
+import { mountBasePath } from "../core/base-path.ts";
+import { absoluteUrl } from "../core/site-url.ts";
+
 /** `encodeURIComponent` leaves these as they are, so they're mapped here. */
 const UNESCAPED = new Map([
   ["'", "%27"],
@@ -6,24 +9,36 @@ const UNESCAPED = new Map([
 ]);
 
 /**
- * A link target with the characters `chars` matches percent-encoded: ones
- * that would end or split a Markdown link destination or the attribute it's
- * in (whitespace, parentheses, quotes). The rest stays as written, so
- * `/ja/ポイント` reads as it is.
+ * An href as a Markdown link target: the characters that would end or split
+ * a link destination or the attribute it's in (whitespace, quotes,
+ * parentheses, angle brackets) are percent-encoded. The rest stays as
+ * written, escapes included, so `/ja/ポイント` reads as it is.
  */
-export const encodeTargetChars = (target: string, chars: RegExp): string =>
-  target.replaceAll(
-    chars,
+export const hrefTarget = (href: string): string =>
+  href.replaceAll(
+    /[\s"'()<>]/gu,
     (char) => UNESCAPED.get(char) ?? encodeURIComponent(char)
   );
 
 /**
- * A page route as a link target in the assistant's snapshot, which the model
- * cites as written: whitespace, parentheses, and a `%` (which would read as
- * an escape) are percent-encoded.
+ * A page route as a link target: as {@link hrefTarget} writes an href, and
+ * with any `%` encoded too, since one in a route would read as an escape.
  */
 export const routeTarget = (route: string): string =>
-  encodeTargetChars(route, /[%\s()]/gu);
+  hrefTarget(route.replaceAll("%", "%25"));
+
+/**
+ * A page's URL in the lists agents read by URL (`llms.txt`, the site skill,
+ * the changelog index): under `deployment.base` — with or without a `site`
+ * (the mcp.json convention), and even over a route that starts with the
+ * base's own name — and absolute under a configured `site`. Encoded like the
+ * sitemap, so a route with spaces or non-ASCII still makes a valid Markdown
+ * link, and as {@link hrefTarget}, so a quote or a parenthesis can't end it.
+ */
+export const pageUrl = (route: string, site?: string, base = ""): string => {
+  const path = mountBasePath(base, route);
+  return hrefTarget(encodeURI(site ? absoluteUrl(site, path) : path));
+};
 
 /**
  * A title as Markdown link text. An unescaped bracket in it — `[Beta] Webhooks`

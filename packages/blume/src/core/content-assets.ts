@@ -89,7 +89,7 @@ export const rewriteRelativeAssets = (options: {
   sourcePath: string;
   projectRoot: string;
   deployBase?: string;
-  format?: "md" | "mdx";
+  format: "md" | "mdx" | null;
   register?: (param: string, absPath: string) => void;
 }): string => {
   const { source, sourcePath, projectRoot, deployBase, format, register } =
@@ -161,7 +161,7 @@ export const collectContentAssets = async (project: {
         return;
       }
       rewriteRelativeAssets({
-        format: page?.format,
+        format: page?.format ?? null,
         projectRoot: project.context.root,
         register: (param, abs) => {
           files[param] = abs;

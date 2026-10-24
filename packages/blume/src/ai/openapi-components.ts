@@ -17,12 +17,8 @@ import type {
   ComponentMarkdown,
   EvaluatedValue,
 } from "./component-markdown.ts";
-import {
-  fencedBlock,
-  inlineCode,
-  isString,
-  linkDestination,
-} from "./component-markdown.ts";
+import { fencedBlock, inlineCode, isString } from "./component-markdown.ts";
+import { routeTarget } from "./link-text.ts";
 import { operationDetails } from "./operation-details.ts";
 import type { OperationParts } from "./operation-details.ts";
 
@@ -40,7 +36,8 @@ const inlineText = (text: string): string =>
 
 /**
  * One operation as a link, for the tag listings. `href` is the operation's
- * served URL: its route under the deployment base.
+ * route, under the deployment base unless the assistant reads it, written as
+ * every generated page link is (see `routeTarget`).
  */
 const listItem = (
   signature: string,
@@ -55,7 +52,7 @@ const listItem = (
   ]
     .filter(Boolean)
     .join(" ");
-  return `- [${inlineCode(signature)}](${linkDestination(href)})${tail ? ` — ${tail}` : ""}`;
+  return `- [${inlineCode(signature)}](${routeTarget(href)})${tail ? ` — ${tail}` : ""}`;
 };
 
 /**

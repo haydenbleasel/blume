@@ -141,8 +141,13 @@ export const contentAssetsPlugin = (
     if (dir === undefined) {
       return;
     }
-    const next = rewriteElementUrls(node.value, (url) =>
-      isLinkElementUrl(url) ? (fileUrl(dir, url.value) ?? null) : null
+    // An HTML node's value is raw HTML: it holds no Markdown code, and a
+    // comment in it renders nothing whether it's rewritten or not.
+    const next = rewriteElementUrls(
+      node.value,
+      (url) =>
+        isLinkElementUrl(url) ? (fileUrl(dir, url.value) ?? null) : null,
+      null
     );
     if (next !== node.value) {
       ctx.setProperty(node, "value", next);

@@ -550,6 +550,47 @@ describe("expandIncludes", () => {
     ]);
   });
 
+  it("leaves a partial's files in code and comments as written, read in the page's format", async () => {
+    // The partial is read as the page is: in `.md`, indented code shows its
+    // targets and a comment hides them; MDX has no indented code, and a
+    // `.md` partial's HTML comments become the `.mdx` page's.
+    const root = await fixture({
+      "_snippets/code.md": [
+        "A sample:",
+        "",
+        "    ![shown](./pic.png) [spec](./spec.pdf)",
+        "",
+        "<!-- ![hidden](./pic.png) -->",
+        "",
+      ].join("\n"),
+      "_snippets/pic.png": "png",
+      "_snippets/spec.pdf": "pdf",
+      "guides/page.md": "unused",
+      "guides/page.mdx": "unused",
+    });
+    const expand = async (page: string) => {
+      const expanded = await expandIncludes(
+        "<include>../_snippets/code.md</include>",
+        { contentRoot: root, sourcePath: join(root, page) }
+      );
+      return expanded.text.split("\n");
+    };
+    expect(await expand("guides/page.md")).toStrictEqual([
+      "A sample:",
+      "",
+      "    ![shown](./pic.png) [spec](./spec.pdf)",
+      "",
+      "<!-- ![hidden](./pic.png) -->",
+    ]);
+    expect(await expand("guides/page.mdx")).toStrictEqual([
+      "A sample:",
+      "",
+      "    ![shown](../_snippets/pic.png) [spec](../_snippets/spec.pdf)",
+      "",
+      "{/* ![hidden](./pic.png) */}",
+    ]);
+  });
+
   it("writes a .md partial's HTML comments as MDX comments in an .mdx page", async () => {
     const partial = [
       "Before <!-- a note */ here --> after `<!-- shown -->`.",

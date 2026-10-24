@@ -88,12 +88,14 @@ export const isExternalUrl = (target: string): boolean =>
   /^https?:\/\//iu.test(target) || target.startsWith("//");
 
 /**
- * The path part of a root-relative target, before any `?query` or `#fragment`
- * (`/docs#install` -> `/docs`).
+ * A link target split before its `?query` or `#fragment`
+ * (`/docs#install` -> `/docs` and `#install`); `suffix` is `""` without one.
  */
-const pathPart = (target: string): string => {
-  const at = target.search(/[#?]/u);
-  return at === -1 ? target : target.slice(0, at);
+export const splitHref = (href: string): { path: string; suffix: string } => {
+  const at = href.search(/[#?]/u);
+  return at === -1
+    ? { path: href, suffix: "" }
+    : { path: href.slice(0, at), suffix: href.slice(at) };
 };
 
 /**
@@ -102,7 +104,7 @@ const pathPart = (target: string): string => {
  * base written by hand.
  */
 const isUnderBase = (base: string, route: string): boolean => {
-  const path = pathPart(route);
+  const { path } = splitHref(route);
   return path === base || path.startsWith(`${base}/`);
 };
 
@@ -181,7 +183,7 @@ export const withAuthoredBasePath = (
   if (!isInternalPath(target)) {
     return target;
   }
-  const path = pathPart(target);
+  const { path } = splitHref(target);
   return DOTTED_PATH.test(path) && !servesPage(withBasePath(basePath, path))
     ? withBasePath(deployBase, target)
     : withComposedBasePath(deployBase, basePath, target);

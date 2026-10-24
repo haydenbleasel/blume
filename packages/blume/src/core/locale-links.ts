@@ -2,6 +2,7 @@ import {
   isInternalPath,
   mountBasePath,
   normalizePath,
+  splitHref,
   stripBasePath,
   withBasePath,
 } from "./base-path.ts";
@@ -113,9 +114,7 @@ export const localizeHref = (
   if (!isInternalPath(href)) {
     return href;
   }
-  const suffixAt = href.search(/[#?]/u);
-  const path = suffixAt === -1 ? href : href.slice(0, suffixAt);
-  const suffix = suffixAt === -1 ? "" : href.slice(suffixAt);
+  const { path, suffix } = splitHref(href);
   const based = stripBasePath(options.deployBase, path);
   const localized = localizeLinkPath(based, options);
   if (localized === based) {

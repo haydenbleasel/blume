@@ -1,10 +1,9 @@
-import { mountBasePath, normalizeBasePath } from "../core/base-path.ts";
+import { normalizeBasePath } from "../core/base-path.ts";
 import { rewriteRelativeAssets } from "../core/content-assets.ts";
 import matter from "../core/frontmatter.ts";
 import { isHiddenPage } from "../core/hidden-pages.ts";
 import { metaDescription } from "../core/manifest.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
-import { absoluteUrl } from "../core/site-url.ts";
 import { extractHeadings } from "../core/sources/normalize.ts";
 import { readExpandedEntryText } from "../core/sources/read.ts";
 import type { NavNode, Navigation, PageRecord } from "../core/types.ts";
@@ -13,7 +12,7 @@ import { AI_CATALOG_PATH, hasAiCatalog } from "./ai-catalog.ts";
 import { API_CATALOG_PATH, hasApiCatalog } from "./api-catalog.ts";
 import { API_PAGES_PATH, OPENAPI_PATH } from "./api/paths.ts";
 import { downlevelComponents } from "./component-markdown.ts";
-import { linkText } from "./link-text.ts";
+import { linkText, pageUrl } from "./link-text.ts";
 import { relativeLinkRewriter } from "./relative-links.ts";
 import { projectComponentSerializers } from "./serializers.ts";
 import {
@@ -23,16 +22,6 @@ import {
 } from "./skills.ts";
 import type { SkillArtifact } from "./skills.ts";
 import { applyAgentVisibility } from "./visibility.ts";
-
-// Routes carry `basePath`; a `deployment.base` subdirectory is layered on top —
-// with or without a `site` (the mcp.json convention), and even over a route
-// that starts with the base's own name — so the emitted URL matches where the
-// page is served. Encoded like the sitemap: a route with spaces or non-ASCII
-// must still yield a valid Markdown link.
-const pageUrl = (route: string, site?: string, base = ""): string => {
-  const path = mountBasePath(base, route);
-  return encodeURI(site ? absoluteUrl(site, path) : path);
-};
 
 /** Inputs only the build has: the published skills, collected once per build. */
 export interface LlmsIndexOptions {

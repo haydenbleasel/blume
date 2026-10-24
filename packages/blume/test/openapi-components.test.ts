@@ -299,7 +299,7 @@ describe("openapi component serializers", () => {
       )
     ).toBe(
       [
-        "- [`GET /users/{id}`](</reference/pets/get user (v1)>) — Fetch ",
+        "- [`GET /users/{id}`](/reference/pets/get%20user%20%28v1%29) — Fetch ",
         "\\<user\\> by id, \\*only\\* for \\[admins\\]\\_. Deprecated.\n",
       ].join("")
     );

@@ -1,20 +1,15 @@
 import { hasGeneratedChangelog } from "../astro/pages.ts";
-import {
-  mountBasePath,
-  normalizeBasePath,
-  withBasePath,
-} from "../core/base-path.ts";
+import { normalizeBasePath, withBasePath } from "../core/base-path.ts";
 import { CHANGELOG_INDEX_ROUTE } from "../core/changelog-index.ts";
 import { discoverPagesSync } from "../core/custom-pages.ts";
 import { isHiddenPage } from "../core/hidden-pages.ts";
 import { metaDescription } from "../core/manifest.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
-import { absoluteUrl } from "../core/site-url.ts";
 import type { NavNode, PageRecord } from "../core/types.ts";
 import { resolveReferences } from "../openapi/references.ts";
 import { docsPhrase } from "./ai-catalog.ts";
 import { API_PAGES_PATH } from "./api/paths.ts";
-import { linkText } from "./link-text.ts";
+import { linkText, pageUrl } from "./link-text.ts";
 import { asciiSlugify } from "./mcp/discovery.ts";
 import {
   SKILL_DESCRIPTION_MAX,
@@ -213,8 +208,7 @@ const skillMarkdown = (project: BlumeProject, name: string): string => {
   const { site = "" } = config.deployment.options;
   const base = normalizeBasePath(config.deployment.options.base);
   // Mounted and encoded like llms.txt's links.
-  const url = (path: string): string =>
-    encodeURI(absoluteUrl(site, mountBasePath(base, path)));
+  const url = (path: string): string => pageUrl(path, site, base);
   const markdownUrl = (route: string): string =>
     url(route === "/" ? "/index.md" : `${route}.md`);
 

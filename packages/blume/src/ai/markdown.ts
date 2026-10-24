@@ -81,7 +81,7 @@ export const buildRawMarkdown = async (
       if (route.sourcePath) {
         text = rewriteRelativeAssets({
           deployBase: project.config.deployment.options.base,
-          format: page?.format,
+          format: page?.format ?? null,
           projectRoot: project.context.root,
           source: text,
           sourcePath: route.sourcePath,
