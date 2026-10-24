@@ -129,6 +129,9 @@ export const SWAP_STYLESHEET_INIT_SCRIPT = `(()=>{const sel='body link[rel="styl
  * too. `getClientRects()` skips links that aren't rendered — `hidden` drill-in
  * panels and breakpoint-hidden duplicates — and centering no-ops when the
  * active link is already inside the visible scroll area, so a short sidebar
- * never moves.
+ * never moves. On desktop the sticky sidebar's visible area ends where the
+ * footer row starts once that row scrolls in over it (a back navigation that
+ * restores the page bottom, an anchor near the end); the mobile drawer is
+ * fixed above the footer, so it keeps its whole box.
  */
-export const SIDEBAR_SCROLL_INIT_SCRIPT = `(()=>{const drawer=()=>document.querySelector("[data-blume-nav-drawer]");const center=()=>{const n=drawer();const s=n&&(n.querySelector("[data-blume-nav-tree]")||n);if(!s)return;let l=null;for(const a of s.querySelectorAll('a[aria-current="page"]')){if(a.getClientRects().length){l=a;break;}}if(!l)return;const r=n.getBoundingClientRect();const t=l.getBoundingClientRect();if(t.top>=r.top&&t.bottom<=r.bottom)return;n.scrollTop+=t.top-r.top-(n.clientHeight-t.height)/2;};let saved=-1;document.addEventListener("astro:before-swap",()=>{const n=drawer();saved=n?n.scrollTop:-1;});document.addEventListener("astro:after-swap",()=>{const n=drawer();if(n&&saved>=0){n.scrollTop=saved;}center();});center();})();`;
+export const SIDEBAR_SCROLL_INIT_SCRIPT = `(()=>{const drawer=()=>document.querySelector("[data-blume-nav-drawer]");const center=()=>{const n=drawer();const s=n&&(n.querySelector("[data-blume-nav-tree]")||n);if(!s)return;let l=null;for(const a of s.querySelectorAll('a[aria-current="page"]')){if(a.getClientRects().length){l=a;break;}}if(!l)return;const r=n.getBoundingClientRect();const f=getComputedStyle(n).position==="sticky"&&document.querySelector("[data-blume-footer-row]");const b=f?Math.min(r.bottom,f.getBoundingClientRect().top):r.bottom;const t=l.getBoundingClientRect();if(t.top>=r.top&&t.bottom<=b)return;n.scrollTop+=t.top-r.top-(n.clientHeight-t.height)/2;};let saved=-1;document.addEventListener("astro:before-swap",()=>{const n=drawer();saved=n?n.scrollTop:-1;});document.addEventListener("astro:after-swap",()=>{const n=drawer();if(n&&saved>=0){n.scrollTop=saved;}center();});center();})();`;

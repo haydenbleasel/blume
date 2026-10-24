@@ -86,6 +86,16 @@ describe("print stylesheet", () => {
     expect(footer).toContain("data-blume-footer>");
   });
 
+  it("hides the docs footer row, overrides included, with a utility", async () => {
+    // A `layout.Footer` override renders inside the row, where `body > footer`
+    // no longer reaches it. A utility rather than a theme selector, because an
+    // ejected site freezes app.css but keeps pulling RootLayout.
+    const root = await source("components/layout/RootLayout.astro");
+    expect(root).toMatch(
+      /class="[^"]*\bprint:hidden\b[^"]*"\s+data-blume-footer-row/u
+    );
+  });
+
   it("prints a collapsed expandable block in full", () => {
     // The print rule repeats the collapse's selector so it wins by order; a
     // weaker selector lost to it and printed the first lines plus the fade.

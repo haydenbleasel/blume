@@ -466,10 +466,15 @@ hr { border: 0; border-top: 1px solid #ddd; margin: 2em 0; }`;
     }
     const rect = summary.getBoundingClientRect();
     // The rail scrolls, so it clips the menu at its own edges: its top sits
-    // under the sticky header, below the viewport's.
-    const room = details
+    // under the sticky header, below the viewport's. At the end of the page
+    // the footer row slides in over its bottom edge, so a menu stops there.
+    const rail = details
       .closest("[data-blume-toc]")
       ?.getBoundingClientRect() ?? { bottom: window.innerHeight, top: 0 };
+    const footerTop =
+      document.querySelector("[data-blume-footer-row]")?.getBoundingClientRect()
+        .top ?? Number.POSITIVE_INFINITY;
+    const room = { bottom: Math.min(rail.bottom, footerTop), top: rail.top };
     const margin = 8;
     const flipUp =
       rect.bottom + menu.offsetHeight + margin > room.bottom &&
