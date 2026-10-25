@@ -3,6 +3,7 @@ import type { EndpointAuth } from "../components/content/api-page.ts";
 import type { SearchAdapterKind } from "../search/adapters/registry.ts";
 import type { StructuredDataIdentity } from "../seo/jsonld.ts";
 import type { FontHead } from "../theme/fonts.ts";
+import type { BlogCover, BlogPost, BlogTagCount } from "./blog.ts";
 import type { UIStrings } from "./i18n-ui.ts";
 import type { LocalizableLabel, ResolvedConfig } from "./schema.ts";
 import type { Navigation, RouteAlternate, VersionAlternate } from "./types.ts";
@@ -318,8 +319,21 @@ export interface BlumeClientData {
   page: { route: string; title: string };
 }
 
+/** A blog post as the page data carries it: its cover's local file left out. */
+export type BlumeBlogPost = Omit<BlogPost, "cover"> & {
+  cover: Omit<BlogCover, "file"> | null;
+};
+
 /** The `blume:data` module a Blume site's custom pages import. */
 export interface BlumeData {
+  /**
+   * The blog: its posts, newest first, every locale and version — what the
+   * `/blog` index, the tag pages, and each post's byline and footer read —
+   * and the tags of the posts the index lists, each with a page at
+   * `/blog/tags/<slug>` (a tag whose route a redirect answers is left out).
+   * Empty without `type: blog` pages.
+   */
+  blog: { posts: BlumeBlogPost[]; tags: BlogTagCount[] };
   config: BlumeDataConfig;
   feeds: BlumeFeed[];
   /** Configured fonts for the head: CSS variable + preload weights per family. */
@@ -334,6 +348,11 @@ export interface BlumeData {
    */
   navigationByVersion: Record<string, Record<string, Navigation>>;
   routes: BlumeRoute[];
+  /**
+   * The sidebar's width on a dated type's pages, where its config sets one
+   * (`blog.sidebar.width`, `changelog.sidebar.width`).
+   */
+  sidebarWidths: Partial<Record<"blog" | "changelog", string>>;
   /** Resolved UI strings for the default locale. */
   ui: UIStrings;
   /** Per-locale UI strings, keyed by locale code (empty without i18n). */

@@ -14,7 +14,8 @@ Frontmatter is YAML, so quote a value that holds a colon followed by a space, li
     type: {
       type: "string",
       default: "doc",
-      description: "Content type. blog/changelog drive feeds.",
+      description:
+        "Content type. blog/changelog drive feeds; blog posts get an index, tag pages, and a byline.",
     },
     date: {
       type: "string",
@@ -23,7 +24,17 @@ Frontmatter is YAML, so quote a value that holds a colon followed by a space, li
     authors: {
       type: "string | string[] | object[]",
       description:
-        "Post author(s) for blog/changelog content — a name, or objects with a name plus optional avatar/url and any extra fields. Credited as Person nodes in the page's JSON-LD; other fields are preserved as-is.",
+        "Post author(s) for blog/changelog content — a name, or objects with a name plus optional avatar/url and any extra fields. Shown in a blog post's byline, and credited as Person nodes in the page's JSON-LD; other fields are preserved as-is.",
+    },
+    tags: {
+      type: "string[]",
+      description:
+        "A page's tags: its feed item's categories, and its record's tag for a hosted search adapter. On a blog post, also chips on the post and the blog index, each with a page listing its posts. See Blog.",
+    },
+    cover: {
+      type: "string | { src, alt }",
+      description:
+        "A blog post's cover image — a path beside the post, under public/, or a URL — on the post, the index, and its OG card. See Blog.",
     },
     slug: {
       type: "string",
@@ -228,7 +239,7 @@ reviewedAt: 2026-06-20
 ---
 ```
 
-Schemas are accepted through the [Standard Schema](https://standardschema.dev) interface, so Zod (whichever version your project installs), Valibot, and ArkType all work. Every declared key is validated on every page — absent ones included — so a required schema enforces the key site-wide; mark it `.optional()` to validate only where present. All other keys stay strictly validated, and built-in fields can't be redeclared.
+Schemas are accepted through the [Standard Schema](https://standardschema.dev) interface, so Zod (whichever version your project installs), Valibot, and ArkType all work. Every declared key is validated on every page — absent ones included — so a required schema enforces the key site-wide; mark it `.optional()` to validate only where present. All other keys stay strictly validated, and built-in fields can't be redeclared, except `tags` and `cover`, which a site may have declared before Blume read them: its declaration keeps the key, and Blume reads none of it.
 
 ### Per-type keys
 
@@ -261,7 +272,7 @@ status: enforced
 ---
 ```
 
-Per-type keys follow the same validation rules as `extend`, scoped to pages whose resolved `type` matches — including pages that set no `type`, when the declaration is for [`content.defaultType`](/docs/configuration#content). A key belongs to one declaration, site-wide or per-type, not both. And a key declared only for another type stays unknown elsewhere, so a stray `status` on a plain doc page still fails the build.
+Per-type keys follow the same validation rules as `extend`, scoped to pages whose resolved `type` matches — including pages that set no `type`, when the declaration is for [`content.defaultType`](/docs/configuration#content). A key belongs to one declaration, site-wide or per-type, not both. And a key declared only for another type stays unknown elsewhere, so a stray `status` on a plain doc page still fails the build (a `tags` or `cover` declared for one type is the built-in key elsewhere).
 
 A page that fails validation fails `blume build` with a diagnostic naming the file and key. With [`--no-strict`](/docs/cli#common-flags), the build succeeds anyway and the failing pages are dropped from the output — the build summary reports how many.
 

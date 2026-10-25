@@ -16,9 +16,11 @@ import type { RelativeLinkRewriter } from "../ai/relative-links.ts";
 import { projectComponentSerializers } from "../ai/serializers.ts";
 import { applyAudienceVisibility } from "../ai/visibility.ts";
 import type { VisibilityAudience } from "../ai/visibility.ts";
+import { pageSummary, withBlogIndexText } from "../core/blog.ts";
 import matter from "../core/frontmatter.ts";
 import { parseHeadingMarkers } from "../core/heading-markers.ts";
 import { EN_UI, resolveUIStrings } from "../core/i18n-ui.ts";
+import type { UIStrings } from "../core/i18n-ui.ts";
 import { contentIndexable } from "../core/manifest.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
 import { HTML_COMMENT } from "../core/sources/normalize.ts";
@@ -50,7 +52,7 @@ export interface SearchDocument {
   contentType: string;
   /** Docs version (`""` for the current docs), so results scope to the viewed version. */
   version: string;
-  /** Frontmatter `search.tags`, surfaced for hosted-provider faceting. */
+  /** Frontmatter `search.tags` and `tags`, surfaced for hosted-provider faceting. */
   tags?: string[];
   /**
    * Declared facet values (`content.types.<type>.facets`), key → value.
@@ -375,7 +377,9 @@ const buildCrumbIndex = (sidebar: NavNode[]): Map<string, Crumbs> => {
             section: node.label,
           });
         }
-        walk(node.children, [...trail, node.label]);
+        // A year group of blog posts or changelog entries is no section:
+        // its entries file under the group around it.
+        walk(node.children, node.period ? trail : [...trail, node.label]);
       } else if (node.route) {
         index.set(node.route, {
           breadcrumb: trail,
@@ -392,6 +396,25 @@ const buildCrumbIndex = (sidebar: NavNode[]): Map<string, Crumbs> => {
   }
   return index;
 };
+
+/**
+ * A page's search tags: its `search.tags`, then a blog post's own `tags`,
+ * which facet the same way; undefined when it has none.
+ */
+const searchTags = (page: PageRecord | undefined): string[] | undefined => {
+  const tags = new Set([
+    ...(page?.meta?.search?.tags ?? []),
+    ...(page?.meta?.tags ?? []),
+  ]);
+  return tags.size > 0 ? [...tags] : undefined;
+};
+
+/**
+ * A page's search summary: its description, or a blog post's summary as on
+ * the blog index (its `seo.description`, else its first paragraph).
+ */
+const searchDescription = (page: PageRecord | undefined): string =>
+  (page?.post ? pageSummary(page) : page?.description) ?? "";
 
 interface BuildOptions {
   includeWhenDisabled?: boolean;
@@ -538,24 +561,27 @@ export const buildSearchDocuments = async (
       ? relativeLinkRewriter(project, { assistant: true })
       : undefined;
 
-  // A page in no sidebar group falls under the "Docs" section, in its own
-  // language: the label is a UI string, resolved once per locale.
+  // A page in no sidebar group falls under the "Docs" section, and a blog
+  // post, wherever it sits, under the blog's: both in the page's own
+  // language, UI strings resolved once per locale.
   const { i18n } = project.config;
-  const docsSections = new Map<string, string>();
-  const docsSection = (locale: string): string => {
-    let label = docsSections.get(locale);
-    if (label === undefined) {
-      label = (
+  const uiByLocale = new Map<string, UIStrings>();
+  const uiFor = (locale: string): UIStrings => {
+    let ui = uiByLocale.get(locale);
+    if (ui === undefined) {
+      ui = withBlogIndexText(
+        project.config,
         i18n
           ? resolveUIStrings(locale, {
               defaultLocale: i18n.defaultLocale,
               overrides: i18n.ui,
             })
-          : EN_UI
-      ).search.docs;
-      docsSections.set(locale, label);
+          : EN_UI,
+        locale
+      );
+      uiByLocale.set(locale, ui);
     }
-    return label;
+    return ui;
   };
 
   return await Promise.all(
@@ -568,18 +594,20 @@ export const buildSearchDocuments = async (
         components,
         rewriteLinks
       );
-      const tags = page?.meta?.search?.tags;
       const crumb = crumbs.get(route.path);
       const facets = page ? pageFacets(page, project.config) : undefined;
       const document: SearchDocument = {
         breadcrumb: crumb?.breadcrumb ?? [],
         content: body,
         contentType: route.contentType,
-        description: page?.description ?? "",
+        description: searchDescription(page),
         locale: route.locale,
         route: route.path,
-        section: crumb?.section || docsSection(route.locale),
-        tags: tags && tags.length > 0 ? tags : undefined,
+        section:
+          route.contentType === "blog"
+            ? uiFor(route.locale).blog.title
+            : crumb?.section || uiFor(route.locale).search.docs,
+        tags: searchTags(page),
         title: route.title,
         version: route.version,
       };

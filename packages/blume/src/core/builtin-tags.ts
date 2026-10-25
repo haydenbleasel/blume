@@ -11,6 +11,7 @@ export const BUILTIN_MDX_TAGS = new Set<string>([
   "ApiTagOperations",
   "AutoTypeTable",
   "Badge",
+  "Blog",
   "Callout",
   "Card",
   "CardGroup",

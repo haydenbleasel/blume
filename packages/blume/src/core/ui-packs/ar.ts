@@ -46,6 +46,17 @@ export const ar: UIStringsOverride = {
     you: "أنت",
   },
   banner: { dismiss: "إغلاق الإعلان" },
+  blog: {
+    allPosts: "كل المقالات",
+    description: "أخبار وتحديثات وقصص من الفريق.",
+    empty: "لا توجد مقالات بعد.",
+    newer: "المقالة الأحدث",
+    older: "المقالة الأقدم",
+    readingTime: "{minutes} دقيقة للقراءة",
+    tagged: "مقالات بالوسم «{tag}»",
+    tags: "الوسوم",
+    title: "المدونة",
+  },
   changelog: {
     description: "تحديثات المنتج وملاحظات الإصدارات.",
     empty: "لا توجد إدخالات في سجل التغييرات بعد.",

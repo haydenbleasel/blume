@@ -49,6 +49,17 @@ export const nl: UIStringsOverride = {
     you: "Jij",
   },
   banner: { dismiss: "Aankondiging sluiten" },
+  blog: {
+    allPosts: "Alle berichten",
+    description: "Nieuws, updates en verhalen van het team.",
+    empty: "Nog geen berichten.",
+    newer: "Nieuwer bericht",
+    older: "Ouder bericht",
+    readingTime: "{minutes} min lezen",
+    tagged: "Berichten met de tag “{tag}”",
+    tags: "Tags",
+    title: "Blog",
+  },
   changelog: {
     description: "Productupdates en releaseopmerkingen.",
     empty: "Nog geen items in het wijzigingslogboek.",

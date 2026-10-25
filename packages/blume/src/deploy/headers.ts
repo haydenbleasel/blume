@@ -34,8 +34,8 @@ import type { ResolvedConfig } from "../core/schema.ts";
  * runtime endpoint, which serves both variants as `text/markdown`. Every rule
  * sits at the deployment base, not under `basePath`: most Markdown mirrors
  * live under the page routes, but the section home's mirror (`/docs.md`) sits
- * beside `basePath`, and the synthesized `/index.md`, `/changelog.md`, and
- * `/404.md` sit at the root, as do the `.txt` files (`llms.txt`,
+ * beside `basePath`, and the synthesized `/index.md`, `/changelog.md`,
+ * `/blog.md`, and `/404.md` sit at the root, as do the `.txt` files (`llms.txt`,
  * `llms-full.txt`).
  */
 const HEADER_RULES: readonly { contentType: string; ext: string }[] = [

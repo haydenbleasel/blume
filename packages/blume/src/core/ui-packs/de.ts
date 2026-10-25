@@ -49,6 +49,17 @@ export const de: UIStringsOverride = {
     you: "Du",
   },
   banner: { dismiss: "Ankündigung schließen" },
+  blog: {
+    allPosts: "Alle Beiträge",
+    description: "Neuigkeiten, Updates und Geschichten aus dem Team.",
+    empty: "Noch keine Beiträge.",
+    newer: "Neuerer Beitrag",
+    older: "Älterer Beitrag",
+    readingTime: "{minutes} Min. Lesezeit",
+    tagged: "Beiträge mit dem Tag „{tag}“",
+    tags: "Tags",
+    title: "Blog",
+  },
   changelog: {
     description: "Produkt-Updates und Versionshinweise.",
     empty: "Noch keine Einträge im Änderungsprotokoll.",

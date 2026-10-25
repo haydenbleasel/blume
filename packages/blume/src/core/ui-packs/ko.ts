@@ -47,6 +47,17 @@ export const ko: UIStringsOverride = {
     you: "나",
   },
   banner: { dismiss: "공지 닫기" },
+  blog: {
+    allPosts: "모든 글",
+    description: "팀이 전하는 소식, 업데이트, 이야기.",
+    empty: "아직 글이 없습니다.",
+    newer: "더 최근 글",
+    older: "이전 글",
+    readingTime: "읽는 데 {minutes}분",
+    tagged: "‘{tag}’ 태그가 달린 글",
+    tags: "태그",
+    title: "블로그",
+  },
   changelog: {
     description: "제품 업데이트 및 릴리스 노트.",
     empty: "아직 변경 로그 항목이 없습니다.",
