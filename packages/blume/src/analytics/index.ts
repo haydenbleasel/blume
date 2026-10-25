@@ -61,6 +61,8 @@ export type {
   MixpanelRegion,
 } from "./mixpanel.ts";
 export { oneDollarStats } from "./one-dollar-stats.ts";
+export { openpanel } from "./openpanel.ts";
+export type { OpenpanelAdapter, OpenpanelOptions } from "./openpanel.ts";
 export type {
   OneDollarStatsAdapter,
   OneDollarStatsOptions,
