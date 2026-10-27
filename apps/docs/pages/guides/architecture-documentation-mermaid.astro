@@ -28,6 +28,9 @@
 // Updated for main: mermaid-element.ts logs Mermaid's parser error to the
 // console and shows it under the message in dev (c8820c29); the print
 // stylesheet switches a dark page to light (e12b668a). Read in the source.
+// Updated for the Pele renderer: the diagram element now calls Pele's mount(),
+// theme colors come from --pele-* variables mapped onto --blume-* tokens (so
+// there is no theme re-render), and Mermaid's ELK/neo opt-ins no longer exist.
 import CodeBlock from "blume/components/content/CodeBlock.astro";
 import GuidePage from "../_guides/GuidePage.astro";
 import { guideById } from "../_guides/guides.ts";
@@ -118,7 +121,7 @@ blume.config.ts`}
   <p>
     The page must be <code>.mdx</code>. Diagrams are an MDX-only feature: in a{" "}
     <code>.md</code> page, a <code>mermaid</code> fence renders as a plain code
-    block. Blume loads the Mermaid library only on pages that contain a
+    block. Blume loads the diagram renderer only on pages that contain a
     diagram, so the rest of the site never downloads it.
   </p>
   <p>
@@ -266,7 +269,7 @@ blume.config.ts`}
   <ul>
     <li>
       <strong>Without JavaScript.</strong> The prerendered HTML holds only the
-      diagram's source, in an attribute. Mermaid draws the SVG in the browser.
+      diagram's source, in an attribute. Pele draws the SVG in the browser.
     </li>
     <li>
       <strong>In search.</strong> Blume's default search index leaves out code
@@ -345,7 +348,7 @@ diff --git a/docs/architecture/index.mdx b/docs/architecture/index.mdx
     </li>
     <li>
       <strong>Check the syntax before merging.</strong> <code>blume build</code>{" "}
-      and <code>blume validate</code> don't parse Mermaid, because the browser
+      and <code>blume validate</code> don't parse diagrams, because the browser
       does. A broken diagram only shows up on the page and in the browser
       console.
     </li>
@@ -356,17 +359,17 @@ diff --git a/docs/architecture/index.mdx b/docs/architecture/index.mdx
   </p>
   <CodeBlock
     code={`for f in docs/architecture/_diagrams/*.mmd; do
-  npx -y -p @mermaid-js/mermaid-cli@12.0.0 mmdc -q -i "$f" -o /tmp/diagram-check.svg \\
+  npx -y -p @mermaid-js/mermaid-cli@12.1.0 mmdc -q -i "$f" -o /tmp/diagram-check.svg \\
     || echo "Broken: $f"
 done`}
     lang="bash"
   />
   <p>
     The first run downloads the CLI and the headless browser it renders with.
-    Pin the CLI to the same major version as the <code>mermaid</code> package
-    Blume installs, which <code>npm ls mermaid</code> shows. Treat it as a
-    syntax check, not a preview: the CLI renders with Mermaid's defaults
-    rather than Blume's settings, so its drawing can differ from the site's.
+    Pele targets Mermaid 12.1.0 syntax, so pin the CLI to that version. Treat
+    it as a syntax check, not a preview: the CLI lays the diagram out with
+    Mermaid's engine rather than Pele's, so its drawing can differ from the
+    site's.
     If Chrome won't start on a Linux CI runner, Mermaid CLI documents a{" "}
     <a
       href="https://github.com/mermaid-js/mermaid-cli/blob/master/docs/linux-sandbox-issue.md"
@@ -379,8 +382,8 @@ done`}
   <CodeBlock code="npx blume dev" lang="bash" />
   <p>
     <strong>Both themes.</strong> Switch between light and dark with the
-    toggle in the header. Each diagram redraws in Mermaid's matching theme, and
-    the dashed outlines stay visible in both.
+    toggle in the header. Each diagram restyles from the site's theme tokens
+    without redrawing, and the dashed outlines stay visible in both.
   </p>
   <p>
     <strong>Text alternatives.</strong> Run this in the browser console. It
@@ -419,16 +422,16 @@ npx blume validate`}
   </p>
   <h3>The page says "Could not render this diagram."</h3>
   <p>
-    Mermaid couldn't parse the source, and Blume shows this message in place
-    of the diagram. Mermaid's parser error, with the line it stopped on, is in
-    the browser console under{" "}
-    <code>[blume] Mermaid could not render a diagram</code>, and in{" "}
+    Pele couldn't parse the source, and Blume shows this message in place of
+    the diagram. Pele's parser error, with the line it stopped on, is in the
+    browser console under{" "}
+    <code>[blume] Pele could not render a diagram</code>, and in{" "}
     <code>blume dev</code> it also shows under the message. The{" "}
-    <code>mmdc</code> loop above reports the same error from the command
-    line. Two common causes: a lowercase{" "}
-    <code>end</code> as a flowchart node ID, which Mermaid reads as a keyword
-    (write <code>End</code> or pick another ID), and a label with parentheses
-    or other special characters, which needs quotes, as in{" "}
+    <code>mmdc</code> loop above reports syntax errors from the command line
+    too. Two common causes: a lowercase <code>end</code> as a flowchart node
+    ID, which Mermaid syntax reads as a keyword (write <code>End</code> or
+    pick another ID), and a label with parentheses or other special
+    characters, which needs quotes, as in{" "}
     <code>api["Messages API (v1)"]</code>.
   </p>
   <h3>The build fails with BLUME_INCLUDE_NOT_FOUND</h3>
@@ -440,41 +443,32 @@ npx blume validate`}
   </p>
   <h3>A diagram doesn't follow dark mode</h3>
   <p>
-    A <code>theme</code> set in the diagram's own front matter (a{" "}
-    <code>config:</code> block at the top of the fence) or in an{" "}
-    <code>%%{"{init}"}%%</code> directive outranks the theme Blume picks, so
-    the diagram stays in that theme. Remove it. Colors set with{" "}
-    <code>style</code> or <code>classDef</code> also stay fixed in both themes,
-    so a light <code>fill</code> can leave light text unreadable in dark mode.
-    Style with outlines and dashes instead, as the <code>external</code> class
-    does.
+    Blume themes diagrams with the site's CSS variables, and Pele ignores
+    Mermaid's <code>theme</code> setting and <code>themeVariables</code>, so a
+    <code>theme</code> in front matter or an <code>%%{"{init}"}%%</code>{" "}
+    directive does nothing here. Remove it if you copied the diagram from
+    Mermaid's editor. Colors set with <code>style</code> or{" "}
+    <code>classDef</code> still stay fixed in both themes, so a light{" "}
+    <code>fill</code> can leave light text unreadable in dark mode. Style with
+    outlines and dashes instead, as the <code>external</code> class does.
   </p>
   <h3>Links and HTML in a diagram don't work</h3>
   <p>
-    Blume runs Mermaid at its <code>strict</code> security level, which
-    disables <code>click</code> interactions and encodes HTML tags in labels as
-    text. Put links in the prose next to the diagram instead.
+    Pele renders labels as SVG text, so HTML tags in a label show up as text;
+    use plain text or line breaks instead. A <code>click</code> statement that
+    opens an <code>http</code>, <code>https</code>, <code>mailto</code>, or{" "}
+    <code>tel</code> URL works; a JavaScript callback is ignored, and other
+    schemes such as <code>javascript:</code> and <code>obsidian:</code> are
+    dropped. For anything else, put the link in the prose next to the
+    diagram.
   </p>
   <h3>A large diagram is too small to read</h3>
   <p>
-    By default, Mermaid scales a diagram down to fit the column, so a wide one
-    shrinks. Split it into smaller diagrams, one per concern, or let it keep
-    its natural width and scroll sideways by adding front matter at the top of
-    the source:
-  </p>
-  <CodeBlock
-    code={`---
-config:
-  flowchart:
-    useMaxWidth: false
----
-flowchart TB`}
-    lang="mermaid"
-  />
-  <p>
-    For a sequence diagram, use <code>sequence:</code> in place of{" "}
-    <code>flowchart:</code>. A diagram can also ask for the ELK layout with{" "}
-    <code>layout: elk</code> under <code>config:</code>; Blume loads that
-    engine only for diagrams that request it.
+    Pele lays a diagram out for the content column, and a wide flowchart can
+    switch to a vertical layout, but a diagram that is inherently wide — a long
+    left-to-right chain, a large Gantt, a crowded sequence diagram — still
+    scales down to fit. Split it into smaller diagrams, one per concern. The
+    <code>useMaxWidth</code> front matter that kept a Mermaid diagram at its
+    natural width does nothing here.
   </p>
 </GuidePage>
