@@ -1,0 +1,7 @@
+---
+"blume": patch
+---
+
+`mermaid` fences now render with [Pele](https://pele.run) instead of Mermaid.js. The client library a diagram page loads drops from about 1.6 MB gzip plus 23 direct dependencies to one ~260 kB gzip module with no runtime dependencies, and a typical diagram renders synchronously in a fraction of a millisecond. Diagrams read the site's CSS variables, so they follow light/dark and custom themes without re-rendering, use the theme font, and reflow to the content column (a wide flowchart can switch to a vertical layout) instead of always shrinking. The `mermaid` fence name and existing Markdown don't change.
+
+Pele has its own layout, so Mermaid's `layout` and `look` front matter (ELK, neo) and its `theme`/`themeVariables` no longer apply; colors set with `style`, `classDef`, or a sequence `rect` stay fixed in both themes. Labels are SVG text, so HTML in a label shows as text, `click` links to http/https/mailto/tel URLs work, and JavaScript callbacks are ignored. Pele covers every diagram type built into Mermaid 12.1.0; an external Mermaid plugin such as ZenUML is not supported and shows the error message rather than falling back to Mermaid. A diagram Pele can't parse shows the localized "Could not render this diagram." message, logs the parser error to the browser console, and `blume dev` prints it under the message.
