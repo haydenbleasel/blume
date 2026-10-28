@@ -481,7 +481,7 @@ npm i blume
 
 ## Diagrams
 
-A `mermaid` block renders a [Mermaid](https://mermaid.js.org) diagram straight from text. The fence contents are passed to Mermaid verbatim, so every diagram type Mermaid supports works here. Diagrams follow the active color theme and re-render when it changes. Author one by fencing the source with `mermaid`:
+A `mermaid` block renders a [Mermaid](https://mermaid.js.org) diagram straight from text. Blume draws it with [Pele](https://pele.run), which supports every diagram type built into Mermaid 12.1.0, so the fence contents are passed through verbatim. Diagrams read the site's theme tokens, so they follow the active color theme and custom themes without redrawing. Author one by fencing the source with `mermaid`:
 
 ````md
 ```mermaid
@@ -492,7 +492,7 @@ flowchart LR
 ```
 ````
 
-Diagrams render on the client, so this is an MDX-only feature, and the Mermaid library loads only on pages that include one; a site with no diagram doesn't ship it at all. Diagrams use Mermaid's dagre layout and classic look by default; opt a single diagram into another layout or look through Mermaid front matter (a `config:` block with `layout: elk` or `look: neo`), and the ELK engine loads only for diagrams that ask for it. A diagram Mermaid can't parse shows "Could not render this diagram." in its place; Mermaid's parser error, with the line it stopped on, goes to the browser console, and `blume dev` also prints it under the message. The rest of this section is a gallery of common types — see the [Mermaid docs](https://mermaid.js.org/intro/) for the full list.
+Diagrams render on the client, so this is an MDX-only feature, and Pele loads only on pages that include one; a site with no diagram doesn't ship it at all. Pele lays diagrams out with its own engine, so Mermaid's `layout` and `look` options and its theme colors don't apply; colors set with `style`, `classDef`, or a sequence `rect` stay fixed in both themes, while everything else follows the site tokens. A diagram reflows to the width of the content column — a wide flowchart can switch to a vertical layout — rather than always shrinking to fit, and labels use the theme font. A diagram Pele can't parse shows "Could not render this diagram." in its place; the parser error, with the line it stopped on, goes to the browser console, and `blume dev` also prints it under the message. The rest of this section is a gallery of common types — see the [Mermaid docs](https://mermaid.js.org/intro/) for the full list.
 
 ### Flowchart
 

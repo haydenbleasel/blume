@@ -1040,10 +1040,10 @@ const localeRedirect = localeTargets
       import { copyText, createCopyFlash } from "../copy-feedback.ts";
       import { syncDrawerInert } from "./drawer-inert.ts";
       import { chromeIcons as icons } from "../../theme/chrome-icons.ts";
-      // Registers the <blume-mermaid> custom element (emitted by ```mermaid
-      // fences) when some page has one; Mermaid itself is lazy-loaded only on
-      // pages that use a diagram. The loader is null — and the element and
-      // library absent from the bundle — for a site with no diagrams.
+      // Registers the diagram custom element (emitted by ```mermaid fences)
+      // when some page has one; Pele itself is lazy-loaded only on pages that
+      // use a diagram. The loader is null — and the element and library absent
+      // from the bundle — for a site with no diagrams.
       import { loadMermaid } from "blume:features";
       // Registers the <blume-toc> custom element: scrollspy for the table of
       // contents, highlighting the section currently in view as you scroll.

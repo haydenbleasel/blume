@@ -1950,7 +1950,7 @@ const assertFontFilesExist = (project: BlumeProject): void => {
 
 /**
  * The client libraries a site needs (see `featuresTemplate`): the EPUB
- * generator when `export.epub` is on, and the Mermaid element when any page's
+ * generator when `export.epub` is on, and the diagram element when any page's
  * source has a mermaid fence — read from the raw-Markdown mirrors (every
  * route's verbatim source) and, for sources that carry their text on the
  * page record, the record itself.

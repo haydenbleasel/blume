@@ -1,32 +1,33 @@
 /**
  * Client behavior for the `<blume-mermaid>` custom element emitted by the
- * Mermaid markdown plugin. Mermaid is lazy-loaded — it needs a DOM and is large,
- * so the dependency only downloads on pages that actually contain a diagram —
- * and each diagram re-renders when the color theme flips so it tracks light/dark.
+ * Mermaid markdown plugin. The element module stays small: Pele is imported
+ * only when a diagram mounts, and only on pages that actually contain one.
+ * Pele renders SVG that reads `--pele-*` CSS variables, so a color-theme flip
+ * restyles the diagram without a re-render. A flip that changes the label font
+ * is the exception: Pele measured the old font, so the diagram is refreshed.
  *
  * Imported for its side effect (registers the element) from RootLayout's script.
  */
 
-const importMermaid = async () => {
-  const mod = await import("mermaid");
-  return mod.default;
-};
+import type { Mounted } from "pele";
 
-// Memoize the import so a page with several diagrams loads Mermaid once.
-let loader: ReturnType<typeof importMermaid> | null = null;
-const loadMermaid = () => {
-  loader ??= importMermaid();
+// Memoize the import so a page with several diagrams loads Pele once. Keeping
+// the import dynamic is what leaves Pele out of pages with no diagram: this
+// module is imported on every page of a site that has one, so a static import
+// here would load the renderer everywhere.
+const importPele = () => import("pele");
+let loader: ReturnType<typeof importPele> | null = null;
+const loadPele = () => {
+  loader ??= importPele();
   return loader;
 };
 
-const prefersDark = () => document.documentElement.dataset.theme === "dark";
+const errorMessage = () =>
+  document.body.dataset.i18nDiagramError || "Could not render this diagram.";
 
-let counter = 0;
-
-// Exported so this file is a module, not a script: `blume:features` lazy-loads
-// it with `import()`, and `astro check` rejects a dynamic import of a file with
-// no import or export of its own (ts(2306)) on every site with a diagram.
 export class BlumeMermaid extends HTMLElement {
+  #diagram: Mounted | null = null;
+  #font = "";
   #observer: MutationObserver | null = null;
   #renderToken = 0;
 
@@ -40,85 +41,100 @@ export class BlumeMermaid extends HTMLElement {
     output.setAttribute("aria-busy", "true");
     this.replaceChildren(output);
 
-    const render = async () => {
-      this.#renderToken += 1;
-      const token = this.#renderToken;
-      const mermaid = await loadMermaid();
-      mermaid.initialize({
-        // Mermaid 12 defaults to the bundled ELK layout and the "neo" look,
-        // which re-lays out and restyles every existing diagram and pulls a
-        // ~1.4 MB ELK chunk onto any page with a flowchart. Pin the previous
-        // defaults so diagrams keep rendering as authored; a diagram opts
-        // into ELK or neo through its own front matter (`config: { layout:
-        // elk }`), which outranks these initialize() values.
-        layout: "dagre",
-        look: "classic",
-        securityLevel: "strict",
-        startOnLoad: false,
-        // Without this, a diagram that fails to parse leaves Mermaid's own
-        // "Syntax error in text" graphic appended to <body>, below the page.
-        suppressErrorRendering: true,
-        theme: prefersDark() ? "dark" : "default",
-      });
-      try {
-        counter += 1;
-        const { svg } = await mermaid.render(
-          `blume-mermaid-${counter}`,
-          source
-        );
-        // A newer render (rapid theme toggles) superseded this one — dropping
-        // the stale result keeps the diagram in the latest theme.
-        if (token === this.#renderToken) {
-          // Mermaid's own render output is SVG markup; it must be injected as
-          // HTML, not text. securityLevel "strict" (see initialize) sanitizes it.
-          // oxlint-disable-next-line github/no-inner-html -- Mermaid-generated SVG must be injected as HTML
-          output.innerHTML = svg;
-        }
-      } catch (error) {
-        // Localized message stamped on <body> by RootLayout's markup (the
-        // data-attribute channel); English fallback when the attribute is
-        // missing (a stale snapshot or a custom layout).
-        output.textContent =
-          document.body.dataset.i18nDiagramError ||
-          "Could not render this diagram.";
-        // Readers get only the message above; the writer needs Mermaid's
-        // parser error (line and expected token) to fix the source. It goes
-        // to the console, and `blume dev` also shows it under the message.
-        console.error("[blume] Mermaid could not render a diagram:", error);
-        if (import.meta.env.DEV) {
-          const detail = document.createElement("pre");
-          detail.className =
-            "mt-2 overflow-x-auto text-muted-foreground text-xs";
-          detail.textContent = String(error);
-          output.append(detail);
-        }
+    // The font Pele measured. A theme can change `--blume-font-body`, and
+    // Pele only refreshes measurements when asked, so track the token across
+    // `data-theme` flips and refresh only when it actually changes.
+    const effectiveFont = () => {
+      const token = getComputedStyle(this)
+        .getPropertyValue("--blume-font-body")
+        .trim();
+      return token || getComputedStyle(this).fontFamily;
+    };
+
+    // A reconnect or a newer mount invalidates a pending import or render.
+    this.#renderToken += 1;
+    const token = this.#renderToken;
+    const showError = (error: Error) => {
+      if (token !== this.#renderToken) {
+        return;
+      }
+      // Pele writes its own error text before calling back; replace it with
+      // the localized message the rest of the chrome uses.
+      output.replaceChildren();
+      output.textContent = errorMessage();
+      // Readers get only the message above; the writer needs Pele's parser
+      // error (line and snippet) to fix the source. It goes to the console,
+      // and `blume dev` also shows it under the message.
+      console.error("[blume] Pele could not render a diagram:", error);
+      if (import.meta.env.DEV) {
+        const detail = document.createElement("pre");
+        detail.className = "mt-2 overflow-x-auto text-muted-foreground text-xs";
+        detail.textContent = String(error);
+        output.append(detail);
       }
       output.removeAttribute("aria-busy");
     };
 
-    render();
+    const mountDiagram = async () => {
+      try {
+        const { mount } = await loadPele();
+        // The element may have been removed or remounted while Pele loaded.
+        if (token !== this.#renderToken || !this.isConnected) {
+          return;
+        }
+        this.#diagram?.destroy();
+        // `mount` reads `--pele-font` from the computed style, measures the
+        // labels, lays the diagram out for the column (wide flowcharts reflow
+        // rather than shrink), and redraws when the container resizes or a web
+        // font loads.
+        this.#diagram = mount(output, source, {
+          onError: (error) =>
+            showError(
+              error instanceof Error ? error : new Error(String(error))
+            ),
+          onRender: () => {
+            if (token === this.#renderToken) {
+              output.removeAttribute("aria-busy");
+            }
+          },
+          // Pele's zoom chrome speaks English only; a wide diagram reflows instead.
+          zoom: false,
+        });
 
-    // Re-render on color-theme changes so the diagram tracks light and dark.
-    // One observer per connection, disconnected on removal — otherwise every
-    // DOM move stacks another observer that renders into detached DOM forever.
-    // The theme script rewrites `data-theme` after every client-router swap,
-    // usually to the value it already had, so only a real flip re-renders.
-    let dark = prefersDark();
-    this.#observer?.disconnect();
-    this.#observer = new MutationObserver(() => {
-      if (prefersDark() !== dark) {
-        dark = prefersDark();
-        render();
+        this.#font = effectiveFont();
+        this.#observer?.disconnect();
+        this.#observer = new MutationObserver(() => {
+          const font = effectiveFont();
+          if (font === this.#font) {
+            return;
+          }
+          this.#font = font;
+          try {
+            this.#diagram?.refresh();
+          } catch (error) {
+            showError(
+              error instanceof Error ? error : new Error(String(error))
+            );
+          }
+        });
+        this.#observer.observe(document.documentElement, {
+          attributeFilter: ["data-theme"],
+        });
+      } catch (error) {
+        showError(error instanceof Error ? error : new Error(String(error)));
       }
-    });
-    this.#observer.observe(document.documentElement, {
-      attributeFilter: ["data-theme"],
-    });
+    };
+
+    void mountDiagram();
   }
 
   disconnectedCallback() {
+    this.#renderToken += 1;
     this.#observer?.disconnect();
     this.#observer = null;
+    this.#font = "";
+    this.#diagram?.destroy();
+    this.#diagram = null;
   }
 }
 

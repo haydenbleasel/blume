@@ -1113,17 +1113,17 @@ describe("astroConfigTemplate", () => {
     // data store among them) live inside the runtime dir, never under it.
     expect(out).toContain('cacheDir: "/p/.blume/.cache/astro",');
     expect(out).toContain('cacheDir: "/p/.blume/.cache/vite",');
-    // Both lazy client-side deps are pre-bundled through the `blume` package so
-    // their CJS/UMD entries get ESM interop in dev; the nested form is required
-    // because neither is a direct dep of the generated project, and
-    // epub-gen-memory names the `/bundle` subpath it actually imports — the
-    // package root would leave that entry unoptimized. Astro's client-router
-    // virtual modules must stay OUT of this list: pre-bundling strips the
-    // `define`-injected constants they read. See the optimizeDeps comment.
+    // Both lazy client-side deps are pre-bundled through the `blume` package.
+    // The nested form is required because neither is a direct dep of the
+    // generated project, and epub-gen-memory names the `/bundle` subpath it
+    // actually imports — the package root would leave that entry unoptimized.
+    // Astro's client-router virtual modules must stay OUT of this list:
+    // pre-bundling strips the `define`-injected constants they read. See the
+    // optimizeDeps comment.
     // The default search adapter's client library rides along (see
     // test/dev-optimize-deps.test.ts).
     expect(out).toContain(
-      'include: ["blume > mermaid","blume > epub-gen-memory/bundle","blume > @orama/orama"]'
+      'include: ["blume > pele","blume > epub-gen-memory/bundle","blume > @orama/orama"]'
     );
     // Without a pages dir or aliases, the optimizer scan still covers the
     // convention islands dir so their deps land in the initial optimization.

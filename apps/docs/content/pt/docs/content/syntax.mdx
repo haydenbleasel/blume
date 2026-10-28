@@ -482,7 +482,7 @@ npm i blume
 
 ## Diagramas [#diagrams]
 
-Um bloco `mermaid` renderiza um diagrama do [Mermaid](https://mermaid.js.org) direto do texto. O conteúdo da cerca é passado ao Mermaid literalmente, então todo tipo de diagrama suportado pelo Mermaid funciona aqui. Os diagramas seguem o tema de cores ativo e são renderizados novamente quando ele muda. Crie um delimitando o código-fonte com `mermaid`:
+Um bloco `mermaid` renderiza um diagrama do [Mermaid](https://mermaid.js.org) direto do texto. O Blume o desenha com o [Pele](https://pele.run), que suporta todos os tipos de diagrama incluídos no Mermaid 12.1.0, então o conteúdo da cerca é passado literalmente. Os diagramas leem os tokens de tema do site, então seguem o tema de cores ativo e temas personalizados sem serem redesenhados. Crie um delimitando o código-fonte com `mermaid`:
 
 ````md
 ```mermaid
@@ -493,7 +493,7 @@ flowchart LR
 ```
 ````
 
-Os diagramas são renderizados no cliente, então este é um recurso exclusivo do MDX, e a biblioteca Mermaid é carregada apenas em páginas que incluem um; um site sem nenhum diagrama nem chega a enviá-la. Por padrão, os diagramas usam o layout dagre e o visual clássico do Mermaid; ative outro layout ou visual em um único diagrama pelo front matter do Mermaid (um bloco `config:` com `layout: elk` ou `look: neo`), e o motor ELK é carregado apenas para os diagramas que o solicitarem. Um diagrama que o Mermaid não consegue interpretar mostra "Não foi possível renderizar este diagrama." no lugar dele; o erro do parser do Mermaid, com a linha em que ele parou, vai para o console do navegador, e o `blume dev` também o exibe abaixo da mensagem. O restante desta seção é uma galeria de tipos comuns — veja a [documentação do Mermaid](https://mermaid.js.org/intro/) para a lista completa.
+Os diagramas são renderizados no cliente, então este é um recurso exclusivo do MDX, e o Pele é carregado apenas em páginas que incluem um; um site sem nenhum diagrama nem chega a enviá-lo. O Pele organiza os diagramas com seu próprio motor, então as opções `layout` e `look` do Mermaid e suas cores de tema não se aplicam; cores definidas com `style`, `classDef` ou um `rect` de sequência permanecem fixas nos dois temas, enquanto todo o resto segue os tokens do site. Um diagrama se reflui para a largura da coluna de conteúdo — um fluxograma largo pode mudar para um layout vertical — em vez de sempre encolher para caber, e os rótulos usam a fonte do tema. Um diagrama que o Pele não consegue interpretar mostra "Não foi possível renderizar este diagrama." no lugar dele; o erro do parser, com a linha em que ele parou, vai para o console do navegador, e o `blume dev` também o exibe abaixo da mensagem. O restante desta seção é uma galeria de tipos comuns — veja a [documentação do Mermaid](https://mermaid.js.org/intro/) para a lista completa.
 
 ### Fluxograma [#flowchart]
 
