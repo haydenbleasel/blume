@@ -3,7 +3,8 @@
  * Mermaid markdown plugin. The element module stays small: Pele is imported
  * only when a diagram mounts, and only on pages that actually contain one.
  * Pele renders SVG that reads `--pele-*` CSS variables, so a color-theme flip
- * restyles the diagram without a re-render.
+ * restyles the diagram without a re-render. A flip that changes the label font
+ * is the exception: Pele measured the old font, so the diagram is refreshed.
  *
  * Imported for its side effect (registers the element) from RootLayout's script.
  */
@@ -26,6 +27,8 @@ const errorMessage = () =>
 
 export class BlumeMermaid extends HTMLElement {
   #diagram: Mounted | null = null;
+  #font = "";
+  #observer: MutationObserver | null = null;
   #renderToken = 0;
 
   connectedCallback() {
@@ -37,6 +40,16 @@ export class BlumeMermaid extends HTMLElement {
     const output = document.createElement("div");
     output.setAttribute("aria-busy", "true");
     this.replaceChildren(output);
+
+    // The font Pele measured. A theme can change `--blume-font-body`, and
+    // Pele only refreshes measurements when asked, so track the token across
+    // `data-theme` flips and refresh only when it actually changes.
+    const effectiveFont = () => {
+      const token = getComputedStyle(this)
+        .getPropertyValue("--blume-font-body")
+        .trim();
+      return token || getComputedStyle(this).fontFamily;
+    };
 
     // A reconnect or a newer mount invalidates a pending import or render.
     this.#renderToken += 1;
@@ -87,6 +100,26 @@ export class BlumeMermaid extends HTMLElement {
           // Pele's zoom chrome speaks English only; a wide diagram reflows instead.
           zoom: false,
         });
+
+        this.#font = effectiveFont();
+        this.#observer?.disconnect();
+        this.#observer = new MutationObserver(() => {
+          const font = effectiveFont();
+          if (font === this.#font) {
+            return;
+          }
+          this.#font = font;
+          try {
+            this.#diagram?.refresh();
+          } catch (error) {
+            showError(
+              error instanceof Error ? error : new Error(String(error))
+            );
+          }
+        });
+        this.#observer.observe(document.documentElement, {
+          attributeFilter: ["data-theme"],
+        });
       } catch (error) {
         showError(error instanceof Error ? error : new Error(String(error)));
       }
@@ -97,6 +130,9 @@ export class BlumeMermaid extends HTMLElement {
 
   disconnectedCallback() {
     this.#renderToken += 1;
+    this.#observer?.disconnect();
+    this.#observer = null;
+    this.#font = "";
     this.#diagram?.destroy();
     this.#diagram = null;
   }
