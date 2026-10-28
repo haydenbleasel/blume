@@ -482,7 +482,7 @@ npm i blume
 
 ## Diagramme [#diagrams]
 
-Ein `mermaid`-Block rendert ein [Mermaid](https://mermaid.js.org)-Diagramm direkt aus Text. Der Inhalt des Fences wird unverändert an Mermaid übergeben, sodass jeder von Mermaid unterstützte Diagrammtyp hier funktioniert. Diagramme folgen dem aktiven Farbthema und werden bei einem Wechsel neu gerendert. Erstelle eines, indem du den Quelltext mit `mermaid` einzäunst:
+Ein `mermaid`-Block rendert ein [Mermaid](https://mermaid.js.org)-Diagramm direkt aus Text. Blume zeichnet es mit [Pele](https://pele.run), das jeden in Mermaid 12.1.0 integrierten Diagrammtyp unterstützt; der Inhalt des Fences wird daher unverändert übernommen. Diagramme lesen die Theme-Tokens der Site und folgen damit dem aktiven Farbthema und benutzerdefinierten Themes, ohne neu gezeichnet zu werden. Erstelle eines, indem du den Quelltext mit `mermaid` einzäunst:
 
 ````md
 ```mermaid
@@ -493,7 +493,7 @@ flowchart LR
 ```
 ````
 
-Diagramme werden im Client gerendert, daher ist dies eine reine MDX-Funktion, und die Mermaid-Bibliothek wird nur auf Seiten geladen, die eines enthalten; eine Site ohne Diagramm liefert sie überhaupt nicht aus. Diagramme verwenden standardmäßig das dagre-Layout und den klassischen Look von Mermaid; über Mermaid-Frontmatter (einen `config:`-Block mit `layout: elk` oder `look: neo`) stellst du ein einzelnes Diagramm auf ein anderes Layout oder einen anderen Look um, und die ELK-Engine wird nur für Diagramme geladen, die sie anfordern. Ein Diagramm, das Mermaid nicht parsen kann, zeigt an seiner Stelle „Could not render this diagram.“ an; der Parser-Fehler von Mermaid samt der Zeile, an der er stehen geblieben ist, landet in der Browser-Konsole, und `blume dev` gibt ihn zusätzlich unter der Meldung aus. Der Rest dieses Abschnitts ist eine Galerie gängiger Typen — die vollständige Liste findest du in der [Mermaid-Dokumentation](https://mermaid.js.org/intro/).
+Diagramme werden im Client gerendert, daher ist dies eine reine MDX-Funktion, und Pele wird nur auf Seiten geladen, die eines enthalten; eine Site ohne Diagramm liefert es überhaupt nicht aus. Pele legt Diagramme mit seiner eigenen Engine aus, daher gelten die `layout`- und `look`-Optionen von Mermaid sowie seine Theme-Farben nicht; mit `style`, `classDef` oder einem `rect` in einer Sequenz gesetzte Farben bleiben in beiden Themes unverändert, während alles andere den Site-Tokens folgt. Ein Diagramm passt sich an die Breite der Inhaltsspalte an — ein breites Flussdiagramm kann in ein vertikales Layout wechseln — statt immer nur verkleinert zu werden, und Beschriftungen verwenden die Theme-Schrift. Ein Diagramm, das Pele nicht parsen kann, zeigt an seiner Stelle „Could not render this diagram.“ an; der Parser-Fehler samt der Zeile, an der er stehen geblieben ist, landet in der Browser-Konsole, und `blume dev` gibt ihn zusätzlich unter der Meldung aus. Der Rest dieses Abschnitts ist eine Galerie gängiger Typen — die vollständige Liste findest du in der [Mermaid-Dokumentation](https://mermaid.js.org/intro/).
 
 ### Flussdiagramm [#flowchart]
 
