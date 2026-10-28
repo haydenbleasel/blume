@@ -12,9 +12,9 @@
 //
 // Ran: both diagrams, the dead-letter change, and the failure cases (`end` as
 // a node ID, unquoted parentheses, useMaxWidth front matter) through
-// @mermaid-js/mermaid-cli 12.0.0 (Mermaid 12.0.0, the version Blume installs)
-// with Blume's dagre/classic settings in the default and dark themes; the SVGs
-// carry <title>/<desc> with aria-labelledby/aria-describedby. The npx loop
+// @mermaid-js/mermaid-cli 12.0.0 (bundled Mermaid 12.0.0; Pele targets 12.1.0)
+// in the default and dark themes; the SVGs carry <title>/<desc> with
+// aria-labelledby/aria-describedby. The npx loop
 // shown here ran on macOS and named a broken file. The fixture page ran from
 // repo source with Bun through scanProject (no diagnostics; a missing .mmd is
 // BLUME_INCLUDE_NOT_FOUND), buildRawMarkdown (the .md mirror has both fences
@@ -359,17 +359,18 @@ diff --git a/docs/architecture/index.mdx b/docs/architecture/index.mdx
   </p>
   <CodeBlock
     code={`for f in docs/architecture/_diagrams/*.mmd; do
-  npx -y -p @mermaid-js/mermaid-cli@12.1.0 mmdc -q -i "$f" -o /tmp/diagram-check.svg \\
+  npx -y -p @mermaid-js/mermaid-cli@12.0.0 mmdc -q -i "$f" -o /tmp/diagram-check.svg \\
     || echo "Broken: $f"
 done`}
     lang="bash"
   />
   <p>
     The first run downloads the CLI and the headless browser it renders with.
-    Pele targets Mermaid 12.1.0 syntax, so pin the CLI to that version. Treat
-    it as a syntax check, not a preview: the CLI lays the diagram out with
-    Mermaid's engine rather than Pele's, so its drawing can differ from the
-    site's.
+    Pele targets Mermaid 12.1.0 syntax, but the CLI's latest release is 12.0.0,
+    which bundles Mermaid 12.0.0. Treat it as a close syntax check, not an
+    exact Pele check or a preview: the CLI lays the diagram out with Mermaid's
+    engine rather than Pele's, so its drawing and edge-case syntax support can
+    differ from the site's.
     If Chrome won't start on a Linux CI runner, Mermaid CLI documents a{" "}
     <a
       href="https://github.com/mermaid-js/mermaid-cli/blob/master/docs/linux-sandbox-issue.md"
