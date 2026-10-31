@@ -1437,8 +1437,9 @@ describe("translationOf", () => {
 
   it("reads the route forgivingly and versionizes it", () => {
     expect(translationOfKey("guides/setup", "")).toBe("/guides/setup");
-    expect(translationOfKey(" /guides/setup.md/ ", "")).toBe("/guides/setup");
-    expect(translationOfKey("guides/setup.mdx", "")).toBe("/guides/setup");
+    expect(translationOfKey(" /guides/setup/ ", "")).toBe("/guides/setup");
+    // A route can end in .md (slug: guides/setup.md), so it's kept as written.
+    expect(translationOfKey("guides/setup.md", "")).toBe("/guides/setup.md");
     expect(translationOfKey("/", "")).toBe("/");
     expect(translationOfKey("", "")).toBe("/");
     expect(translationOfKey("guides/setup", "v1.0")).toBe("/v1.0/guides/setup");
@@ -1466,5 +1467,70 @@ describe("translationOf", () => {
     const contentRoot = await tempContent(LOCALIZED);
     const { pages } = await discoverIn(contentRoot, config());
     expect(i18nDiagnostics(pages, i18nOf())).toEqual([]);
+  });
+
+  it("checks a default-locale page's translationOf against real routes", async () => {
+    // Its own translationOf overrides its key, but it can't vouch for itself:
+    // only default-locale routes count as pages to translate.
+    const contentRoot = await tempContent({
+      "guides/setup.mdx":
+        "---\ntitle: Setup\ntranslationOf: guides/missing\n---\n# Setup\n",
+    });
+    const { pages } = await discoverIn(contentRoot, config());
+    expect(
+      i18nDiagnostics(pages, i18nOf()).map((diagnostic) => diagnostic.code)
+    ).toEqual(["BLUME_I18N_UNKNOWN_TRANSLATION"]);
+  });
+
+  it("warns when two pages in one locale translate the same page", async () => {
+    const contentRoot = await tempContent({
+      ...LOCALIZED,
+      "fr/guides/mise-en-place.mdx":
+        "---\ntitle: Mise en place\ntranslationOf: guides/setup\n---\n# Mise en place\n",
+    });
+    const { pages } = await discoverIn(contentRoot, config());
+    const diagnostics = i18nDiagnostics(pages, i18nOf());
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]).toMatchObject({
+      code: "BLUME_I18N_DUPLICATE_TRANSLATION",
+      severity: "warning",
+    });
+    expect(diagnostics[0]?.message).toContain('"guides/setup"');
+  });
+
+  it("pairs within a version, home page included", async () => {
+    const contentRoot = await tempContent({
+      ...LOCALIZED,
+      "fr/accueil.mdx":
+        '---\ntitle: Accueil\ntranslationOf: ""\n---\n# Accueil\n',
+      "index.mdx": "---\ntitle: Home\n---\n# Home\n",
+    });
+    const { pages } = await discoverIn(contentRoot, config());
+    // As a v1.0 snapshot: default-locale routes and translationOf keys both
+    // carry the version prefix, so the pairs still match.
+    const archived = pages.map((page) => ({
+      ...page,
+      translationKey: translationOfKey(
+        page.meta.translationOf ?? page.translationKey,
+        "v1.0"
+      ),
+      version: "v1.0",
+    }));
+    expect(i18nDiagnostics(archived, i18nOf())).toEqual([]);
+  });
+
+  it("names the source entry of a page that has no file", async () => {
+    const contentRoot = await tempContent({
+      "fr/guides/orphan.mdx":
+        "---\ntitle: Orphelin\ntranslationOf: guides/missing\n---\n# Orphelin\n",
+    });
+    const { pages } = await discoverIn(contentRoot, config());
+    // Staged pages from a remote source carry no sourcePath.
+    const remote = pages.map((page) => ({
+      ...page,
+      source: { name: "cms", ref: "fr/orphan" },
+      sourcePath: undefined,
+    }));
+    expect(i18nDiagnostics(remote, i18nOf())[0]?.file).toBe("cms:fr/orphan");
   });
 });

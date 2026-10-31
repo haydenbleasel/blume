@@ -83,7 +83,7 @@ translationOf: guides/setup
 
 The page publishes at `/fr/guides/installation`, and Blume treats it as the French `guides/setup`: [hreflang](#seo) links the two, the [language switcher](#the-language-switcher) moves between them, and no [fallback](#fallbacks) copy of `guides/setup` publishes at `/fr/guides/setup`. On a [versioned](/docs/content/versioning) site the route is read within the page's own version.
 
-A `translationOf` that names no default-locale page pairs with nothing, so Blume warns about it as `BLUME_I18N_UNKNOWN_TRANSLATION`.
+Blume warns when a `translationOf` names no default-locale page (`BLUME_I18N_UNKNOWN_TRANSLATION`), since the translation then pairs with nothing, and when two pages in one locale name the same page (`BLUME_I18N_DUPLICATE_TRANSLATION`), since `hreflang` would list that locale twice.
 
 ## Default-locale URLs
 

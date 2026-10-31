@@ -2314,15 +2314,16 @@ export const resolveEntryRoute = (
 /**
  * The translation key of a page that names the page it translates with
  * `translationOf`: that page's default-locale route, versionized like the
- * logical route so a snapshot pairs within its own version. Slashes and a
- * Markdown extension are forgiven (`/guides/setup.md` reads as
- * `/guides/setup`), and an empty value names the home page.
+ * logical route so a snapshot pairs within its own version. Surrounding
+ * slashes are forgiven (`/guides/setup/` reads as `/guides/setup`), and an
+ * empty value names the home page. The rest is read as written: a route can
+ * end in `.md` (`slug: guides/setup.md`), so no extension is stripped.
  */
 export const translationOfKey = (
   translationOf: string,
   version: string
 ): string => {
-  const route = trimSlashes(translationOf.trim()).replace(/\.mdx?$/u, "");
+  const route = trimSlashes(translationOf.trim());
   return versionizeRoute(route ? `/${route}` : "/", version);
 };
 

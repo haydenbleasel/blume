@@ -238,34 +238,68 @@ const defaultLocaleFolderDiagnostic = (
 });
 
 /**
- * A `translationOf` that names no default-locale page pairs the translation
- * with nothing: it loses its hreflang alternates and switcher entry silently,
- * so say which page and which route it named. Pages pair within their
- * version, so the default-locale keys are compared as the pages carry them.
+ * A page's own logical route: its version-agnostic key under its version
+ * prefix. The same rule as `versionizeRoute` (versions.ts), which can't be
+ * imported here because versions.ts imports this module.
+ */
+const ownRoute = (page: PageRecord): string => {
+  if (!page.version) {
+    return page.versionKey;
+  }
+  return page.versionKey === "/"
+    ? `/${page.version}`
+    : `/${page.version}${page.versionKey}`;
+};
+
+/** Where a page came from, for a diagnostic: its file, or its source entry. */
+const pageOrigin = (page: PageRecord): string =>
+  page.sourcePath ?? `${page.source.name}:${page.source.ref}`;
+
+/**
+ * Checks on `translationOf`. One that names no default-locale page pairs the
+ * translation with nothing, losing its hreflang alternates and switcher entry
+ * silently. Two pages in one locale naming the same page both claim to be its
+ * translation, so hreflang lists that locale twice and the switcher picks one.
+ * Default-locale pages count by their own route (versionized, so pages pair
+ * within their version), never by a `translationOf` of their own.
  */
 const translationOfDiagnostics = (
   pages: PageRecord[],
   i18n: ResolvedI18nConfig
 ): Diagnostic[] => {
-  const defaultKeys = new Set(
-    pages
-      .filter((page) => page.locale === i18n.defaultLocale)
-      .map((page) => page.translationKey)
+  const defaultRoutes = new Set(
+    pages.filter((page) => page.locale === i18n.defaultLocale).map(ownRoute)
   );
-  return pages.flatMap((page): Diagnostic[] =>
-    page.meta.translationOf === undefined ||
-    defaultKeys.has(page.translationKey)
-      ? []
-      : [
-          {
-            code: "BLUME_I18N_UNKNOWN_TRANSLATION",
-            file: page.sourcePath,
-            message: `translationOf "${page.meta.translationOf}" names no "${i18n.defaultLocale}" page, so this translation pairs with nothing.`,
-            severity: "warning",
-            suggestion: `Set translationOf to the "${i18n.defaultLocale}" page's route without the locale prefix, like "guides/setup".`,
-          },
-        ]
-  );
+  const claimed = new Set<string>();
+  const diagnostics: Diagnostic[] = [];
+  for (const page of pages) {
+    const named = page.meta.translationOf;
+    if (named === undefined) {
+      continue;
+    }
+    if (!defaultRoutes.has(page.translationKey)) {
+      diagnostics.push({
+        code: "BLUME_I18N_UNKNOWN_TRANSLATION",
+        file: pageOrigin(page),
+        message: `translationOf "${named}" names no "${i18n.defaultLocale}" page, so this translation pairs with nothing.`,
+        severity: "warning",
+        suggestion: `Set translationOf to the "${i18n.defaultLocale}" page's route without the locale prefix, like "guides/setup".`,
+      });
+      continue;
+    }
+    const claim = `${page.locale}\u0000${page.translationKey}`;
+    if (claimed.has(claim)) {
+      diagnostics.push({
+        code: "BLUME_I18N_DUPLICATE_TRANSLATION",
+        file: pageOrigin(page),
+        message: `Another "${page.locale}" page already translates "${named}", so hreflang lists "${page.locale}" twice and the language switcher picks one.`,
+        severity: "warning",
+        suggestion: `Keep one "${page.locale}" translation of "${named}", or point this page's translationOf at another page.`,
+      });
+    }
+    claimed.add(claim);
+  }
+  return diagnostics;
 };
 
 /**
