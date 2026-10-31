@@ -238,12 +238,45 @@ const defaultLocaleFolderDiagnostic = (
 });
 
 /**
+ * A `translationOf` that names no default-locale page pairs the translation
+ * with nothing: it loses its hreflang alternates and switcher entry silently,
+ * so say which page and which route it named. Pages pair within their
+ * version, so the default-locale keys are compared as the pages carry them.
+ */
+const translationOfDiagnostics = (
+  pages: PageRecord[],
+  i18n: ResolvedI18nConfig
+): Diagnostic[] => {
+  const defaultKeys = new Set(
+    pages
+      .filter((page) => page.locale === i18n.defaultLocale)
+      .map((page) => page.translationKey)
+  );
+  return pages.flatMap((page): Diagnostic[] =>
+    page.meta.translationOf === undefined ||
+    defaultKeys.has(page.translationKey)
+      ? []
+      : [
+          {
+            code: "BLUME_I18N_UNKNOWN_TRANSLATION",
+            file: page.sourcePath,
+            message: `translationOf "${page.meta.translationOf}" names no "${i18n.defaultLocale}" page, so this translation pairs with nothing.`,
+            severity: "warning",
+            suggestion: `Set translationOf to the "${i18n.defaultLocale}" page's route without the locale prefix, like "guides/setup".`,
+          },
+        ]
+  );
+};
+
+/**
  * Warn about top-level content folders that look like a locale (a code Blume
  * recognizes) but aren't declared in `i18n.locales`. Without this they're
  * silently treated as default-locale content under a `/<code>/…` route, which
  * is almost never intended — usually a translation that wasn't registered.
  * A folder named after the default locale gets the same treatment (see
  * {@link defaultLocaleFolderDiagnostic}).
+ * So does a `translationOf` that names no default-locale page (see
+ * {@link translationOfDiagnostics}).
  */
 export const i18nDiagnostics = (
   pages: PageRecord[],
@@ -288,5 +321,5 @@ export const i18nDiagnostics = (
       });
     }
   }
-  return diagnostics;
+  return [...diagnostics, ...translationOfDiagnostics(pages, i18n)];
 };

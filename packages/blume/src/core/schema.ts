@@ -301,6 +301,13 @@ const pageMetaBaseSchema = z.strictObject({
   sidebar: sidebarMetaSchema.prefault({}),
   slug: z.string().optional(),
   title: z.string().optional(),
+  /**
+   * The default-locale route of the page this one translates
+   * (`guides/setup`), for a translation published at its own localized URL.
+   * Pairs the two for hreflang, the language switcher and fallbacks, which
+   * otherwise match pages by route.
+   */
+  translationOf: z.string().optional(),
   // No default: an absent `type` must fall through to `content.defaultType`.
   type: z.string().optional(),
 });

@@ -55,6 +55,7 @@ const DOCS_PATHS = new Map(
     BLUME_EXAMPLE_NOT_FOUND: "/docs/content/components#component",
     BLUME_FRONTMATTER_INVALID: "/docs/content/frontmatter",
     BLUME_GRAPHQL_UNKNOWN_CODE_SAMPLE: "/docs/references/graphql",
+    BLUME_I18N_UNKNOWN_TRANSLATION: "/docs/content/i18n#localized-urls",
     BLUME_INCLUDE_CYCLE: DOCS_CONTENT_INCLUDES,
     BLUME_INCLUDE_MALFORMED: DOCS_CONTENT_INCLUDES,
     BLUME_INCLUDE_NOT_FOUND: DOCS_CONTENT_INCLUDES,

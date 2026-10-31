@@ -2311,6 +2311,21 @@ export const resolveEntryRoute = (
   };
 };
 
+/**
+ * The translation key of a page that names the page it translates with
+ * `translationOf`: that page's default-locale route, versionized like the
+ * logical route so a snapshot pairs within its own version. Slashes and a
+ * Markdown extension are forgiven (`/guides/setup.md` reads as
+ * `/guides/setup`), and an empty value names the home page.
+ */
+export const translationOfKey = (
+  translationOf: string,
+  version: string
+): string => {
+  const route = trimSlashes(translationOf.trim()).replace(/\.mdx?$/u, "");
+  return versionizeRoute(route ? `/${route}` : "/", version);
+};
+
 /** The route a logical route publishes at in one locale, base path excluded. */
 export const localizedRoute = (
   logicalRoute: string,
@@ -2563,7 +2578,12 @@ export const normalizeEntry = (
     source: { name: ctx.source.name, ref: entry.ref },
     sourcePath: entry.sourcePath,
     title: deriveTitle(meta, headings, navPath),
-    translationKey: logicalRoute,
+    // A translation published at its own localized URL names the page it
+    // translates; everything else pairs by route.
+    translationKey:
+      meta.translationOf === undefined
+        ? logicalRoute
+        : translationOfKey(meta.translationOf, version),
     unknownProps: unknownProps.length > 0 ? unknownProps : undefined,
     version,
     versionKey,

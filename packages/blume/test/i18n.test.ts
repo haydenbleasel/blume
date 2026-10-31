@@ -30,6 +30,7 @@ import type {
   ResolvedI18nConfig,
 } from "../src/core/schema.ts";
 import { resolveDocsCollection } from "../src/core/sources/collection.ts";
+import { translationOfKey } from "../src/core/sources/normalize.ts";
 import type {
   Navigation,
   NavNode,
@@ -1377,5 +1378,93 @@ describe("UI dictionaries", () => {
       }
     }
     expect(violations).toEqual([]);
+  });
+});
+
+/** Discover a content tree and build its manifest. */
+const manifestOf = async (
+  files: Record<string, string>,
+  resolved: ResolvedConfig
+) => {
+  const contentRoot = await tempContent(files);
+  const { pages } = await discoverIn(contentRoot, resolved);
+  const graph = buildContentGraph(pages, {
+    folderMeta: new Map<string, FolderMeta>(),
+    i18n: resolved.i18n,
+    navigation: resolved.navigation,
+  });
+  // SAFETY: buildManifest reads only contentRoot and root from the context.
+  const context = {
+    contentRoot,
+    root: dirname(contentRoot),
+  } as ProjectContext;
+  return {
+    manifest: buildManifest({ config: resolved, context, graph }),
+    pages,
+  };
+};
+
+describe("translationOf", () => {
+  const LOCALIZED = {
+    "fr/guides/installation.mdx":
+      "---\ntitle: Installation\ntranslationOf: guides/setup\n---\n# Installation\n",
+    "guides/setup.mdx": "---\ntitle: Setup\n---\n# Setup\n",
+  };
+
+  it("pairs a translation published at its own URL", async () => {
+    const { manifest, pages } = await manifestOf(LOCALIZED, config());
+    const fr = pages.find((page) => page.locale === "fr");
+    expect(fr?.route).toBe("/fr/guides/installation");
+    expect(fr?.translationKey).toBe("/guides/setup");
+
+    const byPath = new Map(manifest.routes.map((route) => [route.path, route]));
+    expect(
+      byPath
+        .get("/guides/setup")
+        ?.alternates.map((alt) => alt.path)
+        .toSorted()
+    ).toEqual(["/fr/guides/installation", "/guides/setup"]);
+    expect(
+      byPath
+        .get("/fr/guides/installation")
+        ?.alternates.map((alt) => alt.path)
+        .toSorted()
+    ).toEqual(["/fr/guides/installation", "/guides/setup"]);
+    // The page is translated, so no fallback copy publishes at the
+    // default-locale path under /fr.
+    expect(byPath.has("/fr/guides/setup")).toBe(false);
+  });
+
+  it("reads the route forgivingly and versionizes it", () => {
+    expect(translationOfKey("guides/setup", "")).toBe("/guides/setup");
+    expect(translationOfKey(" /guides/setup.md/ ", "")).toBe("/guides/setup");
+    expect(translationOfKey("guides/setup.mdx", "")).toBe("/guides/setup");
+    expect(translationOfKey("/", "")).toBe("/");
+    expect(translationOfKey("", "")).toBe("/");
+    expect(translationOfKey("guides/setup", "v1.0")).toBe("/v1.0/guides/setup");
+    expect(translationOfKey("", "v1.0")).toBe("/v1.0");
+  });
+
+  it("warns when translationOf names no default-locale page", async () => {
+    const contentRoot = await tempContent({
+      ...LOCALIZED,
+      "fr/guides/orphan.mdx":
+        "---\ntitle: Orphelin\ntranslationOf: guides/missing\n---\n# Orphelin\n",
+    });
+    const { pages } = await discoverIn(contentRoot, config());
+    const diagnostics = i18nDiagnostics(pages, i18nOf());
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]).toMatchObject({
+      code: "BLUME_I18N_UNKNOWN_TRANSLATION",
+      file: join(contentRoot, "fr/guides/orphan.mdx"),
+      severity: "warning",
+    });
+    expect(diagnostics[0]?.message).toContain('"guides/missing"');
+  });
+
+  it("stays quiet when every translationOf names a page", async () => {
+    const contentRoot = await tempContent(LOCALIZED);
+    const { pages } = await discoverIn(contentRoot, config());
+    expect(i18nDiagnostics(pages, i18nOf())).toEqual([]);
   });
 });
