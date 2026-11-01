@@ -50,7 +50,7 @@
     },
     "packages/blume": {
       "name": "blume",
-      "version": "2.2.4",
+      "version": "2.2.6",
       "bin": {
         "blume": "bin/blume.mjs",
       },
@@ -103,7 +103,7 @@
         "mdast-util-from-markdown": "^2.0.3",
         "mdast-util-gfm": "^3.1.0",
         "mdast-util-to-string": "^4.0.0",
-        "medium-zoom": "^1.1.0",
+        "medium-zoom": "^1.1.2",
         "mermaid": "^12.0.0",
         "micromark-extension-gfm": "^3.0.0",
         "nanotar": "^0.3.0",
@@ -1847,7 +1847,7 @@
 
     "media-typer": ["media-typer@1.1.1", "", {}, "sha512-yz3xRaG20c6/BOzvYoDaGtPmGscs7YivItZEEqe6GbwNfHuxu9YNmvnEkMzKldAGY4/80pRcQRZSEnhquk9XuQ=="],
 
-    "medium-zoom": ["medium-zoom@1.1.0", "", {}, "sha512-ewyDsp7k4InCUp3jRmwHBRFGyjBimKps/AJLjRSox+2q/2H4p/PNpQf+pwONWlJiOudkBXtbdmVbFjqyybfTmQ=="],
+    "medium-zoom": ["medium-zoom@1.1.2", "", {}, "sha512-0wTqeCQ4NGzjPghi7i2lMI6RyGj9N60fGvzY9HiNcxDTcvOw7S+ri7K3xVkrIZ+2uzUg4w/KSVMDdZXYMtHkdw=="],
 
     "merge-descriptors": ["merge-descriptors@2.0.0", "", {}, "sha512-Snk314V5ayFLhp3fkUREub6WtjBfPdCPY1Ln8/8munuLuiYhsABgBVWsozAG+MWMbVEvcdcpbi9R7ww22l9Q3g=="],
 
