@@ -445,10 +445,14 @@ npx blume validate`}
   <h3>A diagram doesn't follow dark mode</h3>
   <p>
     Blume themes diagrams with the site's CSS variables, and Pele ignores
-    Mermaid's <code>theme</code> setting and <code>themeVariables</code>, so a
-    <code>theme</code> in front matter or an <code>%%{"{init}"}%%</code>{" "}
-    directive does nothing here. Remove it if you copied the diagram from
-    Mermaid's editor. Colors set with <code>style</code> or{" "}
+    Mermaid's <code>theme</code> setting, so a <code>theme</code> in front
+    matter or an <code>%%{"{init}"}%%</code>{" "}
+    directive does nothing here. Of Mermaid's <code>themeVariables</code>, only
+    the chart series palettes are honored (<code>pie1</code>–<code>pie8</code>,{" "}
+    <code>git0</code>–<code>git7</code>, <code>cScale0</code>–<code>cScale8</code>,{" "}
+    <code>venn1</code>–<code>venn8</code>, and{" "}
+    <code>xyChart.plotColorPalette</code>). Remove it if you copied the
+    diagram from Mermaid's editor. Colors set with <code>style</code> or{" "}
     <code>classDef</code> still stay fixed in both themes, so a light{" "}
     <code>fill</code> can leave light text unreadable in dark mode. Style with
     outlines and dashes instead, as the <code>external</code> class does.
