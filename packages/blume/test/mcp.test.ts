@@ -11,10 +11,12 @@ import {
   buildMcpDiscovery,
   buildMcpServerCard,
 } from "../src/ai/mcp/discovery.ts";
+import { getNavigation, normalizeRoute } from "../src/ai/mcp/query.ts";
 import { createMcpFetchHandler } from "../src/ai/mcp/server.ts";
 import { MCP_TOOLS } from "../src/ai/mcp/tools.ts";
 import { scanProject } from "../src/core/project-graph.ts";
 import type { BlumeProject } from "../src/core/project-graph.ts";
+import type { Navigation } from "../src/core/types.ts";
 import { buildOramaIndex, queryOramaIndex } from "../src/search/orama-index.ts";
 import type { OramaQueryFilters } from "../src/search/orama-index.ts";
 
@@ -1805,6 +1807,53 @@ describe("unknown tool", () => {
   });
 });
 
+describe("normalizeRoute", () => {
+  it("treats a string that only looks like a URL as a path", () => {
+    // An unclosed IPv6 host fails URL parsing, so the input stays a path.
+    expect(normalizeRoute("https://[::1/guides", DATA)).toBe(
+      "/https://[::1/guides"
+    );
+  });
+
+  it("compares a malformed percent sequence as written", () => {
+    expect(normalizeRoute("/guides/100%", DATA)).toBe("/guides/100%");
+    // A well-formed sequence still decodes.
+    expect(normalizeRoute("/guides/caf%C3%A9", DATA)).toBe("/guides/café");
+  });
+});
+
+/** A navigation tree told apart by its one tab's label. */
+const navWith = (label: string): Navigation => ({
+  ...DATA.navigation,
+  tabs: [{ label, path: "/v1.0/guides/install" }],
+});
+
+/** {@link DATA} with one archived version holding `byLocale`'s trees. */
+const versioned = (byLocale: Record<string, Navigation>): McpData => ({
+  ...DATA,
+  archivedVersions: ["v1.0"],
+  defaultLocale: "en",
+  navigationByVersion: { "v1.0": byLocale },
+});
+
+describe("getNavigation on a versioned snapshot", () => {
+  it("falls back to any tree the version has when neither the locale nor the default does", () => {
+    const french = navWith("Guides (fr)");
+    expect(
+      getNavigation(versioned({ fr: french }), {
+        locale: "de",
+        version: "v1.0",
+      })
+    ).toEqual({ navigation: french });
+  });
+
+  it("serves the current tree for a version with no trees", () => {
+    expect(getNavigation(versioned({}), { version: "v1.0" })).toEqual({
+      navigation: DATA.navigation,
+    });
+  });
+});
+
 const scanDirs: string[] = [];
 
 const scanFixture = async (
@@ -1983,6 +2032,31 @@ export default { content: { types: { rfc: { facets: ["status"], frontmatter: { s
   });
 });
 
+/** The `instructions` a server built from `data` answers `initialize` with. */
+const initialize = async (data: McpData): Promise<string | undefined> => {
+  const response = await createMcpFetchHandler(data)(
+    new Request("https://docs.example.com/mcp", {
+      body: JSON.stringify({
+        id: 1,
+        jsonrpc: "2.0",
+        method: "initialize",
+        params: {
+          capabilities: {},
+          clientInfo: { name: "probe", version: "0" },
+          protocolVersion: "2025-03-26",
+        },
+      }),
+      headers: {
+        accept: "application/json, text/event-stream",
+        "content-type": "application/json",
+      },
+      method: "POST",
+    })
+  );
+  const body: { result?: { instructions?: string } } = await response.json();
+  return body.result?.instructions;
+};
+
 describe("MCP resources", () => {
   it("advertises the resources capability on initialize", async () => {
     const response = await handler(
@@ -2011,6 +2085,13 @@ describe("MCP resources", () => {
       "resources",
       "tools",
     ]);
+  });
+
+  it("hands the configured instructions to the client on initialize", async () => {
+    expect(await initialize({ ...DATA, instructions: "Be concise." })).toBe(
+      "Be concise."
+    );
+    expect(await initialize(DATA)).toBeUndefined();
   });
 
   it("lists one text/markdown resource per page at its served URL", async () => {

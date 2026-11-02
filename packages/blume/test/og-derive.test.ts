@@ -115,6 +115,36 @@ describe("deriveOgFonts", () => {
     expect(families).toEqual({ title: "Custom Sans" });
   });
 
+  it("carries a local face's normal or italic style onto its card entry", () => {
+    const { fonts } = deriveOgFonts(
+      {
+        body: {
+          name: "Custom Serif",
+          variants: [
+            { src: "/fonts/serif.woff2", style: "normal", weight: 400 },
+            { src: "fonts/serif-italic.woff2", style: "italic", weight: 400 },
+          ],
+        },
+      },
+      ROOT
+    );
+    expect(fonts).toEqual([
+      // An absolute source is kept as written.
+      {
+        name: "Custom Serif",
+        src: "/fonts/serif.woff2",
+        style: "normal",
+        weight: 400,
+      },
+      {
+        name: "Custom Serif",
+        src: "/site/fonts/serif-italic.woff2",
+        style: "italic",
+        weight: 400,
+      },
+    ]);
+  });
+
   it("derives nothing from an empty config", () => {
     expect(deriveOgFonts(undefined, ROOT)).toEqual({ fonts: [] });
     expect(deriveOgFonts({}, ROOT)).toEqual({ fonts: [] });

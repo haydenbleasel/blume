@@ -136,6 +136,34 @@ describe("cache: pollingWatch", () => {
     expect(changes).toBeGreaterThan(0);
     expect(call).toBeGreaterThan(2);
   });
+
+  it("seeds the baseline from the first tick when the seed load fails", async () => {
+    let call = 0;
+    let seeds = 0;
+    const changed = Promise.withResolvers<number>();
+    const stop = pollingWatch(
+      () => {
+        call += 1;
+        return Promise.resolve({
+          diagnostics: [],
+          entries: [entry("a.md", call === 1 ? "served" : "edited")],
+        });
+      },
+      0.01,
+      () => {
+        seeds += 1;
+        return Promise.reject(new Error("offline"));
+      }
+    )(() => {
+      changed.resolve(call);
+    });
+    // The failed seed sets no baseline, so the first tick sets it instead
+    // and the change fires on the second tick rather than the first.
+    const firedOn = await changed.promise;
+    stop();
+    expect(seeds).toBe(1);
+    expect(firedOn).toBe(2);
+  });
 });
 
 describe("cache: snapshotCache", () => {

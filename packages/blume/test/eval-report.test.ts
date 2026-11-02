@@ -186,6 +186,36 @@ describe("fixLines", () => {
   });
 });
 
+describe("a finding on a page with no local file", () => {
+  // A failed question hinting at a page from a remote or CMS source anchors
+  // to that page's route, which has no source file to name.
+  const remote = {
+    code: "BLUME_EVAL_QUESTION_FAILED",
+    message: 'Docs could not answer: "How do I deploy to Vercel?"',
+    url: "/guides/deploy",
+  };
+
+  it("prints a fix line without a file site", () => {
+    const lines = fixLines(
+      { ...result, diagnostics: [{ ...remote, severity: "error" }] },
+      "/root"
+    ).map(strip);
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatch(
+      /^ {2}fix: +Docs could not answer: "How do I deploy to Vercel\?"$/u
+    );
+  });
+
+  it("prints a warning line without a file site", () => {
+    expect(
+      warningLines(
+        { ...result, diagnostics: [{ ...remote, severity: "warning" }] },
+        "/root"
+      ).map(strip)
+    ).toEqual(['  ⚠ Docs could not answer: "How do I deploy to Vercel?"']);
+  });
+});
+
 describe("a warning-severity miss", () => {
   const warned: QuestionResult = { ...failResult, severity: "warning" };
   const finding = {

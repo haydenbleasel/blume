@@ -1,5 +1,13 @@
 import { afterAll, describe, expect, it, spyOn } from "bun:test";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import * as fs from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 
@@ -200,6 +208,40 @@ describe("dev lock", () => {
       pid: 2_147_483_647,
       port: 3001,
     });
+  });
+
+  it("leaves a lock path it can't read alone on update and release", async () => {
+    const dir = await outDir();
+    const release = acquireDevLock(dir, 4321);
+    // Something replaced the lock file with a directory: unreadable, so it
+    // can't be proven ours, and neither the update nor the release touches it.
+    const lock = join(dir, "dev.lock");
+    rmSync(lock);
+    mkdirSync(lock);
+    expect(() => updateDevLockPort(dir, 4322)).not.toThrow();
+    expect(() => release()).not.toThrow();
+    expect(statSync(lock).isDirectory()).toBe(true);
+  });
+
+  it("swallows a failed removal on release, leaving the lock to the liveness check", async () => {
+    const dir = await outDir();
+    const release = acquireDevLock(dir, 4321);
+    // The lock is ours, but removing it fails (e.g. EBUSY on Windows while
+    // another process holds the file open).
+    const remove = spyOn(fs, "rmSync").mockImplementation(() => {
+      throw Object.assign(new Error("EBUSY: resource busy or locked"), {
+        code: "EBUSY",
+      });
+    });
+    try {
+      expect(() => release()).not.toThrow();
+    } finally {
+      remove.mockRestore();
+    }
+    expect(readDevLock(dir)).toEqual({ pid: process.pid, port: 4321 });
+    // The release already ran once; a retry doesn't attempt the removal again.
+    release();
+    expect(existsSync(join(dir, "dev.lock"))).toBe(true);
   });
 });
 

@@ -491,6 +491,31 @@ describe("ensureDepsLink", () => {
     expect(existsSync(join(link, "astro", "package.json"))).toBe(true);
   });
 
+  it("replaces a link whose target can't be read instead of failing", async () => {
+    // `lstat` sees a link, but reading where it points fails (a permissions
+    // error, or the link swapped out between the two calls). Generation must
+    // still repair it rather than surface the error.
+    const { outDir, pkgDir, store } = await isolatedFixture();
+    const link = join(outDir, "node_modules");
+    const staleTarget = join(root, "stale");
+    await mkdir(staleTarget, { recursive: true });
+    await symlink(staleTarget, link, "junction");
+    const spy = spyOn(fsPromises, "readlink").mockRejectedValue(
+      Object.assign(new Error("EACCES: permission denied"), { code: "EACCES" })
+    );
+    try {
+      await ensureDepsLink(outDir, pkgDir);
+      expect(spy).toHaveBeenCalledTimes(1);
+    } finally {
+      spy.mockRestore();
+    }
+
+    const stats = await lstat(link);
+    expect(stats.isSymbolicLink()).toBe(true);
+    await expectLinkTarget(link, store);
+    expect(existsSync(join(link, "astro", "package.json"))).toBe(true);
+  });
+
   it("re-points a cached junction that resolves a superseded Blume", async () => {
     // A restored build cache (Vercel) resurrects `.blume/node_modules` as a
     // junction into the *previous* release's store directory. That directory

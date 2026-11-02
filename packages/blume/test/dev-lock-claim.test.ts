@@ -1,4 +1,5 @@
-import { afterAll, describe, expect, it } from "bun:test";
+import { afterAll, describe, expect, it, spyOn } from "bun:test";
+import * as fs from "node:fs";
 import { existsSync, mkdirSync, utimesSync, writeFileSync } from "node:fs";
 import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -114,6 +115,25 @@ describe("acquireDevLock", () => {
     expect(thrown).toBeInstanceOf(DevLockHeldError);
     expect(await readdir(dir)).toEqual(["dev.lock"]);
     release();
+  });
+
+  it("surfaces a filesystem that can't hard-link the lock into place", async () => {
+    const dir = await outDir();
+    // Only a lock that already exists (EEXIST) is a lost race to retry; any
+    // other link failure would retry forever, so it reaches the caller.
+    const link = spyOn(fs, "linkSync").mockImplementation(() => {
+      throw Object.assign(new Error("EPERM: operation not permitted, link"), {
+        code: "EPERM",
+      });
+    });
+    try {
+      expect(() => acquireDevLock(dir)).toThrow("EPERM");
+    } finally {
+      link.mockRestore();
+    }
+    // No lock was claimed, and the staged payload was cleaned up.
+    expect(await readdir(dir)).toEqual([]);
+    expect(readDevLock(dir)).toBeNull();
   });
 });
 

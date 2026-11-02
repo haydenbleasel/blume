@@ -418,6 +418,51 @@ describe("asyncapi.extractAsyncApiOperations", () => {
     });
   });
 
+  it("inlines a top-level ref only from its own components section", () => {
+    const document = normalizeAsyncApiDocument({
+      channels: {
+        // Names an operation component: a channel must not become one.
+        crossed: { $ref: "#/components/operations/publish" },
+        // The section is right, but no `components.channels` table exists.
+        unbacked: { $ref: "#/components/channels/unbacked" },
+      },
+      components: {
+        operations: {
+          publish: { action: "send", channel: { $ref: "#/channels/crossed" } },
+        },
+      },
+    });
+    // Both stay references for the extractor to report.
+    expect(document.channels).toStrictEqual({
+      crossed: { $ref: "#/components/operations/publish" },
+      unbacked: { $ref: "#/components/channels/unbacked" },
+    });
+  });
+
+  it("skips a trait $ref outside the trait sections", () => {
+    const document = applyAsyncApiTraits({
+      channels: { c: { address: "topic" } },
+      components: {
+        schemas: { kafka: { bindings: { kafka: { groupId: "g" } } } },
+      },
+      operations: {
+        op: {
+          action: "send",
+          channel: { $ref: "#/channels/c" },
+          traits: [
+            // A schema is no trait, even one shaped like a trait.
+            { $ref: "#/components/schemas/kafka" },
+            { summary: "From trait" },
+          ],
+        },
+      },
+    });
+    const operation = document.operations?.op;
+    expect(operation?.summary).toBe("From trait");
+    expect(operation?.bindings).toBeUndefined();
+    expect(operation?.traits).toBeUndefined();
+  });
+
   it("falls back to action + address for an id that slugifies to nothing", () => {
     const document = {
       channels: { c: { address: "topic" } },
@@ -637,6 +682,24 @@ describe("components/openapi/async helpers", () => {
         schema: { type: "string" },
       },
     ]);
+  });
+
+  it("lowers a parameter without a usable description as undescribed", () => {
+    const [bare, numeric] = channelParameters(
+      { parameters: { bare: {}, numeric: { description: 42 } } },
+      {}
+    );
+    // Neither row carries a description, but both still lower as required
+    // string parameters the address template needs.
+    expect(bare).toMatchObject({
+      in: "channel",
+      name: "bare",
+      required: true,
+      schema: { type: "string" },
+    });
+    expect(bare?.description).toBeUndefined();
+    expect(numeric?.name).toBe("numeric");
+    expect(numeric?.description).toBeUndefined();
   });
 
   it("resolves channel servers, defaulting to all declared", () => {

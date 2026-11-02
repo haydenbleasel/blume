@@ -170,6 +170,30 @@ describe("runEval", () => {
     expect(result.results[0]?.notes).toBe("vague");
   });
 
+  it("reports a failed answer the judge named no missing fact for", async () => {
+    const project = await projectFixture();
+    const evals: EvalsFile = {
+      questions: [question({ id: "vague" })],
+      version: 1,
+    };
+    const result = await runEval({
+      agent: "claude",
+      evals,
+      evalsPath: "/project/evals.yaml",
+      project,
+      rawEvals: rawFor(evals),
+      run: claudeRunner({ verdict: '{"pass": false, "score": 0.1}' }),
+    });
+
+    expect(result.counts.fail).toBe(1);
+    expect(result.results[0]?.missing).toEqual([]);
+    const [finding] = result.diagnostics;
+    expect(finding?.code).toBe("BLUME_EVAL_QUESTION_FAILED");
+    expect(finding?.message).toBe(
+      'Docs could not answer: "What is the minimum Node.js version?"'
+    );
+  });
+
   it("falls back to the evals file anchor and warns on unknown route hints", async () => {
     const project = await projectFixture();
     const evals: EvalsFile = {

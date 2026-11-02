@@ -312,6 +312,18 @@ describe("duplicate checks", () => {
     });
     expect(run(duplicateChecks, ctx)).not.toContain("DUPLICATE_CONTENT");
   });
+
+  it("does not group pages that share a missing title or description", () => {
+    // No title and no description is TITLE_MISSING and DESCRIPTION_MISSING's
+    // finding; an absent value is not one two pages can duplicate.
+    const ctx = context({
+      pages: [
+        snapshot({ contentHash: "a", descriptions: [], titles: [], url: "/a" }),
+        snapshot({ contentHash: "b", descriptions: [], titles: [], url: "/b" }),
+      ],
+    });
+    expect(run(duplicateChecks, ctx)).toEqual([]);
+  });
 });
 
 describe("indexability checks", () => {

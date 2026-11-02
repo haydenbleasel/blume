@@ -11,6 +11,7 @@ import {
   enrichDiagnostic,
   formatDiagnostic,
   hasErrors,
+  locateFrontmatterKey,
   resolveDocsUrl,
 } from "../src/core/diagnostics.ts";
 import type { Diagnostic } from "../src/core/types.ts";
@@ -103,6 +104,23 @@ describe("diagnosticsFromZod", () => {
     expect(diagnostic?.column).toBe(1);
   });
 
+  it("reads a quote that doesn't close on its line as an apostrophe", () => {
+    // Read as a string, `it's` would run to the quote on line 4 and swallow
+    // the `title` entry in between.
+    const source = "seo: {\n  note: it's here,\n  title: 123,\n  tag: 'a'\n}\n";
+    const schema = z.object({ seo: z.object({ title: z.string() }) });
+    const result = schema.safeParse({ seo: { title: 123 } });
+    if (result.success) {
+      throw new Error("expected a failure");
+    }
+    const [diagnostic] = diagnosticsFromZod(result.error, {
+      code: "BLUME_X",
+      source,
+    });
+    expect(diagnostic?.line).toBe(3);
+    expect(diagnostic?.column).toBe(3);
+  });
+
   it("leaves line/column unset when no source is given", () => {
     const result = z.object({ count: z.number() }).safeParse({ count: "x" });
     if (result.success) {
@@ -111,6 +129,23 @@ describe("diagnosticsFromZod", () => {
     const [diagnostic] = diagnosticsFromZod(result.error, { code: "BLUME_X" });
     expect(diagnostic?.line).toBeUndefined();
     expect(diagnostic?.column).toBeUndefined();
+  });
+});
+
+describe("locateFrontmatterKey", () => {
+  it("counts lines from the top of the file, past the opening fence", () => {
+    const source = "---\ntitle: Docs\nseo:\n  description: 1\n---\n# Docs\n";
+    expect(locateFrontmatterKey(source, ["seo", "description"])).toEqual({
+      column: 3,
+      line: 4,
+    });
+  });
+
+  it("returns undefined for a file with no front matter", () => {
+    // The body's `title:` isn't a front matter key, so there's no line to name.
+    expect(
+      locateFrontmatterKey("# Docs\n\ntitle: body\n", ["title"])
+    ).toBeUndefined();
   });
 });
 

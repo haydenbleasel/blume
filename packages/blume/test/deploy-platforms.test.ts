@@ -482,6 +482,20 @@ const WRANGLER_CONFIG = JSON.stringify({
   name: "docs",
 });
 
+/** The wrapper Worker a Cloudflare build with these config entries emits. */
+const workerFor = async (config: string): Promise<string> => {
+  const built = await project(
+    JSON.stringify(cloudflare()),
+    { "dist/server/wrangler.json": WRANGLER_CONFIG },
+    config
+  );
+  await emitCloudflareNegotiation(built, recorder().log);
+  return readFile(
+    join(built.context.root, "dist", "server", NEGOTIATION_WORKER_FILE),
+    "utf-8"
+  );
+};
+
 describe("cloudflare platform", () => {
   it("wires the wrapper Worker into the emitted server bundle", async () => {
     const built = await project(JSON.stringify(cloudflare()), {
@@ -506,6 +520,15 @@ describe("cloudflare platform", () => {
     );
     expect(worker).toContain(
       'const NOT_FOUND = {"json":false,"markdown":true};'
+    );
+  });
+
+  it("routes per-page JSON through the wrapper only while the docs API is on", async () => {
+    expect(await workerFor("")).toContain('"/api/docs/pages/intro.json"');
+    // With `agents.api: false` the build emits no per-page JSON documents, so
+    // the wrapper claims none of their paths.
+    expect(await workerFor(", agents: { api: false }")).toContain(
+      "const PAGE_JSON = new Set([]);"
     );
   });
 

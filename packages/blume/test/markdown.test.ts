@@ -1602,6 +1602,19 @@ describe("markdown processors", () => {
     expect(html).toContain("blume-heading-anchor");
   });
 
+  it("substitutes content variables in a .md page's text, code, and links", async () => {
+    const html = await renderTo(
+      blumeMarkdownProcessor({
+        variables: { product: "acme", version: "2.1" },
+      }),
+      "Install {{product}} `v{{ version }}` from [the docs](https://{{product}}.dev).\n"
+    );
+    expect(html).toContain("Install acme");
+    expect(html).toContain("<code>v2.1</code>");
+    expect(html).toContain('href="https://acme.dev"');
+    expect(html).not.toContain("{{");
+  });
+
   it("carries heading markers through a full .md render", async () => {
     const renderer = await blumeMarkdownProcessor({}).createRenderer({});
     const source = [
@@ -1735,6 +1748,18 @@ describe("highlightCode", () => {
     });
     expect(html).toContain("blume-source");
     expect(html).toContain("astro-code");
+  });
+
+  it("tags the block when a notation has already turned its class into a list", async () => {
+    // A notation marks the `<pre>` (`has-diff`) through Shiki's
+    // `addClassToHast`, which leaves the class a list by the time Blume's
+    // class hook runs. The hook still writes one space-separated string.
+    const html = await highlightCode("const x = 1; // [!code ++]", "ts");
+    const preClass = /<pre class="(?<value>[^"]*)"/u.exec(html)?.groups?.value;
+    expect(preClass?.split(" ")).toContain("astro-code");
+    expect(preClass).not.toContain(",");
+    expect(html).toContain('class="line diff add"');
+    expect(html).not.toContain("[!code ++]");
   });
 
   it("falls back to an escaped plain block for an unknown language", async () => {

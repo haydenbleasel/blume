@@ -335,6 +335,27 @@ describe("per-locale navigation", () => {
     expect(labelsOf(fr)).toContain("Guides");
   });
 
+  it("gives an empty site navigation when the default locale has no tree", async () => {
+    // The schema refuses a defaultLocale outside i18n.locales; a resolved
+    // config built by hand can still carry one.
+    const { pages } = await buildProject(config());
+    const graph = buildContentGraph(pages, {
+      folderMeta: new Map<string, FolderMeta>(),
+      i18n: { ...i18nOf(), defaultLocale: "de" },
+      navigation: config().navigation,
+    });
+    expect(graph.navigation).toStrictEqual({
+      featured: [],
+      selectors: [],
+      sidebar: [],
+      tabs: [],
+    });
+    expect(Object.keys(graph.navigationByLocale).toSorted()).toEqual([
+      "en",
+      "fr",
+    ]);
+  });
+
   it("fills a locale's sidebar with fallback pages for untranslated content", async () => {
     const { graph } = await buildProject(config());
     const guides = (graph.navigationByLocale.fr?.sidebar ?? []).find(

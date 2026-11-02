@@ -960,6 +960,20 @@ describe("obsidianSource", () => {
     ]);
   });
 
+  it("orders names that differ only by an accent by code point", async () => {
+    const root = await makeVault({
+      "Cafe.md": "# Plain\n",
+      "Café.md": "# Accented\n",
+    });
+    const { entries } = await sourceFor(root).load();
+    // Base-sensitivity comparison ignores the accent, so the two tie; the
+    // code-point tiebreak keeps the order total whatever readdir returned.
+    expect(entries.map((entry) => entry.ref.normalize("NFC"))).toEqual([
+      "Cafe.md",
+      "Café.md",
+    ]);
+  });
+
   it("skips the never-content directories every filesystem scan skips", async () => {
     const root = await makeVault({
       "Note.md": "# Note\n",

@@ -257,6 +257,50 @@ describe("unregisteredSnapshotDiagnostics", () => {
     expect(diagnostics[0]?.suggestion).toContain('archived: [{ id: "v1.0" }]');
   });
 
+  it("passes over pages with no file in the content root", async () => {
+    // A remote source's `v3.0/` page has no folder on disk to register.
+    const root = await makeProject({
+      "blume.config.ts": `export default {
+  content: {
+    sources: [
+      { kind: "filesystem", options: { root: "docs" }, requiredSecrets: [], runtimeDeps: [] },
+      {
+        kind: "custom",
+        options: {
+          load: () =>
+            Promise.resolve({
+              diagnostics: [],
+              entries: [
+                {
+                  body: { format: "md", text: "Remote." },
+                  data: { title: "Remote" },
+                  raw: "---\\ntitle: Remote\\n---\\nRemote.",
+                  ref: "v3.0/remote.md",
+                },
+              ],
+            }),
+          name: "remote",
+          staged: true,
+        },
+        requiredSecrets: [],
+        runtimeDeps: [],
+      },
+    ],
+  },
+};
+`,
+      "docs/index.mdx": "---\ntitle: Home\n---\n# Home\n",
+      "docs/v1.0/guide.mdx": "---\ntitle: Old guide\n---\n# Old\n",
+    });
+    const project = await scanProject(root);
+    const remote = project.graph.pages.find((page) => page.title === "Remote");
+    expect(remote?.route).toBe("/v3.0/remote");
+    expect(remote?.sourcePath).toBeUndefined();
+    expect(
+      unregisteredSnapshotDiagnostics(project).map((d) => d.file)
+    ).toStrictEqual([join(root, "docs", "v1.0")]);
+  });
+
   it("leaves a versioned project to the scan's own check", async () => {
     const root = await makeProject({
       "blume.config.ts": VERSIONED_CONFIG,

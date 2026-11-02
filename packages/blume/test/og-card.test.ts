@@ -86,6 +86,10 @@ const NO_VIEWBOX_LOGO =
 const filledLogo = (fill: string): string =>
   `<svg viewBox="0 0 24 24"><path d="M0 0h24v24H0z" fill="${fill}" /></svg>`;
 
+/** The glyph SVG every stubbed emoji fetch returns. */
+const STUB_GLYPH =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="18" fill="#e00"/></svg>';
+
 // Takumi's twemoji provider fetches each glyph SVG from a CDN. Stub it so emoji
 // tests are hermetic — and immune to Bun's fetch keeping a once-seen HTTPS_PROXY
 // for the rest of the process (the openapi proxy test would otherwise poison
@@ -101,10 +105,9 @@ const withStubbedGlyphFetch = async (
   globalThis.fetch = ((input: RequestInfo | URL) => {
     urls.push(String(input));
     return Promise.resolve(
-      new Response(
-        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="18" fill="#e00"/></svg>',
-        { headers: { "Content-Type": "image/svg+xml" } }
-      )
+      new Response(STUB_GLYPH, {
+        headers: { "Content-Type": "image/svg+xml" },
+      })
     );
   }) as typeof fetch;
   try {
@@ -149,6 +152,34 @@ describe("renderOgImage", () => {
       await expectPng({ brand: "🦊 Fox Docs", title: "Three" });
       expect(urls).toHaveLength(1);
       expect(urls[0]).toContain("1f98a");
+    });
+  });
+
+  it("draws an emoji from a pre-fetched image instead of fetching it", async () => {
+    // A caller can hand over image bytes up front, as a bare list; a glyph
+    // among them is never requested. Uses an emoji no other test renders, so
+    // the shared glyph cache can't be what skips the fetch.
+    const card = { brand: "🦉 Owl Docs", title: "Hi" };
+    let glyphUrl = "";
+    let fetched: Uint8Array = new Uint8Array();
+    await withStubbedGlyphFetch(async (urls) => {
+      // A private fetch cache keeps this render out of the shared one.
+      fetched = await renderOgImage({
+        ...card,
+        images: { fetchCache: new Map() },
+      });
+      [glyphUrl = ""] = urls;
+    });
+    expect(glyphUrl).toContain("1f989");
+
+    await withStubbedGlyphFetch(async (urls) => {
+      const prefetched = await renderOgImage({
+        ...card,
+        images: [{ data: new TextEncoder().encode(STUB_GLYPH), src: glyphUrl }],
+      });
+      expect(urls).toEqual([]);
+      // The same glyph bytes, so the same card as the fetched render.
+      expect(Buffer.from(prefetched).equals(Buffer.from(fetched))).toBe(true);
     });
   });
 

@@ -379,6 +379,50 @@ export default {
   });
 });
 
+/**
+ * A config module that deletes its own file as it runs, as a checkout or a
+ * delete can between the load and the read that locates its issues.
+ */
+const vanishing = async (config: string) => {
+  const dir = await makeDir();
+  const file = join(dir, "blume.config.ts");
+  await writeFile(
+    file,
+    `import { unlinkSync } from "node:fs";\nunlinkSync(${JSON.stringify(file)});\nexport default ${config};\n`
+  );
+  return { dir, file };
+};
+
+describe("a config file removed while it loads", () => {
+  it("still warns about a color that isn't a CSS color, without a line", async () => {
+    const { dir, file } = await vanishing(
+      '{ theme: { accent: "deep purple" } }'
+    );
+    const { diagnostics } = await loadConfig(dir);
+    expect(diagnostics).toStrictEqual([
+      expect.objectContaining({
+        code: "BLUME_THEME_COLOR_INVALID",
+        file,
+        line: undefined,
+        schemaPath: "theme.accent",
+        severity: "warning",
+      }),
+    ]);
+  });
+
+  it("still reports an invalid config, without a line", async () => {
+    const { dir, file } = await vanishing("{ title: 123 }");
+    const error = await loadError(dir);
+    expect(error).toBeInstanceOf(ConfigValidationError);
+    expect(error.diagnostic).toMatchObject({
+      code: "BLUME_CONFIG_INVALID",
+      file,
+      schemaPath: "title",
+    });
+    expect(error.diagnostic.line).toBeUndefined();
+  });
+});
+
 // The adapters from `blume/analytics` return exactly these descriptors; the
 // fixtures inline them because a tmp-dir config can't resolve the package.
 const descriptor = (kind: string, options: string): string =>
