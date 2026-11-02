@@ -264,7 +264,7 @@
     "@notionhq/client": "^5.26.0",
     "@openrouter/ai-sdk-provider": "^3.0.0",
     "@oramacloud/client": "^2.1.4",
-    "@sanity/client": "^8.6.1",
+    "@sanity/client": "^8.14.1",
     "@types/cross-spawn": "^6.0.6",
     "@types/html-escaper": "^3.0.4",
     "@types/picomatch": "^4.0.3",
