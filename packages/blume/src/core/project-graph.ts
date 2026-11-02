@@ -591,9 +591,7 @@ const publicOpenApiDiagnostics = (
 };
 
 /** The configured banner link target, when the banner has a link. */
-const bannerLinkHref = (
-  banner: ResolvedConfig["banner"]
-): string | undefined =>
+const bannerLinkHref = (banner: ResolvedConfig["banner"]): string | undefined =>
   banner === undefined || isBannerShorthand(banner)
     ? undefined
     : banner.link?.href;

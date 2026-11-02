@@ -518,10 +518,7 @@ export const ensureDepsLink = async (
 };
 
 /** Absolute path to the configured `examples.css`, or null when unset. */
-const examplesCssFile = (
-  root: string,
-  config: ResolvedConfig
-): string | null =>
+const examplesCssFile = (root: string, config: ResolvedConfig): string | null =>
   config.examples.css ? join(root, config.examples.css) : null;
 
 /**
