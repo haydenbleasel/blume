@@ -50,7 +50,7 @@
     },
     "packages/blume": {
       "name": "blume",
-      "version": "2.2.4",
+      "version": "2.2.6",
       "bin": {
         "blume": "bin/blume.mjs",
       },
@@ -76,7 +76,7 @@
         "@tailwindcss/typography": "^0.5.20",
         "@tailwindcss/vite": "^4.3.3",
         "@types/mdast": "^4.0.4",
-        "@types/node": "^22.20.2",
+        "@types/node": "^22.20.5",
         "@vercel/analytics": "^2.0.1",
         "@vitejs/plugin-react": "6.1.1",
         "ai": "^7.0.99",
@@ -1025,7 +1025,7 @@
 
     "@types/nlcst": ["@types/nlcst@2.0.3", "", { "dependencies": { "@types/unist": "*" } }, "sha512-vSYNSDe6Ix3q+6Z7ri9lyWqgGhJTmzRjZRqyq15N0Z/1/UnVsno9G/N40NBijoYx2seFDIl0+B2mgAb9mezUCA=="],
 
-    "@types/node": ["@types/node@22.20.2", "", { "dependencies": { "undici-types": "~6.21.0" } }, "sha512-xlvWf4Vs9n1PEVYwP1n4vvG07M6y8WgvJ2t0vbrWTmijsIHp1cS+uJ2kMIRdY3nHZK0nCYKrPeD171+SzF4/zw=="],
+    "@types/node": ["@types/node@22.20.5", "", { "dependencies": { "undici-types": "~6.21.0" } }, "sha512-U2+DNr+wSjpsTS/wZGYHq7GcwfuSmKiKvoPvK22zwTlRhU91yOniN4qRR5KhIjvif7ysw/dz/hKmfDH0Ris4aA=="],
 
     "@types/picomatch": ["@types/picomatch@4.0.3", "", {}, "sha512-iG0T6+nYJ9FAPmx9SsUlnwcq1ZVRuCXcVEvWnntoPlrOpwtSTKNDC9uVAxTsC3PUvJ+99n4RpAcNgBbHX3JSnQ=="],
 
