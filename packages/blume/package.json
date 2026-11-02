@@ -187,7 +187,7 @@
     "@scalar/openapi-parser": "^0.29.11",
     "@scalar/openapi-types": "^0.9.5",
     "@shikijs/transformers": "^4.4.3",
-    "@shikijs/twoslash": "^4.4.3",
+    "@shikijs/twoslash": "^4.5.0",
     "@tailwindcss/typography": "^0.5.20",
     "@tailwindcss/vite": "^4.3.3",
     "@types/mdast": "^4.0.4",
