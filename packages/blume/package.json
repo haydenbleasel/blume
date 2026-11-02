@@ -218,7 +218,7 @@
     "mdast-util-from-markdown": "^2.0.3",
     "mdast-util-gfm": "^3.1.0",
     "mdast-util-to-string": "^4.0.0",
-    "medium-zoom": "^1.1.0",
+    "medium-zoom": "^1.1.2",
     "mermaid": "^12.0.0",
     "micromark-extension-gfm": "^3.0.0",
     "nanotar": "^0.3.0",
