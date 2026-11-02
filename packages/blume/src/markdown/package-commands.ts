@@ -1,4 +1,4 @@
-import type { Agent, Command } from "package-manager-detector";
+import type { Agent, Command, ResolvedCommand } from "package-manager-detector";
 import { resolveCommand } from "package-manager-detector/commands";
 
 /** Supported package managers, in the order tabs are displayed. */
@@ -188,13 +188,16 @@ const buildCommand = (manager: PackageManager, intent: Intent): string => {
   const command: Command = global
     ? (intent.operation === "add" && "global") || "global_uninstall"
     : COMMAND_FOR[intent.operation];
-  // Non-null: every operation above maps to a command each supported agent's
-  // table defines (null is only possible for gaps like npm's
-  // upgrade-interactive, which no Operation reaches).
-  const resolved = resolveCommand(AGENT_FOR[manager], command, args);
-  const words = resolved
-    ? [resolved.command, ...resolved.args]
-    : [manager, ...args];
+  // SAFETY: never null. Every operation above maps to a command each
+  // supported agent's table defines (null is only possible for gaps like npm's
+  // upgrade-interactive, which no Operation reaches), and the tests render
+  // every operation for every manager, so a table that drops one fails there.
+  const resolved = resolveCommand(
+    AGENT_FOR[manager],
+    command,
+    args
+  ) as ResolvedCommand;
+  const words = [resolved.command, ...resolved.args];
   // Docs favor the explicit spellings over the tables' terse aliases.
   if (words[1] === "i") {
     words[1] = "install";

@@ -75,10 +75,11 @@ const deploymentInputSchema = z.discriminatedUnion(
     staticDeploymentSchema,
   ],
   {
-    error: (issue) =>
-      issue.code === "invalid_union" || issue.code === "invalid_type"
-        ? HINT
-        : undefined,
+    // The union raises only two issues of its own, both a wrong shape for
+    // `deployment` as a whole: a value that isn't an object (`invalid_type`)
+    // and a `kind` no adapter claims (`invalid_union`). An option's issues
+    // belong to that option's schema and keep their own path and message.
+    error: HINT,
   }
 );
 

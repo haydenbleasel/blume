@@ -115,6 +115,19 @@ describe("rollup", () => {
       "links",
     ]);
   });
+
+  it("leads with the busier check when category and severity tie", () => {
+    // Both are content warnings, so the one with more findings comes first.
+    const groups = rollup([
+      finding("BLUME_AUDIT_TITLE_LENGTH", { url: "/a" }, "x"),
+      finding("BLUME_AUDIT_DESCRIPTION_MISSING", { url: "/a" }, "x"),
+      finding("BLUME_AUDIT_DESCRIPTION_MISSING", { url: "/b" }, "x"),
+    ]);
+    expect(groups.map((group) => [group.id, group.count])).toEqual([
+      ["BLUME_AUDIT_DESCRIPTION_MISSING", 2],
+      ["BLUME_AUDIT_TITLE_LENGTH", 1],
+    ]);
+  });
 });
 
 describe("formatReport", () => {
@@ -243,6 +256,18 @@ describe("formatReport", () => {
     const text = strip(formatReport(result([]), "/root"));
     expect(text).toContain("network      skipped — pass --url");
     expect(text).toContain("external     skipped — pass --external");
+  });
+
+  it("names the origin it audited alongside the build", () => {
+    const online: AuditResult = {
+      ...result([]),
+      origin: "https://docs.example.com",
+      tiers: { external: false, network: true, static: true },
+    };
+    const text = strip(formatReport(online, "/root"));
+    expect(text).toContain("10 pages · dist + https://docs.example.com");
+    expect(text).not.toContain("offline");
+    expect(text).not.toContain("network      skipped");
   });
 });
 

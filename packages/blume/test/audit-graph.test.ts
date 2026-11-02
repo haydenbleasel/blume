@@ -387,6 +387,25 @@ describe("parseSitemap", () => {
     expect(doc.error).toBeUndefined();
   });
 
+  it("skips url entries that carry no usable loc", () => {
+    // Text-only and self-closed <url> elements, a loc that is blank, and an
+    // entry with only a lastmod contribute nothing; their neighbors still do.
+    const doc = parseSitemap(
+      "/f",
+      `<urlset>
+        <url>text</url>
+        <url/>
+        <url><loc>   </loc></url>
+        <url><lastmod>2026-01-01</lastmod></url>
+        <url><loc>https://x.dev/kept</loc></url>
+      </urlset>`,
+      10
+    );
+    expect(doc.error).toBeUndefined();
+    expect(doc.urls).toEqual(["https://x.dev/kept"]);
+    expect([...(doc.lastmod?.keys() ?? [])]).toEqual([]);
+  });
+
   it("rejects a document that is not a urlset or sitemap index", () => {
     expect(parseSitemap("/f", "<html></html>", 10).error).toBe(
       "no <urlset> element"

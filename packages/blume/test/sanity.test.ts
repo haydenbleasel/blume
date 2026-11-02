@@ -33,9 +33,13 @@ const ctxFor = (cacheDir: string): SourceContext => ({
   projectRoot: cacheDir,
 });
 
-/** A hand-built Sanity document fixture: an id plus the fields the test maps. */
+/**
+ * A hand-built Sanity document fixture: an id plus the fields the test maps.
+ * The id is optional because a GROQ projection (`{ title, body }`) can leave
+ * it out.
+ */
 interface SanityDocFixture {
-  _id: string;
+  _id?: string;
   _updatedAt?: string;
   body?: PortableTextBlock[] | string;
   description?: string;
@@ -447,6 +451,53 @@ describe("sanitySource (field + client resolution edge cases)", () => {
     );
     const { entries } = await source.load();
     expect(entries[0]?.body.text).not.toContain("cdn.sanity.io");
+  });
+
+  it("skips an image block that carries no asset ref", async () => {
+    const source = sanitySource(
+      {
+        client: clientReturning([
+          {
+            _id: "x",
+            body: [
+              // An image whose upload never finished has no `asset` yet.
+              { _type: "image", alt: "Diagram" },
+              {
+                _type: "block",
+                children: [{ _type: "span", text: "After the image" }],
+                style: "normal",
+              },
+            ],
+          },
+        ]),
+        dataset: "production",
+        name: "guides",
+        projectId: "p1",
+        query: "*",
+      },
+      ctxFor(await tempDir())
+    );
+    const { entries } = await source.load();
+    const text = entries[0]?.body.text ?? "";
+    expect(text).toContain("After the image");
+    expect(text).not.toContain("![Diagram]");
+  });
+
+  it("routes a document with neither a slug nor an id as untitled", async () => {
+    // A GROQ projection that picks only `title` drops `_id` too.
+    const source = sanitySource(
+      {
+        client: clientReturning([{ title: "Projected" }]),
+        dataset: "production",
+        name: "guides",
+        projectId: "p1",
+        query: "*{ title }",
+      },
+      ctxFor(await tempDir())
+    );
+    const { entries } = await source.load();
+    expect(entries.map((entry) => entry.ref)).toStrictEqual(["untitled.md"]);
+    expect(entries[0]?.data.title).toBe("Projected");
   });
 
   it("read() serves the staged raw, then falls back to the cache for unknown refs", async () => {

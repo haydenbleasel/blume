@@ -261,10 +261,11 @@ export const networkChecks: CheckModule = {
     ]);
 
     for (const page of context.pages) {
-      const result = results.get(liveUrl(origin, page, deployBase));
-      if (!result) {
-        continue;
-      }
+      // SAFETY: every page URL was in the probed list, and `probeAll` returns
+      // a result for each URL it was given.
+      const result = results.get(
+        liveUrl(origin, page, deployBase)
+      ) as ProbeResult;
       const failure = badResponse(context, page, result);
       if (failure) {
         found.push(failure);
@@ -354,10 +355,9 @@ export const externalChecks: CheckModule = {
 
     const found: Diagnostic[] = [];
     for (const [url, pages] of linkers) {
-      const result = results.get(url);
-      if (!result) {
-        continue;
-      }
+      // SAFETY: every `linkers` key was in the probed list, and `probeAll`
+      // returns a result for each URL it was given.
+      const result = results.get(url) as ProbeResult;
       // SAFETY: every `linkers` entry is created with its linking page and only
       // ever appended to, so the array is never empty.
       const site = pageSite(context, pages[0] as PageSnapshot);

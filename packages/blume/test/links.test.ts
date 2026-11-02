@@ -635,6 +635,24 @@ describe(validateLinks, () => {
       expect(diagnostics).toHaveLength(0);
     });
 
+    it("reports a file link outside the locale folders that no page has", async () => {
+      // A default-tree page's sibling has no other tree to fall back on.
+      const diagnostics = await validateLinks(
+        makeGraph([
+          makePage({
+            id: "guides/leaf.mdx",
+            links: [link("./setup.mdx")],
+            locale: "en",
+            route: "/guides/leaf",
+          }),
+        ]),
+        { contentRoot: "/abs", i18n, publicDir: null }
+      );
+      expect(diagnostics.map((d) => d.code)).toStrictEqual([
+        "BLUME_BROKEN_LINK",
+      ]);
+    });
+
     it("keeps the authored route when no locale variant is served", async () => {
       // Fallbacks off and no translation: the link stays on `/nav`, so the
       // English anchor is what gets checked.

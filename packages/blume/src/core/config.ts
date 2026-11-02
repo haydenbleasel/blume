@@ -367,13 +367,9 @@ export const loadConfig = async (
       file: configFile ?? undefined,
       source,
     });
-    const [first, ...rest] = diagnostics;
-    const primary = first ?? {
-      code: "BLUME_CONFIG_INVALID",
-      file: configFile ?? undefined,
-      message: "Invalid Blume config.",
-      severity: "error" as const,
-    };
+    // SAFETY: a failed parse carries at least one issue, and `configIssues`
+    // turns each into a diagnostic, so there is always a first.
+    const [primary, ...rest] = diagnostics as [Diagnostic, ...Diagnostic[]];
     // Surface every issue in one failing run — reporting only the first turns
     // a three-mistake config into three fix-rerun-fail loops.
     const moreIssues = rest.map((d) => `  - ${d.message}`).join("\n");

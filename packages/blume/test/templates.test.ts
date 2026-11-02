@@ -1160,6 +1160,73 @@ describe("astroConfigTemplate", () => {
     expect(out).not.toContain("watch:");
   });
 
+  it("keeps an absolute local font source as written", () => {
+    // Relative sources are anchored at the project root (the Astro root is
+    // the runtime dir); an absolute one already names its file.
+    const out = astroConfigTemplate({
+      askPath: ASK_PATH,
+      config: blumeConfigSchema.parse({
+        theme: {
+          fonts: {
+            mono: {
+              name: "Brand Mono",
+              variants: [
+                { src: "/srv/fonts/brand-mono.woff2", weight: 400 },
+                { src: "fonts/brand-mono-bold.woff2", weight: 700 },
+              ],
+            },
+          },
+        },
+      }),
+      consentClientPath: CONSENT_CLIENT_PATH,
+      contentRoutes: [],
+      context: context(),
+      examplesPath: EXAMPLES_PATH,
+      examplesThemePath: EXAMPLES_THEME_PATH,
+      featuresPath: FEATURES_PATH,
+      needsReact: false,
+      pages: [],
+      searchClientPath: SEARCH_CLIENT_PATH,
+      themePath: THEME_PATH,
+    });
+    expect(out).toContain(
+      'options: { variants: [{"weight":400,"src":["/srv/fonts/brand-mono.woff2"]},{"weight":700,"src":["/p/fonts/brand-mono-bold.woff2"]}] }'
+    );
+  });
+
+  it("emits no fonts block when no configured family resolves", () => {
+    // A hand-built config the schema never vetted can name only unknown
+    // slugs. None becomes a Fonts API entry, so the config neither declares
+    // `fonts` nor imports the unused `fontProviders`.
+    const out = astroConfigTemplate({
+      askPath: ASK_PATH,
+      config: {
+        ...config,
+        theme: {
+          ...config.theme,
+          fonts: {
+            body: "no-such-font",
+            display: "no-such-font",
+            mono: "no-such-font",
+          },
+        },
+      },
+      consentClientPath: CONSENT_CLIENT_PATH,
+      contentRoutes: [],
+      context: context(),
+      examplesPath: EXAMPLES_PATH,
+      examplesThemePath: EXAMPLES_THEME_PATH,
+      featuresPath: FEATURES_PATH,
+      needsReact: false,
+      pages: [],
+      searchClientPath: SEARCH_CLIENT_PATH,
+      themePath: THEME_PATH,
+    });
+    expect(out).toContain('import { defineConfig } from "astro/config";');
+    expect(out).not.toContain("fontProviders");
+    expect(out).not.toContain("fonts: [");
+  });
+
   it("wires the adapter, site, base, redirects, i18n and renderers", () => {
     const serverConfig = blumeConfigSchema.parse({
       deployment: node({ base: "/docs", site: "https://x.com" }),
@@ -1634,6 +1701,30 @@ describe("astroConfigTemplate", () => {
       'dataFile: fileURLToPath(new URL("./src/generated/data.json", import.meta.url)) }';
     expect(out).toContain(`blumeMdxProcessor({ ...{`);
     expect(out.split(dataFile)).toHaveLength(3);
+  });
+
+  it("bakes no homepage Link header into an ejected app with nothing to advertise", () => {
+    // With the JSON API off and no content homepage, the dev surface has no
+    // relation to advertise, so the baked-in options leave the header out
+    // rather than carrying an empty one.
+    const out = astroConfigTemplate({
+      askPath: ASK_PATH,
+      config: blumeConfigSchema.parse({ agents: { api: false } }),
+      consentClientPath: CONSENT_CLIENT_PATH,
+      contentRoutes: ["/guide"],
+      context: context({ distDir: "./dist", outDir: ".", root: "." }),
+      examplesPath: EXAMPLES_PATH,
+      examplesThemePath: EXAMPLES_THEME_PATH,
+      featuresPath: FEATURES_PATH,
+      generatedModulesDir: "./src/generated",
+      needsReact: false,
+      pages: [],
+      searchClientPath: SEARCH_CLIENT_PATH,
+      themePath: THEME_PATH,
+    });
+    expect(out).toContain('"buildArtifactsRoot":"."');
+    expect(out).toContain('"contentRoutes":["/guide"]');
+    expect(out).not.toContain("homeLinkHeader");
   });
 
   it("drops only Rolldown's head-inject directive warning from build logs", async () => {

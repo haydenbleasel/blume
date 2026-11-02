@@ -391,6 +391,14 @@ describe("the 1.x reference blocks", () => {
     expect(message).toContain("`reference: [openapi({ … })]`");
     expect(message).toEndWith('Unrecognized key: "colour"');
   });
+
+  it("keeps Zod's own message when the config itself isn't an object", () => {
+    // The hint only speaks to unrecognized keys; an array config reports the
+    // standard type error.
+    expect(messages(parse([{ openapi: {} }]))).toEqual([
+      expect.stringMatching(/expected object/iu),
+    ]);
+  });
 });
 
 describe("search.boost frontmatter", () => {

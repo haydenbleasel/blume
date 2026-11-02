@@ -520,6 +520,21 @@ describe("analyzeComponentOverrides with real files", () => {
     expect(widget?.source.framework).toBe("react");
   });
 
+  it("probes extensions for an absolute path, as written", async () => {
+    const dir = await makeProject({
+      "Widget.tsx": "export default () => null;",
+    });
+    // Analyzed from another folder: an absolute path doesn't resolve against
+    // the components file's directory.
+    const result = analyzeComponentOverrides(
+      `export default { mdx: { Widget: { component: ${JSON.stringify(join(dir, "Widget"))}, client: "load" } } };`,
+      join(dir, "config", "components.ts")
+    );
+    const [widget] = result.mdx;
+    expect(widget?.source.path).toBe(join(dir, "Widget.tsx"));
+    expect(widget?.source.framework).toBe("react");
+  });
+
   /** The rejection analyzing `source` in a fresh project with `files` raises. */
   const rejectionIn = async (
     files: Record<string, string>,

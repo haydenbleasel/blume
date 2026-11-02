@@ -1215,20 +1215,13 @@ export const buildRuntimeData = (project: BlumeProject): string => {
 
   const hreflang = hreflangAlternates(project);
 
+  // With i18n the graph holds one tree per configured locale, in config order
+  // (see `buildI18nNavigation`).
   const navigationByLocale = i18n
     ? Object.fromEntries(
-        i18n.locales.map(({ code }) => [
+        Object.entries(graph.navigationByLocale).map(([code, navigation]) => [
           code,
-          withRepoUrl(
-            graph.navigationByLocale[code] ?? {
-              actions: [],
-              cta: null,
-              featured: [],
-              selectors: [],
-              sidebar: [],
-              tabs: [],
-            }
-          ),
+          withRepoUrl(navigation),
         ])
       )
     : {};

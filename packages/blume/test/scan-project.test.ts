@@ -188,6 +188,89 @@ export default { content: { types: { rfc: { frontmatter: { status } } } } };`,
     expect(project.droppedPages).toBe(0);
   });
 
+  it("keeps the configured sources when the overrides name no content root", async () => {
+    // `blume dev` without `--content-dir` still passes an overrides object.
+    const root = await makeProject({
+      "blume.config.ts": 'export default { content: { root: "guides" } };\n',
+      "guides/index.md": "# Home\n",
+    });
+    const project = await scanProject(root, { overrides: {} });
+    expect(project.config.content.sources[0]?.options).toMatchObject({
+      root: "guides",
+    });
+    expect(routesOf(project.manifest.routes)).toStrictEqual(["/"]);
+  });
+
+  it("threads frontmatter.extend through to page validation", async () => {
+    // A dependency-free Standard Schema, so the temp config needs no imports.
+    const project = await scanProject(
+      await makeProject({
+        "blume.config.ts": `const owner = {
+  "~standard": {
+    version: 1,
+    vendor: "test",
+    validate: (value) =>
+      typeof value === "string"
+        ? { value }
+        : { issues: [{ message: "must be a string" }] },
+  },
+};
+export default { frontmatter: { extend: { owner } } };`,
+        "docs/guide.md": "---\ntitle: Guide\nowner: docs-team\n---\n# Guide\n",
+        "docs/index.md": "---\ntitle: Home\nowner: 5\n---\n# Home\n",
+      })
+    );
+    const byRoute = new Map(
+      project.graph.pages.map((page) => [page.route, page])
+    );
+    // The site-wide key applies to every page, so the one with a number for
+    // an owner is rejected.
+    expect(byRoute.get("/guide")?.custom).toStrictEqual({ owner: "docs-team" });
+    expect(byRoute.has("/")).toBe(false);
+    expect(project.diagnostics).toContainEqual(
+      expect.objectContaining({
+        code: "BLUME_FRONTMATTER_INVALID",
+        message: expect.stringContaining("must be a string"),
+      })
+    );
+  });
+
+  it("drops each source redirect a page or a missing target rules out", async () => {
+    const root = await makeProject({
+      "blume.config.ts": `export default {
+  content: {
+    sources: [
+      { kind: "filesystem", options: { root: "docs" }, requiredSecrets: [], runtimeDeps: [] },
+      {
+        kind: "custom",
+        options: {
+          load: () =>
+            Promise.resolve({
+              diagnostics: [],
+              entries: [],
+              redirects: [
+                { from: "/old", to: "/missing" },
+                { from: "/guide", to: "/" },
+              ],
+            }),
+          name: "remote",
+        },
+        requiredSecrets: [],
+        runtimeDeps: [],
+      },
+    ],
+  },
+};
+`,
+      "docs/guide.md": "# Guide\n",
+      "docs/index.md": "# Home\n",
+    });
+    const project = await scanProject(root);
+    // `/missing` isn't a page, and `/guide` is one, so neither redirect is added.
+    expect(project.config.redirects).toStrictEqual([]);
+    expect(routesOf(project.manifest.routes)).toStrictEqual(["/", "/guide"]);
+  });
+
   it("keeps the platform site detection loadConfig ran", async () => {
     const root = await makeProject({ "docs/index.md": "# Home\n" });
     const saved = {

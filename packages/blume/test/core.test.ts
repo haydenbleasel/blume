@@ -1618,11 +1618,16 @@ describe("sitemap", () => {
         title: "A",
       }),
       makePage({ id: "b", route: "/b", title: "B" }),
+      // Frontmatter takes any string; one that isn't a date is left out
+      // rather than written as an invalid <lastmod>.
+      makePage({ id: "c", lastModified: "soon", route: "/c", title: "C" }),
     ];
     const xml = buildSitemap(makeProject(pages)) ?? "";
     expect(xml).toContain("<lastmod>2024-05-01</lastmod>");
     // A page without a date gets a plain <url> with no lastmod.
     expect(xml).toContain("<loc>https://example.com/b</loc></url>");
+    expect(xml).toContain("<loc>https://example.com/c</loc></url>");
+    expect(xml.match(/<lastmod>/gu)).toHaveLength(1);
   });
 });
 
