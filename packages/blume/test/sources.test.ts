@@ -578,6 +578,28 @@ describe("normalizeEntry", () => {
     expect(diagnostics[0]?.file).toBe("/abs/sdks/index.md");
     expect(diagnostics[0]?.schemaPath).toBe("sidebar.display");
   });
+
+  it("locates invalid frontmatter in the file on disk when the entry has no raw", async () => {
+    const root = await makeProject({
+      "guide.md": "---\ntitle: Guide\ndraft: maybe\n---\n# Guide\n",
+    });
+    const sourcePath = join(root, "guide.md");
+    const { pages, diagnostics } = normalizeEntry(
+      {
+        body: { format: "md", text: "# Guide\n" },
+        data: { draft: "maybe", title: "Guide" },
+        ref: "guide.md",
+        sourcePath,
+      },
+      { defaultType: "doc", source: { name: "filesystem", staged: false } }
+    );
+    expect(pages).toHaveLength(0);
+    expect(diagnostics[0]?.code).toBe("BLUME_FRONTMATTER_INVALID");
+    expect(diagnostics[0]?.file).toBe(sourcePath);
+    expect(diagnostics[0]?.schemaPath).toBe("draft");
+    // Read from the file itself, the error points at the `draft:` line.
+    expect(diagnostics[0]?.line).toBe(3);
+  });
 });
 
 const entryWith = (data: SourceEntry["data"]): SourceEntry => ({

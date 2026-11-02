@@ -1,8 +1,11 @@
 import { describe, expect, it } from "bun:test";
 
-import { mdxToJs } from "satteri";
+import { markdownToHtml, mdxToJs } from "satteri";
 
-import { MDX_BODY_FEATURES } from "../src/markdown/features.ts";
+import {
+  MARKDOWN_BODY_FEATURES,
+  MDX_BODY_FEATURES,
+} from "../src/markdown/features.ts";
 import { headingAnchorPlugin } from "../src/markdown/heading-anchors.ts";
 import { blumeMarkdownProcessor } from "../src/markdown/index.ts";
 import {
@@ -19,6 +22,30 @@ const renderMarkdown = async (
   const renderer = await blumeMarkdownProcessor({}).createRenderer({});
   const { code } = await renderer.render(source, { frontmatter });
   return code;
+};
+
+/**
+ * A `.md` page's HTML with Satteri's `rawHtml` on, which parses raw HTML into
+ * hast `element`/`comment` nodes before the plugins see it.
+ */
+const renderParsedHtml = async (source: string): Promise<string> => {
+  const { html } = await markdownToHtml(source, {
+    data: {
+      astro: {
+        frontmatter: {},
+        headings: [],
+        localImagePaths: new Set(),
+        remoteImagePaths: new Set(),
+      },
+    },
+    features: { ...MARKDOWN_BODY_FEATURES, rawHtml: true },
+    // SAFETY: Blume's plugins are typed structurally (see `markdown/index.ts`);
+    // Satteri drives them through the same visitor protocol.
+    hastPlugins: [headingAnchorPlugin(), titleHeadingPlugin()] as NonNullable<
+      Parameters<typeof markdownToHtml>[1]
+    >["hastPlugins"],
+  });
+  return html;
 };
 
 /** The `<h1>` texts an `.mdx` page compiles to, as Astro's MDX compile runs it. */
@@ -61,6 +88,18 @@ describe("titleHeadingPlugin", () => {
     expect(
       await renderMarkdown("<!-- draft -->\n\n# Setup\n\nText.\n")
     ).not.toContain("<h1");
+  });
+
+  it("looks past a comment that raw-HTML parsing made a node", async () => {
+    // With Satteri's `rawHtml`, the comment reaches the plugin as a hast
+    // `comment` node instead of an opaque `raw` string. Raw HTML that renders
+    // something still keeps the heading.
+    expect(
+      await renderParsedHtml("<!-- draft -->\n\n# Setup\n\nText.\n")
+    ).not.toContain("<h1");
+    expect(await renderParsedHtml("<p>Intro.</p>\n\n# Setup\n")).toContain(
+      '<h1 id="setup">'
+    );
   });
 
   it("keeps the heading of a titled page, a later heading, and a raw <h1>", async () => {

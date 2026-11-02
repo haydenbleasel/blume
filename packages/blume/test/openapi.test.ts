@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 
 import { join } from "pathe";
 import stringWidth from "string-width";
+import type * as UndiciModule from "undici";
 
 import {
   constraints,
@@ -39,6 +40,7 @@ import {
   sampleLanguages,
 } from "../src/components/openapi/snippets.ts";
 import { EN_UI } from "../src/core/i18n-ui.ts";
+import { nodeRequire } from "../src/core/node-require.ts";
 import { scanProject } from "../src/core/project-graph.ts";
 import { blumeConfigSchema } from "../src/core/schema.ts";
 import { resolveSources } from "../src/core/sources/resolve.ts";
@@ -207,6 +209,12 @@ const asFetch = (
     init?: RequestInit
   ) => Promise<Response>
 ): typeof fetch => Object.assign(handler, { preconnect: fetch.preconnect });
+
+/** The undici exports the proxy install reads, writable as `require` gives them. */
+interface UndiciExports {
+  EnvHttpProxyAgent: typeof UndiciModule.EnvHttpProxyAgent;
+  getGlobalDispatcher: typeof UndiciModule.getGlobalDispatcher;
+}
 
 /** A `fetch` stub that always resolves to the given response. */
 const respondWith = (response: Response): typeof fetch =>
@@ -951,6 +959,43 @@ describe("parse.parseSpec remote hardening", () => {
     }
   });
 
+  // Runs before the proxy test below: a successful install is memoized for the
+  // rest of the process, after which no later attempt reaches the agent.
+  it("falls back to a direct connection when the proxy agent can't be built", async () => {
+    const original = globalThis.fetch;
+    const hadProxy = process.env.HTTPS_PROXY;
+    // `require` hands back undici's live exports object, the one the proxy
+    // install reads its agent class from on every attempt.
+    const undici: UndiciExports = nodeRequire("undici");
+    const { EnvHttpProxyAgent } = undici;
+    const previous = undici.getGlobalDispatcher();
+    undici.EnvHttpProxyAgent = class extends EnvHttpProxyAgent {
+      constructor() {
+        super();
+        throw new Error("proxy support unavailable");
+      }
+    };
+    process.env.HTTPS_PROXY = "http://127.0.0.1:9";
+    globalThis.fetch = queued([Response.json(remoteSpec)]).fetch;
+    try {
+      const { document } = await parseSpec(
+        "https://api.test/openapi.json",
+        "/"
+      );
+      expect(document.info?.title).toBe("Remote");
+      // The failed install left the global dispatcher as it was.
+      expect(undici.getGlobalDispatcher()).toBe(previous);
+    } finally {
+      undici.EnvHttpProxyAgent = EnvHttpProxyAgent;
+      globalThis.fetch = original;
+      if (hadProxy === undefined) {
+        delete process.env.HTTPS_PROXY;
+      } else {
+        process.env.HTTPS_PROXY = hadProxy;
+      }
+    }
+  });
+
   it("routes through a proxy when a *_PROXY env var is set", async () => {
     const original = globalThis.fetch;
     const hadProxy = process.env.HTTPS_PROXY;
@@ -997,6 +1042,27 @@ describe("parse.parseSpec remote hardening", () => {
     } finally {
       globalThis.fetch = original;
       await rm(cacheDir, { force: true, recursive: true });
+    }
+  });
+
+  it("still serves a fetched spec when its cache can't be written", async () => {
+    const original = globalThis.fetch;
+    const root = await mkdtemp(join(tmpdir(), "blume-openapi-cache-"));
+    // A file where the cache dir's parent should be fails every cache write.
+    const blocker = join(root, "blocker");
+    await writeFile(blocker, "");
+    globalThis.fetch = queued([Response.json(remoteSpec)]).fetch;
+    try {
+      const { document, warnings } = await parseSpec(
+        "https://api.test/openapi.json",
+        "/",
+        { cacheDir: join(blocker, "cache"), refresh: true }
+      );
+      expect(document.info?.title).toBe("Remote");
+      expect(warnings).toStrictEqual([]);
+    } finally {
+      globalThis.fetch = original;
+      await rm(root, { force: true, recursive: true });
     }
   });
 

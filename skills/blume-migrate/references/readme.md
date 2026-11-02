@@ -78,6 +78,7 @@ Then the layout. **Leave the section folders where they are.** Set `content.root
 ```ts
 import { defineConfig } from "blume";
 import { openapi } from "blume/reference";
+
 import redirects from "./readme-redirects.json";
 
 export default defineConfig({

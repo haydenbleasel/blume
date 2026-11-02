@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 
-import { basename, dirname, extname, isAbsolute, join, resolve } from "pathe";
+import { basename, dirname, extname, isAbsolute, resolve } from "pathe";
 import ts from "typescript";
 
 import { BlumeError } from "./diagnostics.ts";
@@ -269,14 +269,12 @@ const TS_SOURCE_EXTS = ["ts", "tsx", "mts"];
 
 /**
  * Whether a local path names something the bundler can import: the file
- * itself, the file with a component extension added, a folder's `index`, or
- * the TypeScript source a `.js` specifier stands for.
+ * itself or a folder (whose `index` the bundler reads), the file with a
+ * component extension added, or the TypeScript source a `.js` specifier
+ * stands for.
  */
 const resolvesLocally = (absolute: string): boolean => {
   if (existsSync(absolute) || probeExtension(absolute)) {
-    return true;
-  }
-  if (probeExtension(join(absolute, "index"))) {
     return true;
   }
   const base = absolute.replace(SCRIPT_EXT, "");

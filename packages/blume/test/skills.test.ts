@@ -244,6 +244,33 @@ describe("collectSkills", () => {
     expect(files[1]?.mode).toBe(process.platform === "win32" ? 0o644 : 0o755);
   });
 
+  it("leaves a skill's dotfiles out of what it publishes", async () => {
+    const dir = join(root, "dotfiles");
+    // A lone SKILL.md beside Finder debris still ships verbatim.
+    await mkdir(join(dir, "lone"), { recursive: true });
+    await writeFile(join(dir, "lone", "SKILL.md"), skillMd("lone"));
+    await writeFile(join(dir, "lone", ".DS_Store"), "junk");
+    // A bundled skill's archive skips dotfiles and dot-directories.
+    await mkdir(join(dir, "bundled", ".git"), { recursive: true });
+    await writeFile(join(dir, "bundled", "SKILL.md"), skillMd("bundled"));
+    await writeFile(join(dir, "bundled", "notes.md"), "notes\n");
+    await writeFile(join(dir, "bundled", ".env"), "SECRET=1\n");
+    await writeFile(join(dir, "bundled", ".git", "HEAD"), "ref: main\n");
+
+    const { skills, warnings } = await collectSkills(dir);
+    expect(warnings).toEqual([]);
+    expect(skills.map((skill) => [skill.name, skill.type, skill.path])).toEqual(
+      [
+        ["bundled", "archive", "bundled.tar.gz"],
+        ["lone", "skill-md", "lone/SKILL.md"],
+      ]
+    );
+    const bundled = skills.find((skill) => skill.name === "bundled");
+    expect(
+      readTarGz(bundled?.content ?? new Uint8Array()).map((file) => file.path)
+    ).toEqual(["SKILL.md", "notes.md"]);
+  });
+
   it("warns about invalid skills instead of publishing them", async () => {
     const dir = join(root, "invalid");
     await mkdir(join(dir, "Bad_Name"), { recursive: true });

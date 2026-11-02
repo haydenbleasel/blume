@@ -14,7 +14,7 @@
     "translate": "blume translate"
   },
   "dependencies": {
-    "@ai-sdk/openai": "^4.0.78",
+    "@ai-sdk/openai": "^4.0.105",
     "blume": "workspace:*"
   },
   "devDependencies": {

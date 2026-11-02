@@ -2040,10 +2040,10 @@ const examplesConfigSchema = z
 const lastModifiedConfigSchema = z.union(
   [z.literal(false), z.enum(["git", "frontmatter"])],
   {
-    error: (issue) =>
-      issue.code === "invalid_union"
-        ? 'lastModified takes false, "git", or "frontmatter": `true` became "git" and `{ type: "…" }` became the bare string.'
-        : undefined,
+    // The union's own issue is the only one it raises: both options reject a
+    // wrong value outright, so neither's issue is passed through on its own.
+    error:
+      'lastModified takes false, "git", or "frontmatter": `true` became "git" and `{ type: "…" }` became the bare string.',
   }
 );
 

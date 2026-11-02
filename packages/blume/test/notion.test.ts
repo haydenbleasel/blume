@@ -1172,6 +1172,42 @@ describe("notionSource data sources", () => {
     expect(calls).toEqual(["retrieve:db1", "query:ds-first"]);
   });
 
+  it("follows the query's next_cursor until the last page", async () => {
+    const cursors: (string | undefined)[] = [];
+    const second = {
+      ...PAGE,
+      id: "page2",
+      properties: {
+        ...PAGE.properties,
+        Name: { title: [rich("Second Page")], type: "title" },
+      },
+    };
+    const paged: NotionClientLike = {
+      ...client(),
+      dataSources: {
+        query: ({ start_cursor }) => {
+          cursors.push(start_cursor);
+          return Promise.resolve(
+            start_cursor === "cursor-2"
+              ? { has_more: false, next_cursor: null, results: [second] }
+              : { has_more: true, next_cursor: "cursor-2", results: [PAGE] }
+          );
+        },
+      },
+    };
+    const source = notionSource(
+      { client: paged, database: "db1", fetchImpl, name: "handbook" },
+      await ctxFor()
+    );
+    const { entries } = await source.load();
+    // Both pages of results land, the second fetched with the first's cursor.
+    expect(cursors).toEqual([undefined, "cursor-2"]);
+    expect(entries.map((entry) => entry.ref)).toEqual([
+      "hello-world.mdx",
+      "second-page.mdx",
+    ]);
+  });
+
   it("fails clearly when the database has no data source", async () => {
     const empty: NotionClientLike = {
       ...client(),

@@ -390,6 +390,49 @@ describe("client loaders", () => {
     expect(gizmo.hits.map((hit) => hit.url)).toStrictEqual(["/c"]);
   });
 
+  it("flexsearch scopes matches to the requested locale and version", async () => {
+    stubFetch(() =>
+      Promise.resolve(
+        Response.json([
+          // A page without a version is the current docs ("").
+          {
+            content: "widget",
+            description: "",
+            locale: "en",
+            route: "/a",
+            title: "A",
+          },
+          {
+            content: "widget",
+            description: "",
+            locale: "en",
+            route: "/v1.0/a",
+            title: "A",
+            version: "v1.0",
+          },
+          {
+            content: "widget",
+            description: "",
+            locale: "fr",
+            route: "/fr/a",
+            title: "A",
+          },
+        ])
+      )
+    );
+    const { createSearch } =
+      await import("../src/components/layout/search/flexsearch.ts");
+    const search = await createSearch({ indexUrl: "/blume-search.json" });
+    const urls = async (options?: { locale?: string; version?: string }) => {
+      const { hits } = await search("widget", options);
+      return hits.map((hit) => hit.url).toSorted();
+    };
+    expect(await urls()).toStrictEqual(["/a", "/fr/a", "/v1.0/a"]);
+    expect(await urls({ version: "" })).toStrictEqual(["/a", "/fr/a"]);
+    expect(await urls({ version: "v1.0" })).toStrictEqual(["/v1.0/a"]);
+    expect(await urls({ locale: "en", version: "" })).toStrictEqual(["/a"]);
+  });
+
   it("endpoint posts the query and returns the server's hits", async () => {
     const captured: CapturedRequest = {};
     stubFetch((url, init) => {
@@ -468,6 +511,18 @@ describe("client loaders", () => {
     await search("q", { locale: "fr" });
     expect(captured.value?.requests[0]?.facetFilters).toStrictEqual([
       "locale:fr",
+    ]);
+
+    // A version scope adds its facet; the current docs ("") upload as
+    // "current", an archived version under its own id.
+    await search("q", { locale: "fr", version: "" });
+    expect(captured.value?.requests[0]?.facetFilters).toStrictEqual([
+      "locale:fr",
+      "version:current",
+    ]);
+    await search("q", { version: "v1.0" });
+    expect(captured.value?.requests[0]?.facetFilters).toStrictEqual([
+      "version:v1.0",
     ]);
   });
 
@@ -563,6 +618,13 @@ describe("client loaders", () => {
 
     await search("q", { locale: "fr" });
     expect(captured.value?.filter_by).toBe("locale:=fr");
+
+    // A version scope joins the filter; the current docs ("") upload as
+    // "current", an archived version under its own id.
+    await search("q", { locale: "fr", version: "" });
+    expect(captured.value?.filter_by).toBe("locale:=fr && version:=current");
+    await search("q", { version: "v1.0" });
+    expect(captured.value?.filter_by).toBe("version:=v1.0");
   });
 
   it("hosted clients hand the options Blume doesn't read to their SDK", async () => {

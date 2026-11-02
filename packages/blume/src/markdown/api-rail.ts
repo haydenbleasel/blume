@@ -82,9 +82,12 @@ const isNode = (value: MdastValue): value is MdastNode =>
 const childrenOf = (node: MdastNode): MdastNode[] =>
   Array.isArray(node.children) ? node.children.filter(isNode) : [];
 
-/** One JSX attribute, as the parser leaves it. */
+/**
+ * One JSX attribute, as the parser leaves it. The parser names every one: a
+ * spread (`{...props}`) is an `mdxJsxExpressionAttribute`, not one of these.
+ */
 interface JsxAttribute {
-  name?: string;
+  name: string;
   type: string;
   value?: string | { value: string } | null;
 }
@@ -110,9 +113,6 @@ const attributeValues = (
   const attributes = Array.isArray(node.attributes) ? node.attributes : [];
   for (const attribute of attributes.filter(isAttribute)) {
     const { name, value } = attribute;
-    if (!name) {
-      continue;
-    }
     if (value === null || value === undefined) {
       values[name] = true;
     } else if (isName(value)) {

@@ -1287,10 +1287,8 @@ const scanLinkLine = (
   defined: Set<string>
 ): void => {
   for (const match of masked.matchAll(MD_LINK)) {
-    const written = match.groups?.target;
-    if (written === undefined || match.index === undefined) {
-      continue;
-    }
+    // `target` is a required group of `MD_LINK`, so every match carries one.
+    const written = match.groups?.target ?? "";
     // Locate the target by its group's index rather than searching for its
     // text — a label that contains the same text (e.g. `[/a/b](/a/b)`) would
     // otherwise report the column inside the label.
@@ -1311,10 +1309,8 @@ const scanLinkLine = (
     // own target; surface it too so a missing image is still caught.
     const label = `[${match.groups?.label ?? ""}`;
     for (const image of label.matchAll(LABEL_IMAGE)) {
-      const imageWritten = image.groups?.target;
-      if (imageWritten === undefined || image.index === undefined) {
-        continue;
-      }
+      // As above: `LABEL_IMAGE` always captures its `target`.
+      const imageWritten = image.groups?.target ?? "";
       const imageLink = destinationLink(imageWritten, {
         column: match.index + image.index + targetStart(image) + 1,
         line: lineNumber,

@@ -173,4 +173,27 @@ describe("the MCP server in the discovery documents", () => {
     );
     expect(raw["/"]?.mdx).not.toContain("[MCP server]");
   });
+
+  it("leaves out a server a custom .astro page's route kept from being generated", async () => {
+    const { file } = await build({
+      "blume.config.ts": config,
+      "docs/index.md": HOME,
+      "pages/mcp.astro": "<h1>Our MCP server</h1>\n",
+    });
+    expect(await file("llms.txt")).not.toContain("[MCP server]");
+    const manifest = JSON.parse(await file("agent-readability.json"));
+    expect(manifest.artifacts.mcp).toBeUndefined();
+    expect(await file("_headers")).not.toContain("/.well-known/mcp");
+  });
+
+  it("still advertises the server beside custom pages on other routes", async () => {
+    const { file } = await build({
+      "blume.config.ts": config,
+      "docs/index.md": HOME,
+      "pages/about.astro": "<h1>About</h1>\n",
+    });
+    expect(await file("llms.txt")).toContain(`[MCP server](${SITE}/mcp)`);
+    const manifest = JSON.parse(await file("agent-readability.json"));
+    expect(manifest.artifacts.mcp?.url).toBe(`${SITE}/mcp`);
+  });
 });

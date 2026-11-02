@@ -88,14 +88,14 @@ Reportamos o problema upstream em [oxc-project/oxc#24096](https://github.com/oxc
 
 Aplique um patch no oxfmt para que ele preserve a quebra de linha que fica encostada em um fence `:::`. O Blume inclui a mesma correção no próprio repositório, e você pode aplicá-la em qualquer projeto.
 
-1. Salve o patch como `patches/oxfmt@0.71.0.patch`:
+1. Salve o patch como `patches/oxfmt@0.75.0.patch`:
 
-   ```diff patches/oxfmt@0.71.0.patch
-   diff --git a/dist/markdown-gizI1LFO.js b/dist/markdown-gizI1LFO.js
-   index 95a638402fa6f73b29ebb8d7a7ef229bee68a690..e2e2ea5b443fe10698c49c2ef3dc3d5909335915 100644
-   --- a/dist/markdown-gizI1LFO.js
-   +++ b/dist/markdown-gizI1LFO.js
-   @@ -4898,7 +4898,43 @@ function lu(e, t, r) {
+   ```diff patches/oxfmt@0.75.0.patch
+   diff --git a/dist/markdown-COx0Sqwt.js b/dist/markdown-COx0Sqwt.js
+   index 5b366cb1694061cfbf4072fe64fc7b5adc573e2f..c0040862210c81f9efc72422f6628e94bf37658f 100644
+   --- a/dist/markdown-COx0Sqwt.js
+   +++ b/dist/markdown-COx0Sqwt.js
+   @@ -4895,7 +4895,43 @@ function lu(e, t, r) {
     		case "sentence": return Oh(e, r);
     		case "word": return t.parser !== "mdx" ? zh(e, t) : Uh(e);
     		case "whitespace": {
@@ -147,7 +147,7 @@ Aplique um patch no oxfmt para que ele preserve a quebra de linha que fica encos
    ```json package.json
    {
      "patchedDependencies": {
-       "oxfmt@0.71.0": "patches/oxfmt@0.71.0.patch"
+       "oxfmt@0.75.0": "patches/oxfmt@0.75.0.patch"
      }
    }
    ```
@@ -156,7 +156,7 @@ Aplique um patch no oxfmt para que ele preserve a quebra de linha que fica encos
 
    ```yaml pnpm-workspace.yaml
    patchedDependencies:
-     oxfmt@0.71.0: patches/oxfmt@0.71.0.patch
+     oxfmt@0.75.0: patches/oxfmt@0.75.0.patch
    ```
 
 3. Reinstale para que o patch seja aplicado:

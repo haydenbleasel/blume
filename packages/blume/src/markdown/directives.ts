@@ -136,8 +136,8 @@ const labelSource = (label: MdastNode[]): string =>
 
 /** A directive's `{attributes}` rebuilt from its node, or nothing. */
 const attributeSource = (node: DirectiveNode): string => {
-  const attributes = Object.entries(node.attributes ?? {}).map(
-    ([key, value]) => (value ? `${key}="${value}"` : key)
+  const attributes = Object.entries(node.attributes ?? {}).map(([key, value]) =>
+    value ? `${key}="${value}"` : key
   );
   return attributes.length > 0 ? `{${attributes.join(" ")}}` : "";
 };

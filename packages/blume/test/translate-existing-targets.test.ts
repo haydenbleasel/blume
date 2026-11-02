@@ -141,6 +141,31 @@ describe("a stale translation at a non-canonical name", () => {
     ).toEqual([]);
   });
 
+  it("rewrites the first of two translations claiming one route", async () => {
+    const root = await fixture({
+      "blume.config.ts": config("fr"),
+      // Both serve /fr/guide (a duplicate-route error); the scan keeps them in
+      // path order, and the retranslation writes over the first.
+      "docs/fr/guide.md": HAND_WRITTEN,
+      "docs/fr/guide/index.mdx": HAND_WRITTEN,
+      "docs/guide.mdx": SOURCE,
+      "docs/index.mdx": "---\ntitle: Home\n---\n# Home\n",
+    });
+    const ledger = emptyLedger();
+    stampLedger(ledger, "docs/guide.mdx", "fr", hashSource("older source"));
+
+    const project = await scanForTranslation(root);
+    const workList = await computeWorkList(project, ledger, {
+      locales: ["fr"],
+    });
+    const items = pageItems(workList.items).filter(
+      (entry) => entry.sourceRel === "docs/guide.mdx"
+    );
+    expect(items.map((entry) => [entry.status, entry.targetRel])).toEqual([
+      ["stale", "docs/fr/guide.md"],
+    ]);
+  });
+
   it("still goes to the canonical path when it's missing", async () => {
     const root = await fixture({
       "blume.config.ts": config("fr"),

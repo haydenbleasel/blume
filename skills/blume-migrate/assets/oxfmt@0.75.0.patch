@@ -1,8 +1,8 @@
-diff --git a/dist/markdown-gizI1LFO.js b/dist/markdown-gizI1LFO.js
-index 95a638402fa6f73b29ebb8d7a7ef229bee68a690..e2e2ea5b443fe10698c49c2ef3dc3d5909335915 100644
---- a/dist/markdown-gizI1LFO.js
-+++ b/dist/markdown-gizI1LFO.js
-@@ -4898,7 +4898,43 @@ function lu(e, t, r) {
+diff --git a/dist/markdown-COx0Sqwt.js b/dist/markdown-COx0Sqwt.js
+index 5b366cb1694061cfbf4072fe64fc7b5adc573e2f..c0040862210c81f9efc72422f6628e94bf37658f 100644
+--- a/dist/markdown-COx0Sqwt.js
++++ b/dist/markdown-COx0Sqwt.js
+@@ -4895,7 +4895,43 @@ function lu(e, t, r) {
  		case "sentence": return Oh(e, r);
  		case "word": return t.parser !== "mdx" ? zh(e, t) : Uh(e);
  		case "whitespace": {

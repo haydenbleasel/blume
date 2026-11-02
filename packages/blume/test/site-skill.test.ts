@@ -148,6 +148,26 @@ describe("the generated site skill", () => {
     );
   });
 
+  it("leaves the changelog out when a custom page serves its route", async () => {
+    const { project: scanned } = await project({
+      "blume.config.ts": config(),
+      ...PAGES,
+      // The user's own `.astro` changelog takes the route, so Blume generates
+      // none to point at; other custom pages don't affect the bullet.
+      "pages/changelog.astro": "<h1>Our changelog</h1>\n",
+    });
+    expect(skillOf(scanned)).not.toContain("[Changelog]");
+
+    const { project: unrelated } = await project({
+      "blume.config.ts": config(),
+      ...PAGES,
+      "pages/pricing.astro": "<h1>Pricing</h1>\n",
+    });
+    expect(skillOf(unrelated)).toContain(
+      `- [Changelog](${SITE}/changelog.md): release notes, newest first.`
+    );
+  });
+
   it("maps pages up to its cap, then points at llms.txt", async () => {
     const many = Object.fromEntries(
       Array.from({ length: MAX_SKILL_PAGES + 2 }, (_, index) => [

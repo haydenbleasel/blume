@@ -68,6 +68,21 @@ describe("named examples", () => {
     ).toStrictEqual([]);
     expect(namedExamples({ examples: [1, 2] }, schemas, "request")).toEqual([]);
   });
+
+  it("skips an entry that isn't an Example Object", () => {
+    // A hand-written spec that puts the bare value where the Example Object
+    // goes names nothing to show for that key.
+    expect(
+      namedExamples(
+        { examples: { a: { value: 1 }, b: "oops", c: { value: 3 } } },
+        schemas,
+        "request"
+      )
+    ).toStrictEqual([
+      { key: "a", label: "a", value: 1 },
+      { key: "c", label: "c", value: 3 },
+    ]);
+  });
 });
 
 describe("response tabs", () => {
