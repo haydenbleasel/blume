@@ -117,6 +117,9 @@ describe("blume validate — routes beyond the content graph", () => {
     expect(exitCode).toBe(0);
   });
 
+  // The config imports `blume/reference`, which a fresh `bun` process on a
+  // cold Windows runner takes 12-16s to load (the other cases here take ~1s),
+  // so this one needs more than the default 5s.
   it("accepts links and redirects to a scalar() reference page", async () => {
     const root = await fixture({
       "blume.config.ts": [
@@ -133,7 +136,7 @@ describe("blume validate — routes beyond the content graph", () => {
     const { exitCode, stderr } = await validate(root, "--strict");
     expect(stderr).not.toContain("BLUME_BROKEN");
     expect(exitCode).toBe(0);
-  });
+  }, 30_000);
 
   it("warns about a redirect to a page that doesn't exist, at its line", async () => {
     const root = await fixture({
