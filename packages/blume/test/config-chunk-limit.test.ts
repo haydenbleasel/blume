@@ -32,8 +32,8 @@ const configFor = (mermaid: boolean): string =>
   });
 
 describe("the chunk-size warning limit", () => {
-  it("rises above Mermaid's lazy chunks on a site with diagrams", () => {
-    expect(configFor(true)).toContain("chunkSizeWarningLimit: 2048,");
+  it("rises above Pele's lazy chunk on a site with diagrams", () => {
+    expect(configFor(true)).toContain("chunkSizeWarningLimit: 1024,");
   });
 
   it("stays at Vite's default everywhere else", () => {

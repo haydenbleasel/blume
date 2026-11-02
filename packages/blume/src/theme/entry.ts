@@ -146,6 +146,32 @@ const TOKEN_DEFAULTS = `:root {
 }`;
 
 /**
+ * Pele reads `--pele-*` variables from its root `<svg class="pele">`, so
+ * pointing them at Blume's tokens themes every diagram — and a theme flip
+ * restyles it live, without a re-render. The fonts matter beyond looks: Pele
+ * measures labels with them before it lays out the SVG.
+ */
+const DIAGRAM_TOKENS = `/* Pele diagrams: map --pele-* onto the active --blume-* tokens. The host
+   carries them too: mount() measures labels from the container before it
+   inserts the <svg>, so the font must already be visible there. */
+blume-mermaid,
+.pele {
+  --pele-bg: var(--blume-background);
+  --pele-fg: var(--blume-foreground);
+  --pele-muted: var(--blume-muted-foreground);
+  --pele-line: var(--blume-foreground);
+  --pele-surface: var(--blume-muted);
+  /* Subgraphs sit a step darker than node fills in light mode and a step
+     lighter in dark; mixing toward the foreground keeps that direction. */
+  --pele-surface-alt: color-mix(in oklab, var(--blume-muted) 92%, var(--blume-foreground));
+  --pele-border: var(--blume-border);
+  --pele-accent: var(--blume-accent);
+  --pele-radius: var(--blume-radius);
+  --pele-font: var(--blume-font-body);
+  --pele-font-mono: var(--blume-font-mono);
+}`;
+
+/**
  * Tailwind theme mapping from `--blume-*` tokens to utility-facing names
  * (`bg-background`, `border-border`, `rounded-blume`, the font stacks).
  * Shared by both sheets so example code written against Blume's utility
@@ -189,6 +215,8 @@ ${DARK_VARIANT}
 ${COLOR_SCHEME_DEFAULTS}
 
 ${TOKEN_DEFAULTS}
+
+${DIAGRAM_TOKENS}
 
 ${THEME_MAPPING}
 

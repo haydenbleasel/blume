@@ -806,7 +806,7 @@ describe("layout chrome sources", () => {
     expect(cache).toContain("referencedIconSymbols(rendered)");
   });
 
-  it("loads Mermaid and the EPUB generator through the generated feature loaders", async () => {
+  it("loads the diagram renderer and the EPUB generator through the generated feature loaders", async () => {
     // A direct import would put the library in every site's client bundle;
     // the loaders are null (and the library absent) for sites that don't use
     // the feature.
