@@ -25,7 +25,7 @@
     "translate": "cd apps/docs && bun translate --claude --concurrency 16 && cd ../.. && bun fix"
   },
   "devDependencies": {
-    "@changesets/cli": "^3.0.2",
+    "@changesets/cli": "^3.0.3",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@orama/orama": "^3.1.18",
     "astro": "^7.3.2",
