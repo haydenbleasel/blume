@@ -185,7 +185,7 @@
     "@pierre/diffs": "^1.5.1",
     "@scalar/astro": "^0.4.26",
     "@scalar/openapi-parser": "^0.29.11",
-    "@scalar/openapi-types": "^0.9.5",
+    "@scalar/openapi-types": "^0.9.8",
     "@shikijs/transformers": "^4.4.3",
     "@shikijs/twoslash": "^4.4.3",
     "@tailwindcss/typography": "^0.5.20",
