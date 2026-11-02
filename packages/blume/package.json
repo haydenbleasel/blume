@@ -195,7 +195,7 @@
     "@vercel/analytics": "^2.0.1",
     "@vitejs/plugin-react": "6.1.1",
     "ai": "^7.0.157",
-    "astro": "^7.3.2",
+    "astro": "^7.4.4",
     "chokidar": "^5.0.0",
     "citty": "^0.2.2",
     "consola": "^3.4.2",
