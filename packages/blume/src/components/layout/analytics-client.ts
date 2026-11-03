@@ -37,6 +37,7 @@ interface AnalyticsWindow {
   htevents?: { track?: (event: string, props?: TrackProps) => void };
   LogRocket?: { track?: (event: string, props?: TrackProps) => void };
   mixpanel?: { track?: (event: string, props?: TrackProps) => void };
+  op?: (command: "track", event: string, props?: TrackProps) => void;
   pirsch?: (event: string, options?: { meta?: TrackProps }) => void;
   plausible?: (event: string, options?: { props?: TrackProps }) => void;
   posthog?: { capture?: (event: string, props?: TrackProps) => void };
@@ -87,6 +88,7 @@ const trackGlobals = (
   // Privacy-first counters take a name, some with properties.
   attempt(() => w.plausible?.(event, { props }));
   attempt(() => w.databuddy?.track?.(event, props));
+  attempt(() => w.op?.("track", event, props));
   attempt(() => w.fathom?.trackEvent?.(event));
   // OneDollarStats only takes string property values.
   attempt(() =>

@@ -51,6 +51,7 @@ Every identifier below — a project key, a measurement ID, a site token — is 
 | `logrocket()` | [LogRocket](#logrocket) | `id` |
 | `mixpanel()` | [Mixpanel](#mixpanel) | `token` |
 | `oneDollarStats()` | [OneDollarStats](#onedollarstats) | — |
+| `openpanel()` | [OpenPanel](#openpanel) | `clientId` |
 | `pirsch()` | [Pirsch](#pirsch) | `code` |
 | `plausible()` | [Plausible](#plausible) | `domain` |
 | `posthog()` | [PostHog](#posthog) | `key` |
@@ -224,6 +225,32 @@ Each option becomes its own `data-` attribute on the tag, and values are strings
 - `url` is the collector endpoint events are posted to (`https://collector.onedollarstats.com/events` by default), not the site's URL.
 - `autocollect: "false"` turns off automatic page views.
 - `"hash-routing": "true"` sends a page view on every navigation, even when only the `#fragment` changes, like a table-of-contents click. Blume leaves the attribute off for `"false"`, because the tracker turns hash routing on whenever it's present.
+
+## OpenPanel
+
+Pass your **client ID** (from the project's settings in [OpenPanel](https://openpanel.dev)) to `openpanel()`. Blume adds the [script tag install](https://openpanel.dev/docs/get-started/install-openpanel): the `window.op` queue, its `init` call, and the tracker.
+
+```ts blume.config.ts lineNumbers
+import { openpanel } from "blume/analytics";
+
+analytics: [openpanel({ clientId: "YOUR_CLIENT_ID" })],
+```
+
+`clientId` is the one option Blume maps. Anything else you pass — `apiUrl`, `trackHashChanges`, `sessionReplay`, and every other init option — is forwarded to `window.op("init")` verbatim. Blume turns on `trackScreenViews`, `trackOutgoingLinks`, and `trackAttributes`, as OpenPanel's own snippet does, because the tracker leaves each one off unless it's `true`. Set any of them to `false` to turn it off.
+
+With `trackScreenViews` on, the tracker counts client-side navigations itself, including Blume's client router, so don't add a second pageview hook.
+
+To send events through a proxy or a self-hosted instance, set `apiUrl` to its API and `scriptUrl` to where it serves `op1.js`:
+
+```ts blume.config.ts lineNumbers
+analytics: [
+  openpanel({
+    clientId: "YOUR_CLIENT_ID",
+    apiUrl: "https://api.example.com",
+    scriptUrl: "https://api.example.com/op1.js",
+  }),
+],
+```
 
 ## Mixpanel
 
@@ -432,6 +459,9 @@ A root-relative `src` points at a file in `public/` (`src: "/js/redirects.js"` f
 | `mixpanel()` | anything else | `track_pageview: "url-with-path-and-query-string"` | Merged into the `mixpanel.init` options verbatim. |
 | `oneDollarStats()` | `hostname` | — | Bare host name every event is reported under, on every host. |
 | `oneDollarStats()` | anything else | — | Rendered as a `data-` attribute on the tag (`"hash-routing": "false"` is left off). |
+| `openpanel()` | `clientId` | — | OpenPanel client ID. Required. |
+| `openpanel()` | `scriptUrl` | `https://openpanel.dev/op1.js` | Tracker script URL, for a proxy or self-hosted instance. |
+| `openpanel()` | anything else | `trackScreenViews: true`, `trackOutgoingLinks: true`, `trackAttributes: true` | Merged into the `window.op("init")` options verbatim. |
 | `pirsch()` | `code` | — | Pirsch identification code. Required. |
 | `pirsch()` | anything else | — | Rendered as a `data-` attribute on the tag. |
 | `plausible()` | `domain` | — | The site's domain in Plausible. Required. |
@@ -451,4 +481,4 @@ A root-relative `src` points at a file in `public/` (`src: "/js/redirects.js"` f
 
 ## Custom events
 
-Blume's page feedback (`feedback`, and `feedback_comment` when [written feedback](/docs/configuration#written-feedback) is on), [search](/docs/configuration/search#search-analytics) (`search`, `search_select`), [assistant](/docs/configuration/assistant#analytics) (`ask`, `ask_answer`, `ask_error`), and [narration](/docs/configuration/narration#analytics) player (`narration_play`, `narration_complete`) send custom events through every configured adapter that has a client API — PostHog, Mixpanel, Heap, Segment, Hightouch, Amplitude, LogRocket, Adobe, Google Analytics, Google Tag Manager (as a `{ event }` push on `window.dataLayer`), Plausible, Databuddy, Fathom, OneDollarStats (with each property value as a string), Pirsch, Clarity, Hotjar, and Vercel. Fathom, Clarity, and Hotjar take an event's name alone, so they count each event without its properties. Cloudflare and Clearbit have no event API, and Clics has no global one for Blume to call. Every event also fires as a `blume:track` CustomEvent on `window` with `{ event, props }` in `detail`, so a `script()` adapter can forward it anywhere else. The assistant never sends a question's text to a provider, and search sends its queries as typed unless you set [`search.analytics.queries`](/docs/configuration/search#search-analytics) to `false`, which sends each query's length instead; either way the text still reaches the `blume:track` event, for a listener you write to forward. For deploying your built site, see [Deployment](/docs/deployment).
+Blume's page feedback (`feedback`, and `feedback_comment` when [written feedback](/docs/configuration#written-feedback) is on), [search](/docs/configuration/search#search-analytics) (`search`, `search_select`), [assistant](/docs/configuration/assistant#analytics) (`ask`, `ask_answer`, `ask_error`), and [narration](/docs/configuration/narration#analytics) player (`narration_play`, `narration_complete`) send custom events through every configured adapter that has a client API — PostHog, Mixpanel, Heap, Segment, Hightouch, Amplitude, LogRocket, Adobe, Google Analytics, Google Tag Manager (as a `{ event }` push on `window.dataLayer`), Plausible, Databuddy, OpenPanel, Fathom, OneDollarStats (with each property value as a string), Pirsch, Clarity, Hotjar, and Vercel. Fathom, Clarity, and Hotjar take an event's name alone, so they count each event without its properties. Cloudflare and Clearbit have no event API, and Clics has no global one for Blume to call. Every event also fires as a `blume:track` CustomEvent on `window` with `{ event, props }` in `detail`, so a `script()` adapter can forward it anywhere else. The assistant never sends a question's text to a provider, and search sends its queries as typed unless you set [`search.analytics.queries`](/docs/configuration/search#search-analytics) to `false`, which sends each query's length instead; either way the text still reaches the `blume:track` event, for a listener you write to forward. For deploying your built site, see [Deployment](/docs/deployment).

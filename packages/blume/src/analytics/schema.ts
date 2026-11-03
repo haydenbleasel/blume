@@ -16,6 +16,7 @@ import { hotjarAdapterSchema } from "./hotjar.ts";
 import { logrocketAdapterSchema } from "./logrocket.ts";
 import { mixpanelAdapterSchema } from "./mixpanel.ts";
 import { oneDollarStatsAdapterSchema } from "./one-dollar-stats.ts";
+import { openpanelAdapterSchema } from "./openpanel.ts";
 import { pirschAdapterSchema } from "./pirsch.ts";
 import { plausibleAdapterSchema } from "./plausible.ts";
 import { posthogAdapterSchema } from "./posthog.ts";
@@ -41,6 +42,7 @@ export const analyticsAdapterSchema = z.discriminatedUnion("kind", [
   logrocketAdapterSchema,
   mixpanelAdapterSchema,
   oneDollarStatsAdapterSchema,
+  openpanelAdapterSchema,
   pirschAdapterSchema,
   plausibleAdapterSchema,
   posthogAdapterSchema,
