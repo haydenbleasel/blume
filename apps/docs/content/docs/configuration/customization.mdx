@@ -102,7 +102,7 @@ Wired slots (names are case-sensitive; any other key under `layout` renders nowh
 | `Feedback` | The "Was this page helpful?" rating below the article (rendered only when [`feedback`](/docs/configuration#page-feedback) is on) | `strings`, `comments` |
 | `PageHeader` | An injection point above the article (no built-in) | `page`, `headings`, `route` |
 | `PageFooter` | An injection point below the article (no built-in) | `page`, `headings`, `route` |
-| `Footer` | The [site footer](/docs/configuration#footer) after the content grid: links, social profiles, the repository link, and Cookie settings | `footer`, `locale`, `site`, `navigation`, `ui` |
+| `Footer` | The [site footer](/docs/configuration#footer) in the content grid's last, full-width row, which scrolls in over the bottom of the sidebar and table of contents: links, social profiles, the repository link, and Cookie settings | `footer`, `locale`, `site`, `navigation`, `ui` |
 
 The `mobile` variant also receives the [page actions](/docs/content/navigation#page-actions) as its children (an empty element the actions move into from the right rail below 1,280px), so render a `<slot />` in it to keep them on narrower screens. It renders on a page with no headings as well, with `headings` empty, so the actions still show there.
 
