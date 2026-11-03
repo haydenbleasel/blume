@@ -11,14 +11,15 @@ import { getCollection } from "astro:content";
 import data from "blume:data";
 
 import {
-  compareChangelogDates,
-  groupChangelogYears,
-  parseChangelogDate,
+  compareEntryDates,
+  entryDate,
+  groupEntryYears,
+  parseEntryDate,
   uniqueAnchorIds,
-} from "../../core/changelog-list.ts";
-import { resolveDateFormatOptions } from "../../core/date-format.ts";
+} from "../../core/dated-list.ts";
 import { withMountedBase } from "../islands/base-path.ts";
 import { contentStrings } from "./content-strings.ts";
+import { entryDateFormats } from "./entry-dates.ts";
 
 const i18n = data.config.i18n;
 // The list is always the default locale's entries, whatever locale the page
@@ -35,26 +36,15 @@ const { changelog: strings } = contentStrings(data, Astro.currentLocale);
 // unprefixed generated `/changelog` Astro resolves the default locale.
 const readerLocale = i18n ? (Astro.currentLocale ?? i18n.defaultLocale) : "en";
 
-const dateFormatOptions = resolveDateFormatOptions(data.config.dateFormat);
-// The year heads each group, so a row shows the rest of the date: a preset
-// style keeps its month wording, a component format simply drops the year.
-const { dateStyle, year: _year, ...dateComponents } = dateFormatOptions;
-const rowDateFormat: Intl.DateTimeFormatOptions = dateStyle
-  ? {
-      ...dateComponents,
-      day: "numeric",
-      // `medium` abbreviates the month; every other preset spells it out, so a
-      // `long` site keeps reading "October 5" rather than dropping to "Oct 5".
-      month: dateStyle === "medium" ? "short" : "long",
-    }
-  : dateComponents;
-const formatRowDate = (date: Date) =>
-  new Intl.DateTimeFormat(readerLocale, rowDateFormat).format(date);
-const formatYear = (date: Date) =>
-  new Intl.DateTimeFormat(readerLocale, {
-    timeZone: dateFormatOptions.timeZone,
-    year: "numeric",
-  }).format(date);
+// The year heads each group, so a row shows the rest of the date.
+const {
+  iso: formatIsoDate,
+  row: formatRowDate,
+  year: formatYear,
+} = entryDateFormats(
+  data.config.dateFormat,
+  readerLocale
+);
 
 const slugify = (text: string) =>
   text
@@ -78,14 +68,14 @@ const slugify = (text: string) =>
 // disk and a staged release from a source named `releases` share an id while
 // rendering at different routes.
 const entryKey = (collection: string, id: string) => `${collection}:${id}`;
-const routeByEntry = new Map<string, string>();
+const routeByEntry = new Map<string, (typeof data.routes)[number]>();
 for (const route of data.routes) {
   if (
     route.version === "" &&
     !route.fallback &&
     (locale === null || route.locale === locale)
   ) {
-    routeByEntry.set(entryKey(route.collection, route.entryId), route.path);
+    routeByEntry.set(entryKey(route.collection, route.entryId), route);
   }
 }
 
@@ -112,26 +102,30 @@ const entries = [
 
 const rows = entries
   .map((entry) => {
-    const date = parseChangelogDate(entry.data.date ?? entry.data.changelog?.date);
+    const route = routeByEntry.get(entryKey(entry.collection, entry.id));
+    // An undated entry takes its git date (`seo.datePublished: "git"`), which
+    // the route carries.
+    const date = parseEntryDate(
+      entryDate({ meta: entry.data, published: route?.published ?? undefined })
+    );
     const label =
       entry.data.title ??
       (entry.data.changelog?.version
         ? `v${entry.data.changelog.version}`
         : "Update");
-    const route = routeByEntry.get(entryKey(entry.collection, entry.id));
     return {
       date,
-      href: route ? withMountedBase(route) : null,
+      href: route ? withMountedBase(route.path) : null,
       label,
       tag: entry.data.changelog?.category ?? null,
     };
   })
-  .toSorted((a, b) => compareChangelogDates(a.date, b.date));
+  .toSorted((a, b) => compareEntryDates(a.date, b.date));
 
 const ids = uniqueAnchorIds(rows.map((row) => slugify(row.label)));
 const items = rows.map((row, index) => ({
   date: row.date ? formatRowDate(row.date) : null,
-  dateTime: row.date ? row.date.toISOString().slice(0, 10) : null,
+  dateTime: row.date ? formatIsoDate(row.date) : null,
   href: row.href,
   id: ids[index] as string,
   label: row.label,
@@ -139,7 +133,7 @@ const items = rows.map((row, index) => ({
   year: row.date ? formatYear(row.date) : null,
 }));
 
-const groups = groupChangelogYears(items, (item) => item.year);
+const groups = groupEntryYears(items, (item) => item.year);
 ---
 
 {

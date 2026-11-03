@@ -47,6 +47,17 @@ export const fi: UIStringsOverride = {
     you: "Sinä",
   },
   banner: { dismiss: "Sulje ilmoitus" },
+  blog: {
+    allPosts: "Kaikki kirjoitukset",
+    description: "Uutisia, päivityksiä ja tarinoita tiimiltä.",
+    empty: "Ei vielä kirjoituksia.",
+    newer: "Uudempi kirjoitus",
+    older: "Vanhempi kirjoitus",
+    readingTime: "{minutes} min lukuaika",
+    tagged: "Kirjoitukset tunnisteella ”{tag}”",
+    tags: "Tunnisteet",
+    title: "Blogi",
+  },
   changelog: {
     description: "Tuotepäivitykset ja julkaisutiedot.",
     empty: "Muutoslokissa ei ole vielä merkintöjä.",

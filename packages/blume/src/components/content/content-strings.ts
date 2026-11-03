@@ -11,7 +11,7 @@ export interface ContentStringsData {
 /** The UI string groups a content component's chrome reads. */
 export type ContentStrings = Pick<
   UIStrings,
-  "actions" | "changelog" | "content"
+  "actions" | "blog" | "changelog" | "content"
 >;
 
 /**
@@ -32,6 +32,7 @@ export const contentStrings = (
       : data.ui;
   return {
     actions: { ...EN_UI.actions, ...dictionary.actions },
+    blog: { ...EN_UI.blog, ...dictionary.blog },
     changelog: { ...EN_UI.changelog, ...dictionary.changelog },
     content: { ...EN_UI.content, ...dictionary.content },
   };

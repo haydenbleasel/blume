@@ -48,6 +48,17 @@ export const ja: UIStringsOverride = {
     you: "あなた",
   },
   banner: { dismiss: "お知らせを閉じる" },
+  blog: {
+    allPosts: "すべての投稿",
+    description: "チームからのニュース、アップデート、ストーリー。",
+    empty: "まだ投稿はありません。",
+    newer: "新しい投稿",
+    older: "古い投稿",
+    readingTime: "{minutes} 分で読めます",
+    tagged: "「{tag}」タグの投稿",
+    tags: "タグ",
+    title: "ブログ",
+  },
   changelog: {
     description: "製品のアップデートとリリースノート。",
     empty: "変更履歴のエントリーはまだありません。",

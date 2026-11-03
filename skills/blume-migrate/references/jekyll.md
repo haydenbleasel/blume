@@ -194,7 +194,9 @@ The codemod maps these, and reports every other key Blume's strict schema reject
 | `image` (a string, or `{ path }`), `canonical_url` | `seo.image`, `seo.canonical` |
 | jekyll-seo-tag's `seo:` `type`/`name`/`links` | removed |
 | `sitemap: false` | reported: `seo: { noindex: true }` if it shouldn't be indexed, else delete |
-| `author`, `date`, `lang`, `tags`, `categories`, `excerpt`, `toc` | reported: delete (`tags` → `search.tags` if a hosted search filters on them) |
+| `tags` | kept, a space-separated string split into a list (an empty or blank one removed): a doc page's tags label its record for a hosted search |
+| `date` | kept |
+| `author`, `lang`, `categories`, `excerpt`, `toc` | reported: on a doc page, delete; on a post, see `_posts/` below |
 
 ## Theme, layouts, and assets
 
@@ -207,7 +209,7 @@ The codemod maps these, and reports every other key Blume's strict schema reject
 ## Collections and posts
 
 - **A JTD collection** (`collections: { docs: { output: true, permalink: "/:collection/:path/" } }` plus `just_the_docs.collections.docs.name`): rename `_docs/` → `docs/` so the URLs stay `/docs/…`, then run the codemod; give the folder a `meta.ts` `title` from `name`. `nav_fold: true` → `collapsed: true`. A collection document without `title` took its filename as one: write it in.
-- **`_posts/`** → `type: blog` pages (`docs/advanced/blog.mdx`), with `slug` pinned to the old dated URL (`/:categories/:year/:month/:day/:title.html` by default, so also an `.html` redirect) or redirected; `{% post_url %}` → the post's route; jekyll-feed's `/feed.xml` → a redirect to `/blog/rss.xml`.
+- **`_posts/`** (the codemod doesn't convert `_posts/`, so convert these yourself) → `type: blog` pages (`docs/advanced/blog.mdx`) that keep `date` and `tags`, with `categories` folded into `tags` and a space-separated `tags` or `categories` string split into a list (Blume generates the `/blog` index and a page per tag at `/blog/tags/<tag>`) and `author` → `authors`, with `slug` pinned to the old dated URL (`/:categories/:year/:month/:day/:title.html` by default, so also an `.html` redirect) or redirected; `{% post_url %}` → the post's route; jekyll-feed's `/feed.xml` → a redirect to `/blog/rss.xml`.
 
 ## Plugins
 

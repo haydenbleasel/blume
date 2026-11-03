@@ -1,3 +1,4 @@
+import type { PostText } from "./post-text.ts";
 import type {
   DirectoryMode,
   PageMeta,
@@ -264,6 +265,8 @@ export interface PageRecord {
   /** Absolute paths of files this page `<include>`s, transitively. Drives the
    * dev-server invalidation edge from a partial to the pages that splice it. */
   includes?: string[];
+  /** A blog post's excerpt and reading time, read off its body at scan time. */
+  post?: PostText;
 }
 
 /** A node in the generated navigation tree. */
@@ -277,11 +280,22 @@ export type NavNode =
       badge?: string;
       deprecated?: boolean;
       pageId: string;
+      /**
+       * Let the label wrap to a second line instead of truncating: a dated
+       * entry's (blog post, changelog entry) title is often a sentence.
+       */
+      wrap?: boolean;
     }
   | {
       kind: "group";
       label: string;
       badge?: string;
+      /**
+       * Set on a group the sidebar folds dated entries into — a year, or a
+       * month — rather than a folder: breadcrumbs, search sections, and
+       * llms.txt read through it to the section it sits in.
+       */
+      period?: "month" | "year";
       directory?: DirectoryMode;
       /**
        * The group's resolved render mode. Always stamped by both builders

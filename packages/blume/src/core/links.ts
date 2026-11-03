@@ -3,11 +3,13 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { basename, dirname, join, normalize, relative, resolve } from "pathe";
 
 import {
+  isExternalUrl,
   isInternalPath,
   splitHref,
   stripBasePath,
   withBasePath,
 } from "./base-path.ts";
+import { authorEntries, coverEntry } from "./blog.ts";
 import { locatePath } from "./diagnostics.ts";
 import type { LocaleRouting } from "./i18n.ts";
 import { localizeLinkPath } from "./locale-links.ts";
@@ -18,6 +20,7 @@ import {
   pathsUnderPattern,
 } from "./redirect-patterns.ts";
 import {
+  hasImageExtension,
   isRelativeImageTarget,
   resolveRelativeFile,
   resolveRelativeImage,
@@ -459,6 +462,28 @@ const htmlPageRoute = (
     ? authored
     : undefined;
 };
+
+/**
+ * The images a page's front matter names (its `cover`, its authors'
+ * avatars), as image links checked like the body's: one that names no file
+ * is a missing asset. Front matter has no line map, so they point at its
+ * first line. Only a path with an image's extension is looked for: a URL, a
+ * `data:` image, or a free-form value (`avatar: ada`) isn't a file.
+ */
+const frontMatterImageLinks = (
+  meta: Pick<PageRecord["meta"], "authors" | "cover">
+): PageLink[] =>
+  [
+    coverEntry(meta.cover)?.src,
+    ...authorEntries(meta.authors).map((author) => author.avatar),
+  ].flatMap((target) =>
+    target === undefined ||
+    isExternalUrl(target) ||
+    target.startsWith("data:") ||
+    !hasImageExtension(target)
+      ? []
+      : [{ column: 1, image: true, line: 1, target }]
+  );
 
 /**
  * Validate a link to a file (`./spec.pdf`, `/logo.png`, `![](./a.png)`) that
@@ -1103,7 +1128,7 @@ export const validateLinks = async (
   const external: ExternalRef[] = [];
 
   for (const page of graph.pages) {
-    for (const link of page.links) {
+    for (const link of [...page.links, ...frontMatterImageLinks(page.meta)]) {
       const result = classifyLink(page, link, ctx, (ref) => external.push(ref));
       if (result) {
         diagnostics.push(result);

@@ -46,6 +46,17 @@ export const he: UIStringsOverride = {
     you: "אתה",
   },
   banner: { dismiss: "סגירת ההודעה" },
+  blog: {
+    allPosts: "כל הפוסטים",
+    description: "חדשות, עדכונים וסיפורים מהצוות.",
+    empty: "אין עדיין פוסטים.",
+    newer: "פוסט חדש יותר",
+    older: "פוסט ישן יותר",
+    readingTime: "{minutes} דק׳ קריאה",
+    tagged: "פוסטים עם התגית “{tag}”",
+    tags: "תגיות",
+    title: "בלוג",
+  },
   changelog: {
     description: "עדכוני מוצר והערות גרסה.",
     empty: "אין עדיין רשומות ביומן השינויים.",

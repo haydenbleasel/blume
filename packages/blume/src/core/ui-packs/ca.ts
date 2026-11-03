@@ -49,6 +49,17 @@ export const ca: UIStringsOverride = {
     you: "Tu",
   },
   banner: { dismiss: "Tanca l'anunci" },
+  blog: {
+    allPosts: "Totes les entrades",
+    description: "Notícies, novetats i històries de l'equip.",
+    empty: "Encara no hi ha entrades.",
+    newer: "Entrada més recent",
+    older: "Entrada més antiga",
+    readingTime: "{minutes} min de lectura",
+    tagged: "Entrades etiquetades amb «{tag}»",
+    tags: "Etiquetes",
+    title: "Blog",
+  },
   changelog: {
     description: "Actualitzacions del producte i notes de la versió.",
     empty: "Encara no hi ha entrades al registre de canvis.",

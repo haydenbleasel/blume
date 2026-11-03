@@ -174,7 +174,7 @@ What the codemod converts, for checking its output, and what it leaves for you:
 
 ## Frontmatter
 
-The codemod maps `hide: [toc]` → `mode: wide`, `hide: [navigation]` → `mode: center`, `hide: [footer]` → `pagination: false`, `status: new` → `sidebar.badge: New` (`deprecated` → `deprecated: true`), `tags` → `search.tags` (a hosted-search facet; tag pages drop), `icon: material/…` → a Lucide name, and drops `subtitle`, `template`, `social`, `comments`, `render_macros`. `search.exclude`/`boost` keep their meaning. It reports every other key Blume's strict schema rejects (`BLUME_FRONTMATTER_INVALID`) — map or remove them; `.meta.yml` defaults (the `meta` plugin) apply to every page in their folder.
+The codemod maps `hide: [toc]` → `mode: wide`, `hide: [navigation]` → `mode: center`, `hide: [footer]` → `pagination: false`, `status: new` → `sidebar.badge: New` (`deprecated` → `deprecated: true`), `tags` → `search.tags` (a hosted-search facet, with no tag pages; on a blog post, move them back to `tags`, see Blog), `icon: material/…` → a Lucide name, and drops `subtitle`, `template`, `social`, `comments`, `render_macros`. `search.exclude`/`boost` keep their meaning. It reports every other key Blume's strict schema rejects (`BLUME_FRONTMATTER_INVALID`) — map or remove them; `.meta.yml` defaults (the `meta` plugin) apply to every page in their folder.
 
 ## Plugins — map, don't drop
 
@@ -213,7 +213,7 @@ mike publishes built HTML per version (`/<version>/…`, aliases like `/latest/`
 
 ## Blog (Material `blog` plugin)
 
-Posts in `blog/posts/` → `type: blog` pages. `date: { created, updated }` → `date` + `lastModified`; `authors: [id]` → inline objects from `.authors.yml`; `categories` → `search.tags` or drop. Keep the old dated URL with a full-route `slug: blog/2024/01/31/my-post`, or redirect. Delete `<!-- more -->` in `.mdx`. Blume has no blog index, archive, category, or pagination pages: write `blog/index.mdx` (`docs/advanced/blog.mdx`), report the rest. RSS moves to `/blog/rss.xml`; with the `rss` plugin (mkdocs-rss-plugin), redirect its `/feed_rss_created.xml` and `/feed_rss_updated.xml` (and `/feed_json_*.json`) there.
+Posts in `blog/posts/` → `type: blog` pages. `date: { created, updated }` → `date` + `lastModified`; `authors: [id]` → inline objects from `.authors.yml`; `categories` → `tags`, with any `tags` the codemod moved to `search.tags` moved back (each tag gets a page at `/blog/tags/<tag>`). Keep the old dated URL with a full-route `slug: blog/2024/01/31/my-post`, or redirect. Delete `<!-- more -->` in `.mdx`. Blume generates the `/blog` index and the tag pages (`docs/advanced/blog.mdx`), but no archive or pagination pages: report those. RSS moves to `/blog/rss.xml`; with the `rss` plugin (mkdocs-rss-plugin), redirect its `/feed_rss_created.xml` and `/feed_rss_updated.xml` (and `/feed_json_*.json`) there.
 
 ## Repo integration and teardown
 
@@ -233,4 +233,4 @@ grep -rnE '^\s*(!!!|\?\?\?\+?|===[+!]*) |^\s*/{3,} ?[a-z]|--8<--|\{ *[.#:][^}]*\
 
 ## Dropped — report these
 
-Template overrides and hooks with no slot equivalent, links inside `copyright`, code annotations, admonition title bars and collapsible callout colors, `inline` admonition placement, `palette.accent`, unmapped and brand icons, abbreviation tooltips, definition-list styling, snippet line ranges and sections (split into files), tag index pages, blog archive/category/pagination pages, anchor-level redirects without the script, cross-page tab memory, git committers, mkdocstrings/click/gen-files/notebook output not carried over, macro functions and Jinja logic, social platforms `footer.socials` lacks, a `linenums` start offset, image sizing from attribute lists, and every plugin you removed without an equivalent.
+Template overrides and hooks with no slot equivalent, links inside `copyright`, code annotations, admonition title bars and collapsible callout colors, `inline` admonition placement, `palette.accent`, unmapped and brand icons, abbreviation tooltips, definition-list styling, snippet line ranges and sections (split into files), tag index pages for doc pages, blog archive and pagination pages, anchor-level redirects without the script, cross-page tab memory, git committers, mkdocstrings/click/gen-files/notebook output not carried over, macro functions and Jinja logic, social platforms `footer.socials` lacks, a `linenums` start offset, image sizing from attribute lists, and every plugin you removed without an equivalent.

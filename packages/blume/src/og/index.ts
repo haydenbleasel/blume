@@ -7,6 +7,7 @@ export {
 export type { OgCache } from "./cache.ts";
 export { cachedOgImage, renderOgImage } from "./card.ts";
 export type {
+  OgArticle,
   OgCardOptions,
   OgCardPalette,
   OgFont,

@@ -260,17 +260,28 @@ const initialId =
           const current = item.route === currentRoute ? "page" : undefined;
           // A bare row (no icon, badge, or deprecation) is the common case and
           // the bulk of every page's HTML on a large site, so it renders as a
-          // single truncating link with no inner row markup.
+          // single truncating link with no inner row markup. A dated entry's
+          // title wraps to a second line instead (`wrap`).
           if (!(item.icon || item.badge || item.deprecated)) {
             return (
               <li>
-                <a
-                  aria-current={current}
-                  class="blume-nav-link truncate"
-                  href={pageHref(item)}
-                >
-                  {item.label}
-                </a>
+                {item.wrap ? (
+                  <a
+                    aria-current={current}
+                    class="blume-nav-link"
+                    href={pageHref(item)}
+                  >
+                    <span class="line-clamp-2">{item.label}</span>
+                  </a>
+                ) : (
+                  <a
+                    aria-current={current}
+                    class="blume-nav-link truncate"
+                    href={pageHref(item)}
+                  >
+                    {item.label}
+                  </a>
+                )}
               </li>
             );
           }
@@ -289,7 +300,7 @@ const initialId =
                       size={14}
                     />
                   )}
-                  <span class="flex-1 truncate">{item.label}</span>
+                  <span class:list={["flex-1", item.wrap ? "line-clamp-2" : "truncate"]}>{item.label}</span>
                   {item.badge && <span class={badgeClassFor(item.badge)}>{item.badge}</span>}
                   {item.deprecated && (
                     <span class={deprecatedClass}>{n.deprecated}</span>

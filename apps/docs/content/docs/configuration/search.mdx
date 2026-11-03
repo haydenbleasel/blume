@@ -85,14 +85,14 @@ On a site with [`i18n`](/docs/content/i18n), results default to the language of 
 
 ## Tags
 
-Add `search.tags` to a page's frontmatter to label it for a hosted adapter. The page's first tag is uploaded as a `tag` field on its record in Algolia, Orama Cloud, and Typesense, where you can filter on it in the provider's dashboard or your own search UI. Typesense declares `tag` as a facet; on Algolia, add it to the index's `attributesForFaceting` yourself, and the sync keeps it there.
+Add `search.tags` to a page's frontmatter to label it for a hosted adapter. A page's front matter `tags`, the ones a [blog post](/docs/advanced/blog) shows, count too, after its `search.tags`. The page's first tag is uploaded as a `tag` field on its record in Algolia, Orama Cloud, and Typesense, where you can filter on it in the provider's dashboard or your own search UI. Typesense declares `tag` as a facet; on Algolia, add it to the index's `attributesForFaceting` yourself, and the sync keeps it there.
 
 ```yaml
 search:
   tags: [api, reference]
 ```
 
-The search dialog doesn't read tags. Its filters group results by the sidebar section each page is in, and they show with Orama and FlexSearch, whose indexes carry each page's section.
+The search dialog doesn't read tags. Its filters group results by the sidebar section each page is in (blog posts under the blog's title), and they show with Orama and FlexSearch, whose indexes carry each page's section.
 
 ## Ranking
 
@@ -184,7 +184,7 @@ import { pagefind } from "blume/search";
 search: pagefind(),
 ```
 
-Pagefind only runs during `blume build`, so search isn't available in `blume dev` with this adapter. It indexes each docs page's article — not the header, sidebar, or footer around it — so custom pages built on `PageLayout`, the 404 page, and the generated changelog index aren't in its results.
+Pagefind only runs during `blume build`, so search isn't available in `blume dev` with this adapter. It indexes each docs page's article — not the header, sidebar, or footer around it — so custom pages built on `PageLayout`, the 404 page, and the generated changelog and blog indexes (blog tag pages included) aren't in its results.
 
 ### Algolia
 

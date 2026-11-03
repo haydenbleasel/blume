@@ -48,6 +48,17 @@ export const uk: UIStringsOverride = {
     you: "Ви",
   },
   banner: { dismiss: "Закрити оголошення" },
+  blog: {
+    allPosts: "Усі дописи",
+    description: "Новини, оновлення та історії від команди.",
+    empty: "Дописів поки немає.",
+    newer: "Новіший допис",
+    older: "Старіший допис",
+    readingTime: "{minutes} хв читання",
+    tagged: "Дописи з тегом «{tag}»",
+    tags: "Теги",
+    title: "Блог",
+  },
   changelog: {
     description: "Оновлення продукту та примітки до випусків.",
     empty: "У журналі змін поки немає записів.",

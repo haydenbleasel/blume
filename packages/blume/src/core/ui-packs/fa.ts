@@ -47,6 +47,17 @@ export const fa: UIStringsOverride = {
     you: "شما",
   },
   banner: { dismiss: "بستن اطلاعیه" },
+  blog: {
+    allPosts: "همه نوشته‌ها",
+    description: "اخبار، به‌روزرسانی‌ها و داستان‌هایی از تیم.",
+    empty: "هنوز هیچ نوشته‌ای نیست.",
+    newer: "نوشته جدیدتر",
+    older: "نوشته قدیمی‌تر",
+    readingTime: "{minutes} دقیقه مطالعه",
+    tagged: "نوشته‌های دارای برچسب «{tag}»",
+    tags: "برچسب‌ها",
+    title: "وبلاگ",
+  },
   changelog: {
     description: "به‌روزرسانی‌های محصول و یادداشت‌های انتشار.",
     empty: "هنوز هیچ موردی در گزارش تغییرات نیست.",

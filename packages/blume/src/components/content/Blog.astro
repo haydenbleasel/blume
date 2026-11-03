@@ -1,0 +1,200 @@
+---
+// The blog's post list: every post the `/blog` index lists, newest first,
+// grouped by year, each a card with its date, reading time, title, excerpt,
+// authors, tags, and cover. Above it, a row of tag links narrows the list to
+// one tag's page.
+//
+// The generated `/blog` index renders it, and each generated tag page renders
+// it with `tag` (a tag's slug) to keep that tag's posts. A hand-written page
+// that owns `/blog` can place it below an introduction of its own: like
+// `<Changelog />`, only the list lives here, not the heading.
+import data from "blume:data";
+
+import {
+  BLOG_INDEX_ROUTE,
+  blogTagRoute,
+  blogTagSlug,
+  indexedPosts,
+} from "../../core/blog.ts";
+import { groupEntryYears, parseEntryDate } from "../../core/dated-list.ts";
+import { withMountedBase } from "../islands/base-path.ts";
+import PostAuthors from "../layout/PostAuthors.astro";
+import { contentStrings } from "./content-strings.ts";
+import { entryDateFormats } from "./entry-dates.ts";
+
+interface Props {
+  /**
+   * List only the posts carrying this tag: its slug, as in its page's URL, or
+   * its label, which names the same tag (`Product` is `product`).
+   */
+  tag?: string;
+}
+
+// A tag an MDX expression made something else lists every post, as the
+// Markdown mirror does.
+const tag =
+  typeof Astro.props.tag === "string" ? blogTagSlug(Astro.props.tag) : undefined;
+const i18n = data.config.i18n;
+const { blog: strings } = contentStrings(data, Astro.currentLocale);
+// The page's own language, for the dates and year headings. Like the
+// changelog, the list itself is the default locale's posts on every page.
+const readerLocale = i18n ? (Astro.currentLocale ?? i18n.defaultLocale) : "en";
+const formats = entryDateFormats(data.config.dateFormat, readerLocale);
+
+const blog = data.blog ?? { posts: [], tags: [] };
+// The tags whose pages are served: a tag a redirect owns isn't linked.
+const served = new Set(blog.tags.map((entry) => entry.slug));
+const items = indexedPosts(blog.posts, i18n ? i18n.defaultLocale : null)
+  .filter(
+    (post) => tag === undefined || post.tags.some((entry) => entry.slug === tag)
+  )
+  .map((post) => {
+    const date = parseEntryDate(post.date);
+    return {
+      ...post,
+      dateLabel: date ? formats.row(date) : null,
+      dateTime: date ? formats.iso(date) : null,
+      year: date ? formats.year(date) : null,
+    };
+  });
+const groups = groupEntryYears(items, (item) => item.year);
+// A card's title sits under its year's heading, or directly under the page's
+// when no post is dated, so the outline never skips a level.
+const CardHeading = groups.some((group) => group.year) ? "h3" : "h2";
+const readingTime = (minutes: number) =>
+  strings.readingTime.replace("{minutes}", String(minutes));
+
+// The theme's own `.prose` rules for `p`, `ul`, `a`, and `h3` outrank plain
+// utilities inside the article, so the list marks its spacing and link colors
+// important, as `<Changelog />` does.
+const cardChip =
+  "rounded-full bg-muted px-2 py-0.5 font-medium text-[0.65rem] text-muted-foreground!";
+const filterChip =
+  "inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1 font-medium text-muted-foreground! text-xs no-underline! transition-colors hover:text-foreground! aria-[current=page]:border-foreground aria-[current=page]:bg-foreground aria-[current=page]:text-background!";
+---
+
+{
+  blog.tags.length > 0 && (
+    <nav aria-label={strings.tags} class="not-prose mt-8" data-blume-blog-tags>
+      <ul class="m-0! flex list-none flex-wrap gap-2 p-0!">
+        <li class="m-0! p-0!">
+          <a
+            aria-current={tag === undefined ? "page" : undefined}
+            class={filterChip}
+            href={withMountedBase(BLOG_INDEX_ROUTE)}
+          >
+            {strings.allPosts}
+          </a>
+        </li>
+        {blog.tags.map((entry) => (
+          <li class="m-0! p-0!">
+            <a
+              aria-current={entry.slug === tag ? "page" : undefined}
+              class={filterChip}
+              href={withMountedBase(blogTagRoute(entry.slug))}
+            >
+              {entry.label}{" "}
+              <span class="tabular-nums opacity-60">{entry.count}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  )
+}
+{
+  items.length === 0 ? (
+    <p>{strings.empty}</p>
+  ) : (
+    <div class="not-prose mt-8 divide-y divide-border border-border border-y">
+      {groups.map((group) => (
+        <section
+          aria-label={group.year ?? undefined}
+          class="grid md:grid-cols-[6rem_minmax(0,1fr)] md:gap-x-8"
+        >
+          {/* Undated posts close the list under no heading. */}
+          {group.year ? (
+            <h2 class="mt-0! pt-6! font-medium! text-muted-foreground text-sm! leading-5! tabular-nums max-md:pb-1">
+              {group.year}
+            </h2>
+          ) : (
+            <div aria-hidden="true" />
+          )}
+          <ul class="m-0! list-none divide-y divide-border p-0!">
+            {group.items.map((post) => (
+              <li class="m-0! p-0!">
+                <article class="group/post relative flex gap-6 py-6">
+                  <div class="min-w-0 flex-1">
+                    <p class="m-0! flex flex-wrap items-center gap-x-2 text-muted-foreground text-xs">
+                      {post.dateLabel && (
+                        <time datetime={post.dateTime}>{post.dateLabel}</time>
+                      )}
+                      {post.dateLabel && <span aria-hidden="true">·</span>}
+                      <span>{readingTime(post.readingTime)}</span>
+                    </p>
+                    <CardHeading class="mt-1.5! mb-0! font-semibold! text-base! text-foreground leading-snug! tracking-tight!">
+                      {/* The title's link covers the whole card; the author
+                          and tag links sit above it. */}
+                      <a
+                        class="no-underline! transition-colors after:absolute after:inset-0 group-hover/post:text-accent!"
+                        href={withMountedBase(post.route)}
+                      >
+                        {post.title}
+                      </a>
+                    </CardHeading>
+                    {post.excerpt && (
+                      <p class="mt-2! mb-0! line-clamp-3 text-muted-foreground text-sm">
+                        {post.excerpt}
+                      </p>
+                    )}
+                    {(post.authors.length > 0 || post.tags.length > 0) && (
+                      <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+                        <PostAuthors authors={post.authors} size="sm" />
+                        {post.tags.length > 0 && (
+                          <ul
+                            aria-label={strings.tags}
+                            class="m-0! flex list-none flex-wrap gap-1.5 p-0!"
+                          >
+                            {post.tags.map((entry) => (
+                              <li class="m-0! p-0!">
+                                {served.has(entry.slug) ? (
+                                  <a
+                                    class:list={[
+                                      cardChip,
+                                      "relative z-10 no-underline! transition-colors hover:text-foreground!",
+                                    ]}
+                                    href={withMountedBase(
+                                      blogTagRoute(entry.slug)
+                                    )}
+                                  >
+                                    {entry.label}
+                                  </a>
+                                ) : (
+                                  <span class={cardChip}>{entry.label}</span>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  {post.cover && (
+                    <img
+                      alt=""
+                      class="m-0! hidden aspect-[4/3] w-36 shrink-0 self-start rounded-lg border border-border object-cover sm:block"
+                      data-no-zoom
+                      decoding="async"
+                      loading="lazy"
+                      src={post.cover.src}
+                    />
+                  )}
+                </article>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
+    </div>
+  )
+}

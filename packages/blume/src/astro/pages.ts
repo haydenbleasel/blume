@@ -1,9 +1,11 @@
+import { BLOG_INDEX_ROUTE, blogTagRoutes, hasBlogIndex } from "../core/blog.ts";
 import {
   CHANGELOG_INDEX_ROUTE,
   hasChangelogIndex,
 } from "../core/changelog-index.ts";
 import { staticSegments } from "../core/custom-pages.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
+import { redirectCovers } from "../core/redirect-patterns.ts";
 import { referenceRoutes } from "../openapi/references.ts";
 import type { BlumePageRoute } from "./integration.ts";
 
@@ -49,12 +51,113 @@ export const hasGeneratedChangelog = (
   hasChangelogIndex(project.graph.pages, project.config) &&
   !routeIsTaken(userPages, project.graph.pages, CHANGELOG_INDEX_ROUTE);
 
+/** A whole-segment rest parameter (`[...slug]`), which takes the rest. */
+const REST_PARAM = /^\[\.\.\..+\]$/u;
+
+/** A `[param]` within a pattern segment. */
+const PARAM = /\[[^\]]+\]/u;
+
+/**
+ * Whether one pattern segment answers one route segment: its literal text as
+ * written, each `[param]` standing for one or more characters, so
+ * `post-[id]` answers `post-1` but not `blog`.
+ */
+const segmentAnswers = (part: string, segment: string): boolean => {
+  const literal = part
+    .split(PARAM)
+    .map((text) => text.replaceAll(/[$()*+.?[\\\]^{|}]/gu, String.raw`\$&`));
+  return new RegExp(`^${literal.join(".+")}$`, "u").test(segment);
+};
+
+/**
+ * Whether a custom page's `pattern` answers `route` as Astro routes it:
+ * segment by segment (see {@link segmentAnswers}), where a `[...rest]`
+ * segment answers everything after it, nothing included. The route's first
+ * `fixed` segments are static in Blume's own pattern (`blog`, `tags`), which
+ * Astro ranks above a parameter, so only the same literal (or a rest) there
+ * answers them: `blog/[category]/[slug]` leaves `/blog/tags/<tag>` to Blume.
+ */
+const patternAnswers = (
+  pattern: string,
+  route: string,
+  fixed: number
+): boolean => {
+  const parts = pattern.split("/").filter(Boolean);
+  const segments = route.split("/").filter(Boolean);
+  for (const [index, part] of parts.entries()) {
+    if (REST_PARAM.test(part)) {
+      return true;
+    }
+    const segment = segments[index];
+    const answers =
+      index < fixed ? part === segment : segmentAnswers(part, segment ?? "");
+    if (segment === undefined || !answers) {
+      return false;
+    }
+  }
+  return parts.length === segments.length;
+};
+
+/** Whether a custom page's `pattern` lives under `pages/blog/`. */
+const isUnderBlog = (pattern: string): boolean =>
+  pattern.split("/").find(Boolean) === "blog";
+
+/**
+ * Whether a generated blog route is someone else's: content, a user page —
+ * a dynamic one under `pages/blog/` too (`blog/tags/[tag].astro`), the
+ * site's own blog pages, though not a site-wide `[...slug].astro`, which
+ * rarely serves the blog — or a configured redirect (a site whose posts live
+ * elsewhere may redirect `/blog/:slug*` there) already answers it.
+ */
+const blogRouteIsTaken = (
+  project: BlumeProject,
+  userPages: { pattern: string }[],
+  route: string
+): boolean =>
+  routeIsTaken(userPages, project.graph.pages, route) ||
+  userPages.some(
+    (page) =>
+      isUnderBlog(page.pattern) &&
+      // Every segment but a tag page's slug is Blume's own.
+      patternAnswers(page.pattern, route, route === BLOG_INDEX_ROUTE ? 1 : 2)
+  ) ||
+  redirectCovers(project.config.redirects, project.config.basePath, route);
+
+/**
+ * Whether the generated `/blog` index route exists for this project: there
+ * are visible `type: blog` posts and no user content, custom page, or
+ * redirect already owns `/blog`. Shared, like {@link hasGeneratedChangelog},
+ * by the page write and every surface that lists served routes.
+ */
+export const hasGeneratedBlog = (
+  project: BlumeProject,
+  userPages: { pattern: string }[]
+): boolean =>
+  hasBlogIndex(
+    project.graph.pages,
+    project.config.i18n?.defaultLocale ?? null
+  ) && !blogRouteIsTaken(project, userPages, BLOG_INDEX_ROUTE);
+
+/**
+ * The generated tag pages' routes (`/blog/tags/<slug>`), one per tag the
+ * index lists, beside a generated `/blog` index — less any route a user page
+ * or a redirect already owns, which keeps it.
+ */
+export const generatedBlogTagRoutes = (
+  project: BlumeProject,
+  userPages: { pattern: string }[]
+): string[] =>
+  blogTagRoutes(
+    project.graph.pages,
+    project.config.i18n?.defaultLocale ?? null
+  ).filter((route) => !blogRouteIsTaken(project, userPages, route));
+
 /**
  * Every route a navigation entry (a tab, selector item, featured link, header
  * action, or CTA) may point at: content routes, custom `.astro` pages, the
- * generated changelog, and reference routes (so a tab an author points at one
- * still validates). `generateRuntime` and `blume doctor` both check
- * `validateNavTargets` against it, so they flag the same entries.
+ * generated changelog and blog, and reference routes (so a tab an author
+ * points at one still validates). `generateRuntime` and `blume doctor` both
+ * check `validateNavTargets` against it, so they flag the same entries.
  */
 export const navTargetRoutes = (
   project: BlumeProject,
@@ -67,6 +170,12 @@ export const navTargetRoutes = (
   ]);
   if (hasGeneratedChangelog(project, userPages)) {
     routes.add(CHANGELOG_INDEX_ROUTE);
+  }
+  if (hasGeneratedBlog(project, userPages)) {
+    routes.add(BLOG_INDEX_ROUTE);
+  }
+  for (const route of generatedBlogTagRoutes(project, userPages)) {
+    routes.add(route);
   }
   return routes;
 };

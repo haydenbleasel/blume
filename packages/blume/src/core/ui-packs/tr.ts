@@ -48,6 +48,17 @@ export const tr: UIStringsOverride = {
     you: "Siz",
   },
   banner: { dismiss: "Duyuruyu kapat" },
+  blog: {
+    allPosts: "Tüm yazılar",
+    description: "Ekipten haberler, güncellemeler ve hikâyeler.",
+    empty: "Henüz yazı yok.",
+    newer: "Daha yeni yazı",
+    older: "Daha eski yazı",
+    readingTime: "{minutes} dk okuma",
+    tagged: "“{tag}” etiketli yazılar",
+    tags: "Etiketler",
+    title: "Blog",
+  },
   changelog: {
     description: "Ürün güncellemeleri ve sürüm notları.",
     empty: "Değişiklik günlüğünde henüz kayıt yok.",
