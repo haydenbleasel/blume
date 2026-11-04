@@ -106,6 +106,14 @@ describe("blume dev tunnel flags", () => {
       devServer: "::",
       origin: "::1",
     });
+    expect(resolveQuickTunnelHosts("192.0.2.1")).toEqual({
+      devServer: "192.0.2.1",
+      origin: "192.0.2.1",
+    });
+    expect(resolveQuickTunnelHosts("::0")).toEqual({
+      devServer: "::0",
+      origin: "::1",
+    });
     expect(events).toEqual([
       "spawn:cloudflared tunnel --url http://127.0.0.1:4387",
     ]);
