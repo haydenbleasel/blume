@@ -1435,7 +1435,9 @@ describe("astroConfigTemplate", () => {
     expect(quickTunnel).toContain(
       'adapter: adapter({"imageService":"compile","prerenderEnvironment":"node"})'
     );
-    expect(quickTunnel).toContain("server: { allowedHosts: true }");
+    expect(quickTunnel).toContain(
+      "server: {\n      allowedHosts: true,\n      fs: {"
+    );
     expect(quickTunnel).not.toContain('"tunnel"');
     const withoutTunnel = render();
     expect(withoutTunnel).not.toContain("allowedHosts: true");
@@ -1446,14 +1448,18 @@ describe("astroConfigTemplate", () => {
     const nodeConfig = renderTunnelConfig(
       blumeConfigSchema.parse({ deployment: node() })
     );
-    expect(nodeConfig).toContain("server: { allowedHosts: true }");
+    expect(nodeConfig).toContain(
+      "server: {\n      allowedHosts: true,\n      fs: {"
+    );
     expect(nodeConfig).not.toContain('"tunnel"');
     const staticConfig = renderTunnelConfig(
       blumeConfigSchema.parse({
         deployment: cloudflare({ output: "static" }),
       })
     );
-    expect(staticConfig).toContain("server: { allowedHosts: true }");
+    expect(staticConfig).toContain(
+      "server: {\n      allowedHosts: true,\n      fs: {"
+    );
     expect(staticConfig).not.toContain('"tunnel"');
     const ejectedConfig = renderTunnelConfig(
       blumeConfigSchema.parse({ deployment: cloudflare() }),

@@ -127,8 +127,7 @@ const usesQuickTunnel = (tunnel: true | undefined, ejected: boolean): boolean =>
 const renderTunnelViteServerOption = (
   tunnel: true | undefined,
   ejected: boolean
-): string =>
-  usesQuickTunnel(tunnel, ejected) ? "server: { allowedHosts: true }," : "";
+): string => (usesQuickTunnel(tunnel, ejected) ? "allowedHosts: true," : "");
 
 const renderAstroAdapter = (
   deployment: ResolvedConfig["deployment"],
@@ -950,7 +949,6 @@ ${userConfigSetup}export default defineConfig({
   // the overlap only adds memory.
   build: { concurrency: Math.min(8, availableParallelism()) },
   vite: {${viteCacheOption}
-    ${renderTunnelViteServerOption(options.tunnel, ejected)}
     plugins: [${runtimeModulesPluginEntry}${variablesPluginEntry}tailwindcss(), includeHmrPlugin(${configPath(
       `${context.outDir}/src/generated/includes.json`,
       ejected
@@ -1019,6 +1017,7 @@ ${userConfigSetup}export default defineConfig({
       },
     },
     server: {
+      ${renderTunnelViteServerOption(options.tunnel, ejected)}
       fs: {
         allow: ${JSON.stringify(fsAllow)},
       },

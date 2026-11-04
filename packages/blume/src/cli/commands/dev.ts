@@ -91,7 +91,7 @@ export const devCommand = defineCommand({
     strict: { description: "Fail on diagnostics.", type: "boolean" },
     tunnel: {
       description:
-        "Expose a Cloudflare server dev site through a Quick Tunnel.",
+        "Expose the local dev server through a Cloudflare Quick Tunnel.",
       type: "boolean",
     },
   },

@@ -184,12 +184,12 @@ describe("blume dev tunnel flags", () => {
 
           await generateRuntime(project, { tunnel: true });
           expect(await Bun.file(configFile).text()).toContain(
-            "server: { allowedHosts: true }"
+            "server: {\n      allowedHosts: true,\n      fs: {"
           );
 
           await generateRuntime(project, { tunnel: true });
           expect(await Bun.file(configFile).text()).toContain(
-            "server: { allowedHosts: true }"
+            "server: {\n      allowedHosts: true,\n      fs: {"
           );
         }
       )
