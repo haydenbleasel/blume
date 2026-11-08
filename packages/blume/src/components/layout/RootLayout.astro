@@ -1113,6 +1113,13 @@ const localeRedirect = localeTargets
         return panel.matches("pre") ? panel : panel.querySelector("pre");
       };
 
+      // The same for an API reference panel (<blume-panel-tabs>, panel.ts):
+      // the visible panel's pre, or null on a plain-text one.
+      const activePanelPre = (panelTabs: Element) =>
+        Array.from(panelTabs.querySelectorAll(":scope > [data-panel]"))
+          .find((panel) => !panel.classList.contains("hidden"))
+          ?.querySelector("pre") ?? null;
+
       // Per-page setup, run on the initial load and again after every
       // client-router swap (which replaces the body with server-rendered
       // markup that has none of this applied). Everything in here binds to
@@ -1318,6 +1325,30 @@ const localeRedirect = localeTargets
                 actions.appendChild(createAskButton("", readActive));
               }
               actions.appendChild(createCopyButton("", readActive));
+            }
+            continue;
+          }
+          const panelTabs = pre.closest("blume-panel-tabs");
+          if (panelTabs) {
+            // An API reference panel copies from its own header, where one
+            // Ask button joins Copy rather than covering the code. A request
+            // sample's language rides on its panel.
+            const sampleLang =
+              pre.closest<HTMLElement>("[data-sample-lang]")?.dataset.sampleLang;
+            if (sampleLang && pre instanceof HTMLElement) {
+              pre.dataset.blumeLanguage ??= sampleLang;
+            }
+            const actions = panelTabs.querySelector(
+              ":scope > * > [data-panel-actions]"
+            );
+            if (
+              askEnabled &&
+              actions &&
+              !actions.querySelector("[data-blume-ask]")
+            ) {
+              actions.prepend(
+                createAskButton("", () => activePanelPre(panelTabs))
+              );
             }
             continue;
           }

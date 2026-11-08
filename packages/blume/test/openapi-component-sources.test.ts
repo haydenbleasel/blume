@@ -52,6 +52,42 @@ describe("PanelTabs", () => {
     expect(panel).toContain("tab.tabIndex = selected ? 0 : -1;");
     expect(panel).toContain("target.focus();");
   });
+
+  it("hosts the code Ask button in the header, never over the code", async () => {
+    // The layout script used to pin an Ask button over every panel's code,
+    // where it hid the end of the first line (#425). It now joins Copy in
+    // the header and reads whichever panel shows.
+    const [tabs, root] = await Promise.all([
+      source("PanelTabs.astro"),
+      readFile(
+        new URL("../src/components/layout/RootLayout.astro", import.meta.url),
+        "utf-8"
+      ).then((text) => text.replaceAll("\r\n", "\n")),
+    ]);
+    expect(tabs).toMatch(
+      /<div class="flex shrink-0 items-center gap-1" data-panel-actions>\s*\{copy && \(/u
+    );
+    expect(tabs).not.toContain("[data-blume-copy]");
+    // A plain-text panel (no example response) has no code to ask about.
+    expect(tabs).toContain(
+      'class="px-3 py-4 text-muted-foreground text-xs" data-panel-text'
+    );
+    expect(tabs).toContain(
+      "blume-panel-tabs:has(> [data-panel]:not(.hidden) > [data-panel-text])\n    [data-blume-ask] {\n    display: none;"
+    );
+    // The panel branch runs before the overlay buttons and skips them.
+    const start = root.indexOf(
+      'const panelTabs = pre.closest("blume-panel-tabs");'
+    );
+    const end = root.indexOf("const topClass =");
+    expect(start).toBeGreaterThan(-1);
+    expect(start).toBeLessThan(end);
+    const branch = root.slice(start, end);
+    expect(branch).toMatch(
+      /actions\.prepend\(\s*createAskButton\("", \(\) => activePanelPre\(panelTabs\)\)\s*\);\s*\}\s*continue;\s*\}/u
+    );
+    expect(branch).toContain("pre.dataset.blumeLanguage ??= sampleLang;");
+  });
 });
 
 describe("ParametersTable", () => {
