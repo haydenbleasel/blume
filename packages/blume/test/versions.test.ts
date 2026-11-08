@@ -101,7 +101,7 @@ const versionsOf = (over: VersionsOverrides = {}): ResolvedVersionsConfig => {
 // SAFETY: the version helpers under test read only `source.name` and
 // `source.ref` from a page record.
 const pageWithRef = (ref: string): PageRecord =>
-  ({ source: { name: "filesystem", ref } }) as PageRecord;
+  ({ meta: {}, source: { name: "filesystem", ref } }) as PageRecord;
 
 const dirs: string[] = [];
 
