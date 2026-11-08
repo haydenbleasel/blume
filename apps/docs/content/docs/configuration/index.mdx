@@ -379,7 +379,7 @@ When enabled, the date is also emitted as schema.org `dateModified` in the page'
 
 ## Date format
 
-Both the "Last updated" stamp and the [changelog](/docs/advanced/changelog) timeline render their dates through the same `dateFormat`, so they read alike. Dates always render in the site's locale; `dateFormat` controls the _shape_. It defaults to the long form (`July 21, 2026`, `2026年7月21日`):
+The "Last updated" stamp, the [changelog](/docs/advanced/changelog) timeline, and the [blog](/docs/advanced/blog)'s index and posts render their dates through the same `dateFormat`, so they read alike. Dates always render in the site's locale; `dateFormat` controls the _shape_. It defaults to the long form (`July 21, 2026`, `2026年7月21日`):
 
 ```ts blume.config.ts
 dateFormat: { dateStyle: "long" },
@@ -426,6 +426,7 @@ seo: {
 | `rss.enabled` | `true` | Build feeds for blog and changelog content (needs deployment.site). |
 | `rss.types` | `["blog", "changelog"]` | Content types that each get a feed. |
 | `rss.limit` | `50` | Maximum items per feed. |
+| `rss.content` | `false` | Put each item's whole page in the feed as HTML. |
 | `sitemap` | `true` | Generate sitemap.xml (needs deployment.site). |
 | `robots` | `true` | Generate robots.txt with a Sitemap link. |
 | `structuredData` | `true` | Emit schema.org JSON-LD in each page's head. |
@@ -507,7 +508,8 @@ Each of these has its own guide. The config field is the entry point:
 | `react` | React island behavior — the React Compiler's auto-memoization | [Islands](/docs/content/islands#frameworks) |
 | `variables` | Values `{{name}}` reads in any page | [Variables](/docs/content/variables) |
 | `feedback` | The "Was this page helpful?" rating at the foot of each page (default `true`), and optional written comments after it | [Page feedback](#page-feedback) |
-| `changelog` | The title and description of the generated `/changelog` index, each a string or a per-locale map | [Changelogs](/docs/advanced/changelog#the-index-page) |
+| `changelog` | The title and description of the generated `/changelog` index, each a string or a per-locale map, and how the entries group in the sidebar | [Changelogs](/docs/advanced/changelog#the-index-page) |
+| `blog` | The title and description of the generated `/blog` index, each a string or a per-locale map, and how the posts group in the sidebar | [Blog](/docs/advanced/blog#the-index) |
 
 ## Precedence
 

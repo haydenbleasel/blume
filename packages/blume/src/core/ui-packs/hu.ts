@@ -47,6 +47,17 @@ export const hu: UIStringsOverride = {
     you: "Te",
   },
   banner: { dismiss: "Közlemény bezárása" },
+  blog: {
+    allPosts: "Összes bejegyzés",
+    description: "Hírek, frissítések és történetek a csapattól.",
+    empty: "Még nincsenek bejegyzések.",
+    newer: "Újabb bejegyzés",
+    older: "Régebbi bejegyzés",
+    readingTime: "{minutes} perc olvasás",
+    tagged: "„{tag}” címkéjű bejegyzések",
+    tags: "Címkék",
+    title: "Blog",
+  },
   changelog: {
     description: "Termékfrissítések és kiadási megjegyzések.",
     empty: "A változásnaplóban még nincsenek bejegyzések.",

@@ -11,7 +11,7 @@ By default the sidebar mirrors your content tree:
 
 - folders become **groups**, files become **pages**
 - a page's label is its frontmatter `title`; a group's label is the humanized folder name, with common acronyms like API, CLI, and SDK capitalized (`api-reference` reads "API Reference")
-- items sort by [numeric prefix](/docs/content), then alphabetically, and a folder's `index` page comes first
+- items sort by [numeric prefix](/docs/content), then alphabetically, and a folder's `index` page comes first (dated [blog posts](/docs/advanced/blog#the-sidebar) and [changelog entries](/docs/advanced/changelog) sort newest first instead)
 - a folder with an `index` page links its group row to that page, so clicking the section name opens the section's landing page
 
 That's enough for many sites — everything below is opt-in.
@@ -143,7 +143,8 @@ When the sidebar is generated, order is resolved highest priority first:
   </Step>
   <Step title="Frontmatter">`sidebar.order` on a page.</Step>
   <Step title="File system">
-    An `index` page first, then numeric prefixes, then alphabetical by label.
+    An `index` page first, then numeric prefixes, then alphabetical by label;
+    dated blog posts and changelog entries newest first.
   </Step>
 </Steps>
 
@@ -188,7 +189,7 @@ navigation: {
 }
 ```
 
-A tab's `path` is its section prefix, and it doubles as the link target. A section whose `path` isn't a page of its own — a folder with no `index.mdx` — would link to a 404, so the tab falls back to the first page in the section instead. That includes a tab at `path: "/"` on a site with no root `index.mdx`: it links to the first page in the sidebar. A static [custom page](/docs/advanced/custom-pages) at the tab's `path` counts as the section's own page: with `pages/guides.astro`, a `/guides` tab lands on that page while the `guides/` folder fills its sidebar. So does the generated [changelog](/docs/advanced/changelog) index, so a `/changelog` tab opens the timeline rather than the newest entry.
+A tab's `path` is its section prefix, and it doubles as the link target. A section whose `path` isn't a page of its own — a folder with no `index.mdx` — would link to a 404, so the tab falls back to the first page in the section instead. That includes a tab at `path: "/"` on a site with no root `index.mdx`: it links to the first page in the sidebar. A static [custom page](/docs/advanced/custom-pages) at the tab's `path` counts as the section's own page: with `pages/guides.astro`, a `/guides` tab lands on that page while the `guides/` folder fills its sidebar. So do the generated [changelog](/docs/advanced/changelog) and [blog](/docs/advanced/blog) indexes, so a `/changelog` tab opens the timeline and a `/blog` tab the list of posts, rather than the newest entry or post, in every language and version: each index lists the default language's current entries.
 
 Set `href` when you want a tab to land somewhere else — a particular page in the section, say:
 

@@ -46,6 +46,17 @@ export const zhTW: UIStringsOverride = {
     you: "你",
   },
   banner: { dismiss: "關閉公告" },
+  blog: {
+    allPosts: "所有文章",
+    description: "來自團隊的新聞、更新與故事。",
+    empty: "尚無文章。",
+    newer: "較新的文章",
+    older: "較舊的文章",
+    readingTime: "閱讀約 {minutes} 分鐘",
+    tagged: "標籤為「{tag}」的文章",
+    tags: "標籤",
+    title: "部落格",
+  },
   changelog: {
     description: "產品更新與版本說明。",
     empty: "尚無更新日誌項目。",

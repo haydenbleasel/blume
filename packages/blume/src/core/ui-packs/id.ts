@@ -48,6 +48,17 @@ export const id: UIStringsOverride = {
     you: "Anda",
   },
   banner: { dismiss: "Tutup pengumuman" },
+  blog: {
+    allPosts: "Semua tulisan",
+    description: "Berita, pembaruan, dan cerita dari tim.",
+    empty: "Belum ada tulisan.",
+    newer: "Tulisan lebih baru",
+    older: "Tulisan lebih lama",
+    readingTime: "{minutes} mnt baca",
+    tagged: "Tulisan dengan tag “{tag}”",
+    tags: "Tag",
+    title: "Blog",
+  },
   changelog: {
     description: "Pembaruan produk dan catatan rilis.",
     empty: "Belum ada entri di log perubahan.",

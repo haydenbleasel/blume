@@ -4,6 +4,8 @@ import { join } from "pathe";
 import {
   customStaticRoutes,
   discoverPages,
+  generatedBlogTagRoutes,
+  hasGeneratedBlog,
   hasGeneratedChangelog,
 } from "../../astro/pages.ts";
 import { normalizeBasePath } from "../../core/base-path.ts";
@@ -59,9 +61,9 @@ export const validateCommand = defineCommand({
       diagnostics.push(...project.diagnostics);
 
       // Custom `.astro` pages, reference routes (a `scalar()` page), and the
-      // generated changelog index are servable routes the content graph can't
-      // see — without them, a docs link to e.g. a custom landing page fails as
-      // BLUME_BROKEN_LINK.
+      // generated changelog and blog pages are servable routes the content
+      // graph can't see — without them, a docs link to e.g. a custom landing
+      // page fails as BLUME_BROKEN_LINK.
       const userPages = project.context.pagesRoot
         ? await discoverPages(project.context.pagesRoot)
         : [];
@@ -72,6 +74,10 @@ export const validateCommand = defineCommand({
       if (hasGeneratedChangelog(project, userPages)) {
         extraRoutes.push("/changelog");
       }
+      if (hasGeneratedBlog(project, userPages)) {
+        extraRoutes.push("/blog");
+      }
+      extraRoutes.push(...generatedBlogTagRoutes(project, userPages));
 
       // Fallback-materialized locale routes (an untranslated page prerendered
       // at its localized URL) are servable but absent from the content graph —

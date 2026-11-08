@@ -46,6 +46,17 @@ export const sk: UIStringsOverride = {
     you: "Vy",
   },
   banner: { dismiss: "Zavrieť oznámenie" },
+  blog: {
+    allPosts: "Všetky príspevky",
+    description: "Novinky, aktualizácie a príbehy od tímu.",
+    empty: "Zatiaľ tu nie sú žiadne príspevky.",
+    newer: "Novší príspevok",
+    older: "Starší príspevok",
+    readingTime: "{minutes} min čítania",
+    tagged: "Príspevky so štítkom „{tag}“",
+    tags: "Štítky",
+    title: "Blog",
+  },
   changelog: {
     description: "Novinky produktu a poznámky k vydaniu.",
     empty: "V zozname zmien zatiaľ nie sú žiadne záznamy.",

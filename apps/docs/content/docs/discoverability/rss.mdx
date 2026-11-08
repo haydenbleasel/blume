@@ -13,14 +13,18 @@ seo: {
     enabled: true,
     types: ["blog", "changelog"],
     limit: 50,
+    content: false,
   },
 }
 ```
 
-| Option    | Default                 | Description                           |
-| --------- | ----------------------- | ------------------------------------- |
-| `enabled` | `true`                  | Generate feeds.                       |
-| `types`   | `["blog", "changelog"]` | Content types that each get a feed.   |
-| `limit`   | `50`                    | Maximum items per feed, newest first. |
+| Option | Default | Description |
+| --- | --- | --- |
+| `enabled` | `true` | Generate feeds. |
+| `types` | `["blog", "changelog"]` | Content types that each get a feed. |
+| `limit` | `50` | Maximum items per feed, newest first. |
+| `content` | `false` | Put each item's whole page in the feed as HTML (`content:encoded`). |
+
+An item carries its page's title, link, date, and description (a blog post without one, its first paragraph), plus its front matter `authors` as `dc:creator` and `tags` as `<category>`. The blog's feed lists what its [index](/docs/advanced/blog#the-index) does: the default locale's posts. With `content`, an item's HTML is its page's [Markdown copy](/docs/discoverability/markdown), rendered as plain Markdown: a callout reads as its title in bold over its text, and heading markers like `[#id]` drop away.
 
 Blume injects `<link rel="alternate">` tags so browsers and feed readers discover the feeds automatically, and lists them in the [agent readability manifest](/docs/discoverability/agent-discovery#agent-readability) so agents find them too. Every item links to its page's absolute URL on that site.

@@ -24,7 +24,7 @@ seo: {
 }
 ```
 
-A page's `seo.image`, or a custom page's `ogImage` prop, wins over the default. A locale missing from the map takes the default locale's image. The default covers custom pages rendered with `PageLayout` and the generated changelog index too, so Blume stops generating cards once it's set, unless `enabled` is `true`. Root-relative paths resolve under the deployment base. Blume declares image dimensions only for generated cards. Whichever image a page ends up with also goes into its [JSON-LD](/docs/discoverability/structured-data) as the page's `image`.
+A page's `seo.image`, or a custom page's `ogImage` prop, wins over the default. A locale missing from the map takes the default locale's image. The default covers custom pages rendered with `PageLayout` and the generated changelog and [blog](/docs/advanced/blog) pages too, so Blume stops generating cards once it's set, unless `enabled` is `true`. Root-relative paths resolve under the deployment base. Blume declares image dimensions only for generated cards. Whichever image a page ends up with also goes into its [JSON-LD](/docs/discoverability/structured-data) as the page's `image`.
 
 ## Brand the generated card
 

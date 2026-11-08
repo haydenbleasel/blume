@@ -308,6 +308,38 @@ describe("jekyll-codemod", () => {
     expect(out).toContain("Liquid in a code block");
   });
 
+  it("splits a space-separated tags string into a list, and keeps a list", async () => {
+    const root = await tree("blume-jekyll-codemod-", {
+      "_config.yml": CONFIG,
+      "guide/list.md": "---\ntitle: List\ntags: [one, two]\n---\n\nText.\n",
+      "guide/words.md": "---\ntitle: Words\ntags: foo bar  baz\n---\n\nText.\n",
+    });
+    const report = runCodemod(root, "--write", ".");
+    expect(report).toContain("1 × front matter tags split into a list");
+    expect(await read(root, "guide/words.md")).toContain(
+      "tags:\n  - foo\n  - bar\n  - baz\n"
+    );
+    expect(await read(root, "guide/list.md")).toContain(
+      "tags:\n  - one\n  - two\n"
+    );
+  });
+
+  it("removes empty and blank tags, which Blume's schema rejects", async () => {
+    const root = await tree("blume-jekyll-codemod-", {
+      "_config.yml": CONFIG,
+      "guide/blank.md": '---\ntitle: Blank\ntags: "  "\n---\n\nText.\n',
+      "guide/empty.md": "---\ntitle: Empty\ntags:\n---\n\nText.\n",
+      "guide/holes.md":
+        '---\ntitle: Holes\ntags: [a, "", null]\n---\n\nText.\n',
+    });
+    const report = runCodemod(root, "--write", ".");
+    expect(report).toContain("2 × empty front matter tags removed");
+    expect(report).toContain("1 × blank front matter tags removed");
+    expect(await read(root, "guide/empty.md")).not.toContain("tags");
+    expect(await read(root, "guide/blank.md")).not.toContain("tags");
+    expect(await read(root, "guide/holes.md")).toContain("tags:\n  - a\n---");
+  });
+
   it("leaves {% raw %} content exactly as written", async () => {
     const root = await tree("blume-jekyll-codemod-", {
       "_config.yml": CONFIG,

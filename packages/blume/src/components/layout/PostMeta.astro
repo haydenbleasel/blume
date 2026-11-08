@@ -1,0 +1,63 @@
+---
+// The line above a blog post's title: its date, its reading time, and its
+// tags, each tag linking the page that lists its posts.
+import data from "blume:data";
+
+import { blogTagRoute } from "../../core/blog.ts";
+import type { BlumeBlogPost } from "../../core/data.ts";
+import { parseEntryDate } from "../../core/dated-list.ts";
+import { EN_UI } from "../../core/i18n-ui.ts";
+import type { UIStrings } from "../../core/i18n-ui.ts";
+import { entryDateFormats } from "../content/entry-dates.ts";
+import { withMountedBase } from "../islands/base-path.ts";
+
+interface Props {
+  /** The page's language, for the date. */
+  locale: string;
+  post: BlumeBlogPost;
+  /** The page locale's `blog` strings. */
+  strings: UIStrings["blog"];
+}
+
+const { locale, post, strings } = Astro.props;
+const s = { ...EN_UI.blog, ...strings };
+const date = parseEntryDate(post.date);
+const formats = entryDateFormats(data.config.dateFormat, locale);
+// A tag the index doesn't list (a post kept off it, or another locale's), or
+// whose route a redirect answers, has no page to link.
+const served = new Set((data.blog?.tags ?? []).map((tag) => tag.slug));
+// Marked important over the theme's `.prose` link and list rules.
+const chip =
+  "rounded-full bg-muted px-2 py-0.5 font-medium text-[0.7rem] text-muted-foreground!";
+---
+
+{/* "Listen to this page" starts at the title: the date and tags aren't read. */}
+<div
+  class="not-prose mb-3 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-muted-foreground text-sm"
+  data-blume-narration="skip"
+  data-blume-post-meta
+>
+  {date && <time datetime={formats.iso(date)}>{formats.full(date)}</time>}
+  {date && <span aria-hidden="true">·</span>}
+  <span>{s.readingTime.replace("{minutes}", String(post.readingTime))}</span>
+  {
+    post.tags.length > 0 && (
+      <ul aria-label={s.tags} class="m-0! ms-1! flex list-none flex-wrap gap-1.5 p-0!">
+        {post.tags.map((tag) => (
+          <li class="m-0! p-0!">
+            {served.has(tag.slug) ? (
+              <a
+                class:list={[chip, "no-underline! transition-colors hover:text-foreground!"]}
+                href={withMountedBase(blogTagRoute(tag.slug))}
+              >
+                {tag.label}
+              </a>
+            ) : (
+              <span class={chip}>{tag.label}</span>
+            )}
+          </li>
+        ))}
+      </ul>
+    )
+  }
+</div>

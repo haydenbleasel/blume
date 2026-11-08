@@ -1,0 +1,66 @@
+---
+// A blog post's authors: each one's avatar (or initials) and name, linking
+// the author's page when front matter gives a `url`. The byline above a post
+// shows them at full size, the index's cards smaller.
+import { authorInitials } from "../../core/blog.ts";
+import type { BlogAuthor } from "../../core/blog.ts";
+
+interface Props {
+  authors: BlogAuthor[];
+  size?: "md" | "sm";
+}
+
+const { authors, size = "md" } = Astro.props;
+const avatarClass = size === "sm" ? "size-5 text-[0.55rem]" : "size-8 text-xs";
+const nameClass = size === "sm" ? "text-xs" : "text-sm";
+---
+
+{
+  authors.length > 0 && (
+    <ul class="m-0! flex list-none flex-wrap items-center gap-x-4 gap-y-2 p-0!">
+      {authors.map((author) => {
+        const Wrapper = author.url ? "a" : "span";
+        return (
+          <li class="m-0! p-0!">
+            <Wrapper
+              class:list={[
+                "flex items-center gap-2",
+                author.url && "group/author relative z-10 no-underline!",
+              ]}
+              href={author.url}
+            >
+              {author.avatar ? (
+                <img
+                  alt=""
+                  class:list={["m-0! shrink-0 rounded-full object-cover", avatarClass]}
+                  data-no-zoom
+                  decoding="async"
+                  loading="lazy"
+                  src={author.avatar}
+                />
+              ) : (
+                <span
+                  aria-hidden="true"
+                  class:list={[
+                    "grid shrink-0 place-items-center rounded-full bg-muted font-medium text-muted-foreground",
+                    avatarClass,
+                  ]}
+                >
+                  {authorInitials(author.name)}
+                </span>
+              )}
+              <span
+                class:list={[
+                  "font-medium text-foreground transition-colors group-hover/author:text-accent",
+                  nameClass,
+                ]}
+              >
+                {author.name}
+              </span>
+            </Wrapper>
+          </li>
+        );
+      })}
+    </ul>
+  )
+}

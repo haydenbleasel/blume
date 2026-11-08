@@ -4,8 +4,10 @@ export type {
   ComponentMarkdownContext,
 } from "./ai/component-markdown.ts";
 export { defineConfig } from "./core/config.ts";
+export type { BlogTagCount } from "./core/blog.ts";
 export type {
   BlumeBanner,
+  BlumeBlogPost,
   BlumeData,
   BlumeDataConfig,
   BlumeDataI18n,

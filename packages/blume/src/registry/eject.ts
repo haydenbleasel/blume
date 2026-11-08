@@ -7,10 +7,11 @@ import { OPENAPI_PATH } from "../ai/api/paths.ts";
 import { buildApiSpec } from "../ai/api/spec.ts";
 import { buildAskData } from "../ai/ask-data.ts";
 import { resolveAskBackend } from "../ai/ask.ts";
-import { buildRawMarkdown } from "../ai/markdown.ts";
+import { buildFeedMarkdown, buildRawMarkdown } from "../ai/markdown.ts";
 import { buildMcpData } from "../ai/mcp/data.ts";
 import type { McpData } from "../ai/mcp/data.ts";
 import { buildMcpDiscovery, buildMcpServerCard } from "../ai/mcp/discovery.ts";
+import { blogPageFiles } from "../astro/blog-pages.ts";
 import { planComponentSlots } from "../astro/component-slots.ts";
 import {
   EXAMPLE_SCAN_GLOB,
@@ -32,7 +33,13 @@ import {
   specOrigins,
 } from "../astro/generate.ts";
 import { discoverIslands } from "../astro/islands.ts";
-import { customOgRoutes, discoverPages, routeIsTaken } from "../astro/pages.ts";
+import {
+  customOgRoutes,
+  discoverPages,
+  generatedBlogTagRoutes,
+  hasGeneratedBlog,
+  routeIsTaken,
+} from "../astro/pages.ts";
 import {
   apiNavigationTemplate,
   apiNotFoundTemplate,
@@ -68,6 +75,7 @@ import {
   searchEndpointTemplate,
   staticJsonEndpointTemplate,
 } from "../astro/templates.ts";
+import { blogCoverSources, blogPosts } from "../core/blog-posts.ts";
 import { collectContentAssets } from "../core/content-assets.ts";
 import { buildIncludeGraph } from "../core/includes.ts";
 import { packageRoot } from "../core/package-root.ts";
@@ -420,6 +428,24 @@ const changelogFiles = (
     },
   ];
 };
+
+/**
+ * Each blog post's cover for its OG card, a local file written relative to
+ * the project root (where the ejected app builds from), like the content
+ * assets below.
+ */
+const portableCovers = (
+  project: BlumeProject,
+  root: string
+): Record<string, string> =>
+  Object.fromEntries(
+    Object.entries(blogCoverSources(blogPosts(project))).map(
+      ([route, cover]) => [
+        route,
+        /^(?:https?:|data:)/iu.test(cover) ? cover : relative(root, cover),
+      ]
+    )
+  );
 
 /**
  * The colocated-image map and the `/blume-assets/[...asset]` endpoint that
@@ -814,6 +840,12 @@ export const eject = async (
     exportPdf,
     needsReact,
   });
+  // Likewise the blog index and tag pages, whose cards the endpoint adds too.
+  const blog = blogPageFiles(project, pages, srcDir, {
+    exportEpub,
+    exportPdf,
+    needsReact,
+  });
 
   if (config.seo.og.enabled) {
     // The default script fallbacks ride along (Google family names, nothing
@@ -836,7 +868,12 @@ export const eject = async (
           families,
           pageDescriptions: config.seo.og.description !== false,
         },
-        changelog.length > 0
+        changelog.length > 0,
+        {
+          covers: portableCovers(project, root),
+          index: hasGeneratedBlog(project, pages),
+          tags: generatedBlogTagRoutes(project, pages).length > 0,
+        }
       ),
       path: join(srcDir, "pages", "og", "[...slug].png.ts"),
     });
@@ -856,6 +893,7 @@ export const eject = async (
     ...mcpFiles(project, pages, srcDir, agentData),
     ...apiFiles(project, pages, root, srcDir, agentData),
     ...changelog,
+    ...blog,
     ...playgroundProxyFiles(config, openApiData, srcDir)
   );
 
@@ -925,7 +963,7 @@ export const eject = async (
     });
   }
 
-  const feeds = buildRssFeeds(project);
+  const feeds = buildRssFeeds(project, await buildFeedMarkdown(project));
   if (feeds.length > 0) {
     const feedXml = Object.fromEntries(
       feeds.map((feed) => [feed.type, renderRssFeed(feed)])

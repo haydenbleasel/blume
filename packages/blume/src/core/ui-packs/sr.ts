@@ -47,6 +47,17 @@ export const sr: UIStringsOverride = {
     you: "Ви",
   },
   banner: { dismiss: "Затвори обавештење" },
+  blog: {
+    allPosts: "Све објаве",
+    description: "Вести, ажурирања и приче из тима.",
+    empty: "Још нема објава.",
+    newer: "Новија објава",
+    older: "Старија објава",
+    readingTime: "{minutes} мин читања",
+    tagged: "Објаве са ознаком „{tag}“",
+    tags: "Ознаке",
+    title: "Блог",
+  },
   changelog: {
     description: "Ажурирања производа и белешке о издањима.",
     empty: "У дневнику измена још нема уноса.",

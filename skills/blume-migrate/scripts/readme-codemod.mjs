@@ -513,6 +513,7 @@ const BLUME_KEYS = new Set([
   "authMethod",
   "authors",
   "changelog",
+  "cover",
   "date",
   "deprecated",
   "description",
@@ -530,6 +531,7 @@ const BLUME_KEYS = new Set([
   "seo",
   "sidebar",
   "slug",
+  "tags",
   "title",
   "type",
 ]);
