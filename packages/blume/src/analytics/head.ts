@@ -14,6 +14,7 @@ import { hotjarHead } from "./hotjar.ts";
 import { logrocketHead } from "./logrocket.ts";
 import { mixpanelHead } from "./mixpanel.ts";
 import { oneDollarStatsHead } from "./one-dollar-stats.ts";
+import { openpanelHead } from "./openpanel.ts";
 import { pirschHead } from "./pirsch.ts";
 import { plausibleHead } from "./plausible.ts";
 import { posthogHead } from "./posthog.ts";
@@ -101,6 +102,9 @@ const adapterScripts = (
     }
     case "one-dollar-stats": {
       return oneDollarStatsHead(adapter.options);
+    }
+    case "openpanel": {
+      return openpanelHead(adapter.options);
     }
     case "pirsch": {
       return pirschHead(adapter.options);

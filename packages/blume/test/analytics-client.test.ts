@@ -30,6 +30,7 @@ interface WindowStub {
   htevents?: { track?: Fn };
   LogRocket?: { track?: Fn };
   mixpanel?: { track?: Fn };
+  op?: Fn;
   pirsch?: Fn;
   plausible?: Fn;
   posthog?: { capture?: Fn };
@@ -80,6 +81,7 @@ describe("track", () => {
       hj: mock(noop),
       htevents: mock(noop),
       mixpanel: mock(noop),
+      op: mock(noop),
       pirsch: mock(noop),
       plausible: mock(noop),
       stonks: mock(noop),
@@ -102,6 +104,7 @@ describe("track", () => {
       hj: fns.hj,
       htevents: { track: fns.htevents },
       mixpanel: { track: fns.mixpanel },
+      op: fns.op,
       pirsch: fns.pirsch,
       plausible: fns.plausible,
       posthog: { capture: fns.capture },
@@ -129,6 +132,7 @@ describe("track", () => {
     expect(fns.dataLayer).toHaveBeenCalledWith({ ...props, event: "feedback" });
     expect(fns.plausible).toHaveBeenCalledWith("feedback", { props });
     expect(fns.databuddy).toHaveBeenCalledWith("feedback", props);
+    expect(fns.op).toHaveBeenCalledWith("track", "feedback", props);
     expect(fns.fathom).toHaveBeenCalledWith("feedback");
     expect(fns.stonks).toHaveBeenCalledWith("feedback", props);
     expect(fns.pirsch).toHaveBeenCalledWith("feedback", { meta: props });
