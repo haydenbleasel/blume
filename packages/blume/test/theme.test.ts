@@ -838,6 +838,31 @@ describe("resolveIcon (Lucide-only)", () => {
   });
 });
 
+describe("Pele diagram tokens", () => {
+  const entry = tailwindEntryTemplate({
+    configTokens: "",
+    sources: [],
+    userTheme: "",
+  });
+
+  it("maps Pele's CSS variables onto Blume's theme tokens", () => {
+    // Themes apply without a re-render: the SVG reads these live.
+    expect(entry).toContain("--pele-bg: var(--blume-background);");
+    expect(entry).toContain("--pele-fg: var(--blume-foreground);");
+    expect(entry).toContain("--pele-muted: var(--blume-muted-foreground);");
+    expect(entry).toContain("--pele-line: var(--blume-foreground);");
+    expect(entry).toContain("--pele-surface: var(--blume-muted);");
+    expect(entry).toContain("--pele-border: var(--blume-border);");
+    // The fonts are measured before layout, not just drawn.
+    expect(entry).toContain("--pele-font: var(--blume-font-body);");
+    expect(entry).toContain("--pele-font-mono: var(--blume-font-mono);");
+  });
+
+  it("sets them on the element too, so the first measure sees the font", () => {
+    expect(entry).toContain("blume-mermaid,\n.pele {");
+  });
+});
+
 describe("rebaseSourceDirectives", () => {
   // A workspace: theme.css sits in the docs app, the generated entry three
   // levels below it under .blume/src/generated.

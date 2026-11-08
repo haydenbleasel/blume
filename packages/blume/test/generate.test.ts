@@ -2127,10 +2127,9 @@ describe("generateRuntime", () => {
     );
   });
 
-  it("ships the Mermaid element only when a page has a mermaid fence", async () => {
-    // Mermaid is over 3 MB of client chunks (ELK, Cytoscape, KaTeX, every
-    // diagram type); a site with no diagram must not bundle, or pre-bundle in
-    // dev, any of it.
+  it("ships the diagram element only when a page has a mermaid fence", async () => {
+    // Pele is about 730 kB of client chunk (every diagram type); a site with no
+    // diagram must not bundle, or pre-bundle in dev, any of it.
     const withFence = await scanProject(
       await writeProject({
         "docs/index.mdx": "# Home\n\n```mermaid\ngraph TD; A-->B\n```\n",
@@ -2149,7 +2148,7 @@ describe("generateRuntime", () => {
         join(withFence.context.outDir, "astro.config.mjs"),
         "utf-8"
       )
-    ).toContain('"blume > mermaid"');
+    ).toContain('"blume > pele"');
 
     const without = await scanProject(
       await writeProject({ "docs/index.md": "# Home\n\nNo diagrams here.\n" })
@@ -2168,7 +2167,7 @@ describe("generateRuntime", () => {
       join(without.context.outDir, "astro.config.mjs"),
       "utf-8"
     );
-    expect(config).not.toContain('"blume > mermaid"');
+    expect(config).not.toContain('"blume > pele"');
     expect(config).not.toContain('"blume > epub-gen-memory/bundle"');
     expect(config).toContain('"blume:features": ');
   });
