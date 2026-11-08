@@ -466,10 +466,15 @@ hr { border: 0; border-top: 1px solid #ddd; margin: 2em 0; }`;
     }
     const rect = summary.getBoundingClientRect();
     // The rail scrolls, so it clips the menu at its own edges: its top sits
-    // under the sticky header, below the viewport's.
-    const room = details
+    // under the sticky header, below the viewport's. At the end of the page
+    // the footer row slides in over its bottom edge, so a menu stops there.
+    const rail = details
       .closest("[data-blume-toc]")
       ?.getBoundingClientRect() ?? { bottom: window.innerHeight, top: 0 };
+    const footerTop =
+      document.querySelector("[data-blume-footer-row]")?.getBoundingClientRect()
+        .top ?? Number.POSITIVE_INFINITY;
+    const room = { bottom: Math.min(rail.bottom, footerTop), top: rail.top };
     const margin = 8;
     const flipUp =
       rect.bottom + menu.offsetHeight + margin > room.bottom &&
@@ -487,19 +492,19 @@ hr { border: 0; border-top: 1px solid #ddd; margin: 2em 0; }`;
       "[data-blume-page-actions] details[data-blume-dropdown][open]"
     );
 
-  // rAF-coalesced so a live resize drag re-reads layout once per frame, not
-  // once per event, while the open menu still tracks the viewport. Registered
-  // once at module scope (this bundle runs once per real page load) and
-  // querying live, because client-router swaps replace the menu elements.
-  window.addEventListener(
-    "resize",
-    rafThrottle(() => {
-      const open = openDropdown();
-      if (open) {
-        placeMenu(open);
-      }
-    })
-  );
+  // rAF-coalesced so a live resize drag or scroll re-reads layout once per
+  // frame, not once per event, while the open menu still tracks the viewport
+  // and the footer row sliding in over the rail. Registered once at module
+  // scope (this bundle runs once per real page load) and querying live,
+  // because client-router swaps replace the menu elements.
+  const placeOpenMenu = rafThrottle(() => {
+    const open = openDropdown();
+    if (open) {
+      placeMenu(open);
+    }
+  });
+  window.addEventListener("resize", placeOpenMenu);
+  window.addEventListener("scroll", placeOpenMenu, { passive: true });
 
   // Outside-click / Escape / focus-out dismissal is the shared <details>
   // dropdown behavior (also the header language switcher and nav selectors).
