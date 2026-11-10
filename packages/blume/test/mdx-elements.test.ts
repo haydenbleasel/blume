@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { join } from "pathe";
 
 import { BUILTIN_CHILD_PROPS } from "../src/core/builtin-tags.ts";
-import { extractElementUses } from "../src/core/mdx-elements.ts";
+import { extractElementUses, parseMdxBody } from "../src/core/mdx-elements.ts";
 import { normalizeEntry } from "../src/core/sources/normalize.ts";
 
 /**
@@ -117,6 +117,20 @@ describe("extractElementUses", () => {
     for (const body of quiet) {
       expect(extractElementUses(body)).toStrictEqual([]);
     }
+  });
+});
+
+describe(parseMdxBody, () => {
+  it("parses a body once, however many walks read it", () => {
+    const body = '<Steps title="x" />\n';
+    const tree = parseMdxBody(body);
+    expect(tree?.type).toBe("root");
+    expect(parseMdxBody(body)).toBe(tree);
+    expect(parseMdxBody("Other.\n")).not.toBe(tree);
+  });
+
+  it("gives null for a body MDX can't parse", () => {
+    expect(parseMdxBody("<div>Unclosed\n")).toBeNull();
   });
 });
 
