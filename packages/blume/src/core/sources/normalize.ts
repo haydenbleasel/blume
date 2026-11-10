@@ -6,10 +6,12 @@ import type { Nodes } from "mdast";
 import { extname } from "pathe";
 import { markdownToMdast } from "satteri";
 
+import type { EvaluatedValue } from "../../ai/component-markdown.ts";
 import { MARKDOWN_FEATURES } from "../../markdown/features.ts";
 import { mountBasePath } from "../base-path.ts";
 import { nextFenceState } from "../code-fences.ts";
 import type { FenceState } from "../code-fences.ts";
+import { extractComponentAnchors } from "../component-anchors.ts";
 import { diagnosticsFromIssues, diagnosticsFromZod } from "../diagnostics.ts";
 import {
   headingSlug,
@@ -2521,7 +2523,25 @@ export const normalizeEntry = (
   // so a partial's headings anchor-index and TOC under every including page
   // and its components register for the runtime import map.
   const bodyText = entry.expanded?.text ?? entry.body.text;
-  const { anchors, curlyMarkers, headings } = scanBody(bodyText);
+  const scanned = scanBody(bodyText);
+  const { curlyMarkers, headings } = scanned;
+  // Fragments built-in components answer to (`<AccordionItem id>`), and
+  // components exist only in `.mdx`.
+  const anchors =
+    format === "mdx"
+      ? [
+          ...new Set([
+            ...scanned.anchors,
+            ...extractComponentAnchors(
+              bodyText,
+              // SAFETY: front matter is parsed data (YAML, or a source's
+              // JSON), which the static reader only walks to a value; nothing
+              // in it is called.
+              entry.data as Record<string, EvaluatedValue>
+            ),
+          ]),
+        ]
+      : scanned.anchors;
   const { staged } = ctx.source;
   const elements =
     format === "mdx" ? entryLinks(entry, extractElementUses) : [];

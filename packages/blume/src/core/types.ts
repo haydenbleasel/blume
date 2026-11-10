@@ -235,8 +235,10 @@ export interface PageRecord {
   custom?: Record<string, unknown>;
   headings: Heading[];
   /**
-   * Raw HTML element ids (`<a id="…">`) outside headings, deduplicated —
-   * fragment-link targets `blume validate` accepts alongside heading slugs.
+   * Raw HTML element ids (`<a id="…">`) outside headings, and in `.mdx` the
+   * fragments built-in components answer to (an accordion item's id, a tab's;
+   * see `core/component-anchors.ts`), deduplicated — fragment-link targets
+   * `blume validate` accepts alongside heading slugs.
    */
   anchors: string[];
 
