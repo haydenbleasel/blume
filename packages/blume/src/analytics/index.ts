@@ -60,6 +60,8 @@ export type {
   MixpanelOptions,
   MixpanelRegion,
 } from "./mixpanel.ts";
+export { notra } from "./notra.ts";
+export type { NotraAdapter, NotraOptions } from "./notra.ts";
 export { oneDollarStats } from "./one-dollar-stats.ts";
 export type {
   OneDollarStatsAdapter,

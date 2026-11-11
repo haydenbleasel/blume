@@ -192,6 +192,7 @@
     "@tailwindcss/vite": "^4.3.3",
     "@types/mdast": "^4.0.4",
     "@types/node": "^22.20.5",
+    "@usenotra/sdk": "^2.0.0",
     "@vercel/analytics": "^2.0.1",
     "@vitejs/plugin-react": "6.1.1",
     "ai": "^7.0.157",
