@@ -59,7 +59,7 @@ A numbered vertical sequence for ordered instructions — installs, setup flows,
 
 ## Tabs
 
-Switch between equivalent content in place — language variants, OS-specific commands, or alternative approaches — without stacking everything on the page. Each `Tab` takes a `title`.
+Switch between equivalent content in place — language variants, OS-specific commands, or alternative approaches — without stacking everything on the page. Each `Tab` takes a `title`, and an optional `id`.
 
 <Tabs>
   <Tab title="macOS">Use Homebrew to install the toolchain.</Tab>
@@ -77,7 +77,7 @@ Add `inline` to render borderless — a tab strip on a full-width rule with the 
 
 Groups with same-titled tabs switch together — pick "macOS" in one and every group with a macOS tab follows. Add `syncKey` to scope that syncing: only groups sharing the same key switch together, so unrelated groups that happen to share a tab title stay independent, or `sync={false}` to keep a group out of it entirely.
 
-The active tab is written to the URL hash, so a link opens on it; pass `hash={false}` to leave the URL alone. `defaultTabIndex` picks the tab that opens first (zero-based, default `0`) when no link or synced selection chooses one. `dropdown` swaps the tab strip for a select menu (in the boxed layout only), `borderBottom={false}` drops the rule under the strip, and each `Tab` takes an `icon` shown before its title.
+The active tab is written to the URL hash, as its `id` or else its title slugged (`#windows`), so a link opens on it; pass `hash={false}` to leave the URL alone. `defaultTabIndex` picks the tab that opens first (zero-based, default `0`) when no link or synced selection chooses one. `dropdown` swaps the tab strip for a select menu (in the boxed layout only), `borderBottom={false}` drops the rule under the strip, and each `Tab` takes an `icon` shown before its title.
 
 <Tabs inline param="install">
   <Tab title="macOS">Use Homebrew to install the toolchain.</Tab>
@@ -243,7 +243,9 @@ Illustrate a project or folder layout. Wrap a normal Markdown list and Blume sty
 
 ## Accordion
 
-Stack related collapsibles in a single bordered container with dividers between them — FAQs, optional steps, or long examples. Each child is an `AccordionItem` (`title`, optional `icon`, `description`, `defaultOpen`). The `title` renders inline Markdown, so code spans, emphasis, and links in it show as they would in a sentence; raw HTML in it shows as text. For a single standalone disclosure, use [Expandable](#expandable).
+Stack related collapsibles in a single bordered container with dividers between them — FAQs, optional steps, or long examples. Each child is an `AccordionItem` (`title`, optional `id`, `icon`, `description`, `defaultOpen`). The `title` renders inline Markdown, so code spans, emphasis, and links in it show as they would in a sentence; raw HTML in it shows as text. For a single standalone disclosure, use [Expandable](#expandable).
+
+A link to an item opens it. Its anchor is its `id`, or else its title slugged (`#does-it-support-mdx` below), and one that repeats on the page gets `-2`, `-3` after the first.
 
 <Accordion>
   <AccordionItem title="Does it support MDX?">
@@ -267,7 +269,7 @@ Stack related collapsibles in a single bordered container with dividers between 
 
 ## Expandable
 
-A lightweight inline disclosure for nested detail — expanding a field's sub-properties or an optional aside. `title` labels the toggle (defaults to “Show more”) and renders inline Markdown, as an accordion item's does; set `defaultOpen` to start expanded.
+A lightweight inline disclosure for nested detail — expanding a field's sub-properties or an optional aside. `title` labels the toggle (defaults to “Show more”) and renders inline Markdown, as an accordion item's does; set `defaultOpen` to start expanded. A link to its title slugged (`#show-advanced-options`) opens it, as with an accordion item.
 
 <Expandable title="Show advanced options">
   These settings are optional and rarely need changing.

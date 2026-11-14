@@ -12,3 +12,13 @@ import { slug } from "github-slugger";
  * by each component's own script.
  */
 export const componentSlug = (value: string): string => slug(value);
+
+/**
+ * The anchor an accordion item or a tab answers to: its `id`, or else its
+ * title slugged. `blume validate` reads the same rule
+ * (`core/component-anchors.ts`), so links it accepts are the ones that open.
+ */
+export const componentAnchorId = (
+  id: string | undefined,
+  title: string
+): string => id ?? componentSlug(title);

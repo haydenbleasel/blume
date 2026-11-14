@@ -38,6 +38,7 @@ import { resolveDocsCollection, resolveSources } from "./sources/resolve.ts";
 import type { SourceRuntime } from "./sources/resolve.ts";
 import type {
   ContentSource,
+  MdxAnchorReader,
   SourceEntry,
   SourceLoadResult,
 } from "./sources/types.ts";
@@ -186,12 +187,14 @@ const entryIdDiagnostics = (
  * invalid frontmatter, and callers surface that count so a build with missing
  * pages can't read as clean. With `dropUnparsable`, an `.mdx` page whose own
  * text doesn't parse is dropped too, and its file listed in `unparsable` so
- * the docs collection leaves it out.
+ * the docs collection leaves it out. `mdxAnchors` is passed to every entry
+ * (see `NormalizeContext.mdxAnchors`).
  */
 const normalizeLoadedEntries = (
   loaded: ({ source: ContentSource } & SourceLoadResult)[],
   config: ResolvedConfig,
-  dropUnparsable: boolean
+  dropUnparsable: boolean,
+  mdxAnchors?: MdxAnchorReader
 ) => {
   // Only thread `frontmatter.extend` / `content.types` through when a project
   // opts in, so the known-key split in `normalizeEntry` stays off the default
@@ -236,6 +239,7 @@ const normalizeLoadedEntries = (
         defaultType: config.content.defaultType,
         frontmatterExtend,
         i18n: config.i18n,
+        mdxAnchors,
         source: {
           monolingual: source.monolingual,
           name: source.name,
@@ -633,6 +637,11 @@ export const scanProject = async (
      * source that can't load fails the scan, and nothing after it runs.
      */
     beforeSources?: (config: ResolvedConfig) => void;
+    /**
+     * Also record the fragments each `.mdx` body answers to beyond headings
+     * and raw HTML ids (see {@link NormalizeContext.mdxAnchors}).
+     */
+    mdxAnchors?: MdxAnchorReader;
   } = {}
 ): Promise<BlumeProject> => {
   const mode = options.mode ?? "dev";
@@ -742,7 +751,12 @@ export const scanProject = async (
     droppedPages,
     pages: allPages,
     unparsable,
-  } = normalizeLoadedEntries(loaded, config, mode === "build");
+  } = normalizeLoadedEntries(
+    loaded,
+    config,
+    mode === "build",
+    options.mdxAnchors
+  );
 
   // Checked against every page, drafts included: a `pages` entry naming a
   // draft still orders it wherever the draft renders.

@@ -17,7 +17,8 @@ import type { ElementUse } from "./types.ts";
  *   element renders without the content they carry.
  */
 
-type JsxElement = Extract<
+/** A JSX element in an `.mdx` body's tree, flow or inline. */
+export type JsxElement = Extract<
   Nodes,
   { type: "mdxJsxFlowElement" | "mdxJsxTextElement" }
 >;
@@ -148,6 +149,12 @@ export const extractElementUses = (
       }
     }
   };
-  walk(tree);
+  try {
+    walk(tree);
+  } catch {
+    // Nesting deep enough to overflow the stack: report none rather than
+    // fail the scan.
+    return [];
+  }
   return uses;
 };

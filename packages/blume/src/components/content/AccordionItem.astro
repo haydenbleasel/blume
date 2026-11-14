@@ -1,6 +1,6 @@
 ---
 import Icon from "../Icon.astro";
-import { componentSlug } from "../slug.ts";
+import { componentAnchorId } from "../slug.ts";
 import { renderInlineTitle } from "./inline-markdown.ts";
 
 interface Props {
@@ -14,7 +14,7 @@ interface Props {
 const { defaultOpen = false, description, icon, id, title } = Astro.props;
 // The id still slugs the title as written, so existing deep links keep
 // working once its Markdown renders.
-const accordionId = id ?? componentSlug(title);
+const accordionId = componentAnchorId(id, title);
 // The title's inline Markdown (`The \`x\` option`), or undefined for a title
 // shown as written.
 const titleHtml = await renderInlineTitle(title);
