@@ -1,17 +1,27 @@
+import { readFile } from "node:fs/promises";
+
 import { defineCommand } from "citty";
 import { join } from "pathe";
 
+import { discoverIslands } from "../../astro/islands.ts";
 import {
   customStaticRoutes,
   discoverPages,
   hasGeneratedChangelog,
 } from "../../astro/pages.ts";
 import { normalizeBasePath } from "../../core/base-path.ts";
+import { extractComponentAnchors } from "../../core/component-anchors.ts";
+import {
+  analyzeComponentOverrides,
+  ComponentOverridesError,
+} from "../../core/component-overrides.ts";
 import { BlumeError } from "../../core/diagnostics.ts";
 import { validateLinks } from "../../core/links.ts";
 import { buildManifest } from "../../core/manifest.ts";
 import { scanProject } from "../../core/project-graph.ts";
+import { findComponentsFile } from "../../core/project.ts";
 import { resolveDocsCollection } from "../../core/sources/collection.ts";
+import type { MdxAnchorReader } from "../../core/sources/types.ts";
 import type { Diagnostic } from "../../core/types.ts";
 import { generatedFilePaths } from "../../deploy/generated-files.ts";
 import { referenceRoutes } from "../../openapi/references.ts";
@@ -24,6 +34,49 @@ import {
   reportDiagnostics,
   reportDiagnosticsJson,
 } from "../log.ts";
+
+/**
+ * The MDX tags the project renders with its own components: its islands and
+ * the built-ins its `components.ts` overrides. `null` when `components.ts`
+ * can't be planned, so which built-ins it replaces isn't known.
+ */
+const ownComponents = async (root: string): Promise<Set<string> | null> => {
+  const componentsFile = findComponentsFile(root);
+  try {
+    const [islands, overrides] = await Promise.all([
+      discoverIslands(root),
+      componentsFile
+        ? readFile(componentsFile, "utf-8").then(
+            (source) => analyzeComponentOverrides(source, componentsFile).mdx
+          )
+        : [],
+    ]);
+    return new Set([
+      ...islands.islands.map((island) => island.name),
+      ...overrides.map((override) => override.key),
+    ]);
+  } catch (error) {
+    if (error instanceof ComponentOverridesError) {
+      return null;
+    }
+    throw error;
+  }
+};
+
+/**
+ * The reader for the anchors built-in components render (an accordion
+ * item's id, a tab's), skipping the project's own components; none at all
+ * when those can't be known.
+ */
+const componentAnchors = async (
+  root: string
+): Promise<MdxAnchorReader | undefined> => {
+  const own = await ownComponents(root);
+  return own
+    ? (body, frontmatter) =>
+        extractComponentAnchors(body, { frontmatter, ownComponents: own })
+    : undefined;
+};
 
 export const validateCommand = defineCommand({
   args: {
@@ -53,7 +106,12 @@ export const validateCommand = defineCommand({
     const diagnostics: Diagnostic[] = [];
 
     try {
-      const project = await scanProject(root, { mode: "build" });
+      const project = await scanProject(root, {
+        // Links may target what built-in components render; only this scan
+        // reads those, so only it pays for the parse.
+        mdxAnchors: await componentAnchors(root),
+        mode: "build",
+      });
       // Surface content/graph problems too: a page that fails to parse is a
       // link-validation blind spot, so silently passing would be misleading.
       diagnostics.push(...project.diagnostics);

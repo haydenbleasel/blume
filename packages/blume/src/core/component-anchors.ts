@@ -1,23 +1,57 @@
-import { parse as parseModule } from "es-module-lexer/js";
 import type { Nodes, Root } from "mdast";
+import { mdxToMdast } from "satteri";
+import ts from "typescript";
 
-import { isString } from "../ai/component-markdown.ts";
 import type { EvaluatedValue } from "../ai/component-markdown.ts";
 import { readStaticExpression } from "../ai/static-expression.ts";
-import { componentSlug } from "../components/slug.ts";
+import { componentAnchorId, componentSlug } from "../components/slug.ts";
+import { MDX_BODY_FEATURES } from "../markdown/features.ts";
 import { BUILTIN_CHILD_PROPS } from "./builtin-tags.ts";
-import { parseMdxBody } from "./mdx-elements.ts";
 import type { JsxElement } from "./mdx-elements.ts";
 
 type Frontmatter = Record<string, EvaluatedValue>;
 
+/** What {@link extractComponentAnchors} reads besides the body. */
+export interface ComponentAnchorOptions {
+  /** The page's front matter, which `{frontmatter.<key>}` props read. */
+  frontmatter?: Frontmatter;
+  /**
+   * The tags the project renders with its own components: its islands and
+   * the built-ins its `components.ts` overrides. What those render can't be
+   * known, so neither they nor their content count.
+   */
+  ownComponents?: ReadonlySet<string>;
+}
+
 // A body that may hold a built-in that renders an id or opens from the hash.
 const ID_HINT = /<(?:AccordionItem|Expandable|Tab)[\s/>]/u;
+
+/**
+ * The built-ins that render their children where they're written, so an id
+ * inside one lands on the page: each one in {@link BUILTIN_CHILD_PROPS} but
+ * `<Prompt>`, which shows its children as text to copy (`<Visibility>` and
+ * `<CodeBlock>` are read case by case), and the field, tree, and color
+ * components. A test checks this against the `.astro` files.
+ */
+export const RENDERS_CHILDREN: ReadonlySet<string> = new Set([
+  ...[...BUILTIN_CHILD_PROPS.keys()].filter((tag) => tag !== "Prompt"),
+  "Color",
+  "Color.Row",
+  "FileTree",
+  "ParamField",
+  "ResponseField",
+  "Tree",
+  "Tree.Folder",
+  "TypeTable",
+]);
 
 // A prop that can't be known here: any spread (`{...props}`) on the element
 // makes every prop unknown, and an expression that isn't literal data makes
 // its own prop unknown.
 const UNKNOWN = Symbol("unknown");
+
+const isString = <Value>(value: Value): value is Value & string =>
+  typeof value === "string";
 
 /**
  * A prop's value as the component receives it: `undefined` when the element
@@ -29,7 +63,7 @@ const readProp = (
   node: JsxElement,
   name: string,
   frontmatter: Frontmatter | undefined
-): EvaluatedValue | undefined | typeof UNKNOWN => {
+): EvaluatedValue | typeof UNKNOWN => {
   if (
     node.attributes.some((attribute) => attribute.type !== "mdxJsxAttribute")
   ) {
@@ -63,15 +97,6 @@ const stringProp = (
   return value === undefined || isString(value) ? value : null;
 };
 
-/** The title slugged, as `componentSlug` does in the component. */
-const titleSlug = (
-  node: JsxElement,
-  frontmatter: Frontmatter | undefined
-): string | null => {
-  const title = stringProp(node, "title", frontmatter);
-  return isString(title) ? componentSlug(title) : null;
-};
-
 /**
  * An `id` as the component's `id ?? …` reads it: `undefined` when unset or
  * `null`, so the fallback applies; a number as the string it renders; `null`
@@ -92,13 +117,22 @@ const idProp = (
   return Number.isFinite(value) ? String(value) : null;
 };
 
-/** An accordion item's id: `AccordionItem.astro`'s `id ?? componentSlug(title)`. */
-const accordionItemId = (
+/**
+ * The anchor an accordion item or a tab answers to, by the components' own
+ * {@link componentAnchorId}, or `null` when it can't be known. With `titled`
+ * false (a tab outside a group that opens from the hash) only an `id` counts.
+ */
+const anchorOf = (
   node: JsxElement,
-  frontmatter: Frontmatter | undefined
+  frontmatter: Frontmatter | undefined,
+  titled = true
 ): string | null => {
   const id = idProp(node, frontmatter);
-  return id === undefined ? titleSlug(node, frontmatter) : id;
+  const title = titled ? stringProp(node, "title", frontmatter) : null;
+  if (id === null || (id === undefined && !isString(title))) {
+    return null;
+  }
+  return componentAnchorId(id, title ?? "");
 };
 
 /**
@@ -106,8 +140,9 @@ const accordionItemId = (
  * does: with no `param` and a `hash` that isn't `false`. `data-param={param}`
  * renders nothing for `null` and an empty value for `""`, which the script
  * reads as no param; any other value, `false` and `true` included, renders as
- * text and is one. A group whose props can't be known counts as one that
- * doesn't.
+ * text and is one. A group whose props can't be known, or whose `hash` is an
+ * object or array (the component compares `String(hash)`), counts as one
+ * that doesn't.
  */
 const opensFromHash = (
   node: JsxElement,
@@ -115,113 +150,93 @@ const opensFromHash = (
 ): boolean => {
   const hash = readProp(node, "hash", frontmatter);
   const param = readProp(node, "param", frontmatter);
-  if (hash === UNKNOWN || param === UNKNOWN) {
-    return false;
-  }
-  // The component compares `String(hash)`; an object or array isn't read that
-  // way here, so it counts as not opening from the hash.
-  const plainHash =
-    hash === undefined ||
-    hash === null ||
-    hash === true ||
-    hash === false ||
-    isString(hash) ||
-    Number.isFinite(hash);
   return (
-    plainHash &&
-    (param === undefined || param === null || param === "") &&
-    String(hash === undefined ? true : hash) !== "false"
+    hash !== UNKNOWN &&
+    hash !== false &&
+    hash !== "false" &&
+    !(hash instanceof Object) &&
+    (param === undefined || param === null || param === "")
   );
 };
 
-/**
- * The fragment a `<Tab>` answers to. `Tab.astro` renders `id={id}`, so an
- * `id` is always on the page; its hash key is `id ?? componentSlug(title)`,
- * so in a group that opens from the hash a tab without one answers to its
- * title slugged.
- */
-const tabFragment = (
-  node: JsxElement,
-  inHashGroup: boolean,
-  frontmatter: Frontmatter | undefined
-): string | null => {
-  const id = idProp(node, frontmatter);
-  if (id !== undefined) {
-    return id;
+/** The names a declaration's binding pattern (`{ a, b: [c] }`) binds. */
+const patternNames = (name: ts.BindingName): string[] =>
+  ts.isIdentifier(name)
+    ? [name.text]
+    : name.elements.flatMap((element) =>
+        ts.isBindingElement(element) ? patternNames(element.name) : []
+      );
+
+/** The value names one statement binds; types and re-exports bind none. */
+const statementBindings = (statement: ts.Statement): string[] => {
+  if (ts.isImportDeclaration(statement)) {
+    const clause = statement.importClause;
+    if (!clause || clause.isTypeOnly) {
+      return [];
+    }
+    const bindings = clause.namedBindings;
+    const named =
+      bindings && ts.isNamedImports(bindings)
+        ? bindings.elements.flatMap((element) =>
+            element.isTypeOnly ? [] : [element.name.text]
+          )
+        : [];
+    return [
+      ...(clause.name ? [clause.name.text] : []),
+      ...(bindings && ts.isNamespaceImport(bindings)
+        ? [bindings.name.text]
+        : named),
+    ];
   }
-  return inHashGroup ? titleSlug(node, frontmatter) : null;
+  if (ts.isVariableStatement(statement)) {
+    return statement.declarationList.declarations.flatMap((declaration) =>
+      patternNames(declaration.name)
+    );
+  }
+  if (
+    (ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement)) &&
+    statement.name
+  ) {
+    return [statement.name.text];
+  }
+  return [];
 };
 
-/**
- * The names an import clause binds: `a`, `* as ns`, and `{ b as c, d }` bind
- * `a`, `ns`, `c`, and `d`.
- */
-const clauseBindings = (source: string): string[] => {
-  const names: string[] = [];
-  // Comments may sit between the names; the lexer leaves them in the clause.
-  const clause = source.replaceAll(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/gu, " ");
-  const named = /\{(?<list>[^}]*)\}/u.exec(clause);
-  for (const part of named?.groups?.list?.split(",") ?? []) {
-    const name = part
-      .split(/\sas\s/u)
-      .at(-1)
-      ?.trim();
-    if (name) {
-      names.push(name);
-    }
-  }
-  for (const part of clause.replace(/\{[^}]*\}/u, "").split(",")) {
-    const name = part.replace(/^\s*\*\s*as\s/u, "").trim();
-    if (name) {
-      names.push(name);
-    }
-  }
-  return names;
-};
+// How the page's statements are read: TypeScript and JSX both parse.
+const MODULE_FILE = "page.tsx";
 
 /**
  * The names the page's `import` and `export` statements bind. In MDX a tag
  * named by one is the page's own component, not the built-in. `null` when
- * the statements can't be read.
+ * the statements don't parse, so what they bind can't be known.
  */
 const moduleBindings = (tree: Root): Set<string> | null => {
-  const names = new Set<string>();
-  for (const child of tree.children) {
-    if (child.type !== "mdxjsEsm") {
-      continue;
-    }
-    let lexed: ReturnType<typeof parseModule>;
-    try {
-      lexed = parseModule(child.value);
-    } catch {
-      return null;
-    }
-    const [imports, exports] = lexed;
-    for (const entry of imports) {
-      // `export { a } from "x"` is listed as an import too, but binds nothing.
-      if (
-        entry.type === "static" &&
-        !entry.typeOnly &&
-        !child.value.startsWith("export", entry.importStart)
-      ) {
-        // The clause between `import` and the specifier's opening quote.
-        const clause = child.value
-          .slice(entry.importStart, entry.start - 1)
-          .replace(/^import(?![\w$])\s*(?:(?:defer|source)\s+)?/u, "")
-          .replace(/\s*from\s*$/u, "");
-        for (const name of clauseBindings(clause)) {
-          names.add(name);
-        }
-      }
-    }
-    for (const entry of exports) {
-      // Only a value declaration binds a name; a type or a re-export doesn't.
-      if (entry.type === "direct" && !entry.typeOnly && entry.localName) {
-        names.add(entry.localName);
-      }
-    }
+  const source = tree.children
+    .flatMap((child) => (child.type === "mdxjsEsm" ? [child.value] : []))
+    .join("\n");
+  if (!source) {
+    return new Set();
   }
-  return names;
+  const { diagnostics = [] } = ts.transpileModule(source, {
+    compilerOptions: {
+      jsx: ts.JsxEmit.Preserve,
+      module: ts.ModuleKind.ESNext,
+      target: ts.ScriptTarget.ESNext,
+    },
+    fileName: MODULE_FILE,
+    reportDiagnostics: true,
+  });
+  if (diagnostics.length > 0) {
+    return null;
+  }
+  const file = ts.createSourceFile(
+    MODULE_FILE,
+    source,
+    ts.ScriptTarget.Latest,
+    false,
+    ts.ScriptKind.TSX
+  );
+  return new Set(file.statements.flatMap(statementBindings));
 };
 
 /**
@@ -263,11 +278,10 @@ const INERT_ELEMENTS = new Set([
 /**
  * Whether a node's content renders where an id in it lands: Markdown does, as
  * do a container directive's body (`:::note`), an HTML element whose content
- * is markup, and a built-in that shows its children (a `<CodeBlock>` only
+ * is markup, and a built-in in {@link RENDERS_CHILDREN} (a `<CodeBlock>` only
  * without `code`). A directive's label, a text or leaf directive, and an
- * unreferenced footnote can be written out as text or not at all, and a
- * built-in that shows no children, or any other component, may not render
- * its content.
+ * unreferenced footnote can be written out as text or not at all, and any
+ * other component may not render its content.
  */
 const rendersChildren = (
   node: Nodes,
@@ -297,7 +311,7 @@ const rendersChildren = (
   if (name === "CodeBlock") {
     return readProp(node, "code", frontmatter) === undefined;
   }
-  return BUILTIN_CHILD_PROPS.has(name);
+  return RENDERS_CHILDREN.has(name);
 };
 
 /**
@@ -305,40 +319,55 @@ const rendersChildren = (
  * targets `blume validate` accepts alongside heading slugs and raw HTML ids.
  * Each mirrors its component:
  *
- * - `<AccordionItem>`: its `id`, else its `title` slugged.
+ * - `<AccordionItem>`: its `id`, else its `title` slugged
+ *   ({@link componentAnchorId}).
  * - `<Expandable>`: an accordion item with its `title`. An untitled one shows
  *   the localized "Show more", so it has no id that holds in every locale.
- * - `<Tab>`: see {@link tabFragment}. `<CodeGroup>`, `<RequestExample>`, and
- *   `<ResponseExample>` render their tabs in a group that doesn't open from
- *   the hash.
+ * - `<Tab>`: its `id`, which `Tab.astro` always renders, and, in a `<Tabs>`
+ *   group that opens from the hash ({@link opensFromHash}), its title
+ *   slugged, the hash key a tab without an `id` answers to. `<CodeGroup>`,
+ *   `<RequestExample>`, and `<ResponseExample>` render their tabs in a group
+ *   that doesn't open from the hash.
  *
  * An id counts when it is on the page, as a heading's does, whether or not
- * its panel or accordion is open.
+ * its panel or accordion is open. Accordions (expandables included) are
+ * de-duplicated as their script does it (see {@link dedupe}).
  *
- * Only content that renders is walked: see {@link rendersChildren}.
- *
- * Accordions (expandables included) are de-duplicated as their script does
- * it (see {@link dedupe}).
- * Content that never renders on the web page gives none: a `<Prompt>`'s,
- * and a `<Visibility for="agents">`'s. Prop expressions are read as literal
- * data, with `frontmatter` behind `frontmatter.<key>`. A tag the page imports
- * or exports itself is its own component, so neither it nor its content
- * counts; one `components.ts` overrides is still read as the built-in. The
- * body is parsed only when a cheap test finds a candidate; one MDX can't
- * parse, or whose statements can't be read, gives none.
+ * Only content that renders is walked (see {@link rendersChildren}): not a
+ * `<Prompt>`'s, a `<Visibility for="agents">`'s, or that of a component the
+ * page imports or exports itself or the project provides (`ownComponents`),
+ * which may not render it. Prop expressions are read as literal data, with
+ * `frontmatter` behind `frontmatter.<key>`. The body is parsed only when a
+ * cheap test finds a candidate; one MDX can't parse, or whose statements
+ * don't parse, gives none.
  */
 export const extractComponentAnchors = (
   body: string,
-  frontmatter?: Frontmatter
+  options: ComponentAnchorOptions = {}
 ): string[] => {
   if (!ID_HINT.test(body)) {
     return [];
   }
-  const tree = parseMdxBody(body);
-  const bound = tree?.type === "root" ? moduleBindings(tree) : null;
-  if (!(tree && bound)) {
+  let tree: Nodes;
+  try {
+    tree = mdxToMdast(body, { features: MDX_BODY_FEATURES });
+  } catch {
     return [];
   }
+  const bound = tree.type === "root" ? moduleBindings(tree) : null;
+  if (!bound) {
+    return [];
+  }
+  const { frontmatter, ownComponents } = options;
+  // A tag is the page's or the project's own when its name, or the object a
+  // member tag (`Tree.Folder`) reads, is.
+  const isOwn = (name: string): boolean => {
+    const [object = name] = name.split(".");
+    return [name, object].some(
+      (candidate) =>
+        bound.has(candidate) || ownComponents?.has(candidate) === true
+    );
+  };
   const accordions: (string | null)[] = [];
   const tabs: string[] = [];
   const walk = (node: Nodes, inHashGroup: boolean): void => {
@@ -347,15 +376,10 @@ export const extractComponentAnchors = (
       node.type === "mdxJsxFlowElement" ||
       node.type === "mdxJsxTextElement"
     ) {
-      if (node.name && bound.has(node.name)) {
-        // The page's own component: what it and its content render can't be
-        // known here.
+      if (node.name && isOwn(node.name)) {
         return;
       }
       switch (node.name) {
-        case "Prompt": {
-          return;
-        }
         case "Visibility": {
           // `Visibility.astro` renders nothing on the web for `for="agents"`.
           const audience = readProp(node, "for", frontmatter);
@@ -365,11 +389,12 @@ export const extractComponentAnchors = (
           break;
         }
         case "AccordionItem": {
-          accordions.push(accordionItemId(node, frontmatter));
+          accordions.push(anchorOf(node, frontmatter));
           break;
         }
         case "Expandable": {
-          accordions.push(titleSlug(node, frontmatter));
+          const title = stringProp(node, "title", frontmatter);
+          accordions.push(isString(title) ? componentSlug(title) : null);
           break;
         }
         case "Tabs": {
@@ -383,7 +408,7 @@ export const extractComponentAnchors = (
           break;
         }
         case "Tab": {
-          const fragment = tabFragment(node, inHashGroup, frontmatter);
+          const fragment = anchorOf(node, frontmatter, inHashGroup);
           if (fragment !== null) {
             tabs.push(fragment);
           }

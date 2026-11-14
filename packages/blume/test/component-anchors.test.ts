@@ -1,16 +1,29 @@
 import { describe, expect, it } from "bun:test";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 
 import { join } from "pathe";
 
-import { extractComponentAnchors } from "../src/core/component-anchors.ts";
+import { BUILTIN_MDX_TAGS } from "../src/core/builtin-tags.ts";
+import {
+  extractComponentAnchors,
+  RENDERS_CHILDREN,
+} from "../src/core/component-anchors.ts";
 import { normalizeEntry } from "../src/core/sources/normalize.ts";
 
+const COMPONENTS = join(import.meta.dir, "../src/components");
+
+/** A built-in's `.astro` file: `Tree.Folder` is `content/TreeFolder.astro`. */
+const componentFile = (tag: string): string | undefined =>
+  ["content", "openapi"]
+    .map((dir) => join(COMPONENTS, dir, `${tag.replace(".", "")}.astro`))
+    .find((file) => existsSync(file));
+
+/**
+ * A component's source with every run of whitespace read as one space, so a
+ * reformat or a CRLF checkout (Windows) doesn't move what a test pins.
+ */
 const componentSource = (tag: string): string =>
-  readFileSync(
-    join(import.meta.dir, "../src/components/content", `${tag}.astro`),
-    "utf-8"
-  );
+  readFileSync(componentFile(tag) ?? "", "utf-8").replaceAll(/\s+/gu, " ");
 
 describe("component ids", () => {
   it("mirror what each component renders", () => {
@@ -18,8 +31,9 @@ describe("component ids", () => {
     // made there too.
     const accordionItem = componentSource("AccordionItem");
     expect(accordionItem).toContain(
-      "const accordionId = id ?? componentSlug(title);"
+      "const accordionId = componentAnchorId(id, title);"
     );
+    expect(accordionItem).toContain(" id={accordionId} ");
     expect(accordionItem).toContain(
       // oxlint-disable-next-line no-template-curly-in-string -- script source under test
       "accordion.id = `${accordion.id}-${count + 1}`;"
@@ -28,12 +42,12 @@ describe("component ids", () => {
       "<AccordionItem defaultOpen={defaultOpen} title={title}>"
     );
     const tab = componentSource("Tab");
-    expect(tab).toContain("const tabId = id ?? componentSlug(title);");
-    expect(tab).toContain("  id={id}\n");
-    expect(tab).toContain("  data-tab-id={tabId}\n");
+    expect(tab).toContain("const tabId = componentAnchorId(id, title);");
+    expect(tab).toContain(" id={id} ");
+    expect(tab).toContain(" data-tab-id={tabId} ");
     const tabs = componentSource("Tabs");
-    expect(tabs).toContain("  hash = true,\n");
-    expect(tabs).toContain("  data-param={param}\n");
+    expect(tabs).toContain(" hash = true, ");
+    expect(tabs).toContain(" data-param={param} ");
     expect(tabs).toContain('const hashEnabled = String(hash) !== "false";');
     expect(tabs).toContain("return this.dataset.param || null;");
     expect(tabs).toContain(
@@ -51,6 +65,36 @@ describe("component ids", () => {
     const visibility = componentSource("Visibility");
     expect(visibility).toContain('const { for: audience = "humans" }');
     expect(visibility).toContain('const visibleOnWeb = audience !== "agents";');
+  });
+});
+
+// A component renders its children with `<slot />`, or by rendering the
+// slot to HTML (`<Tooltip>`'s label). `<Prompt>` renders it to Markdown
+// text to copy, so ids in it never land on the page.
+const rendersSlot = (tag: string): boolean => {
+  const source = componentSource(tag);
+  return (
+    source.includes("<slot") ||
+    (tag !== "Prompt" && source.includes('Astro.slots.render("default")'))
+  );
+};
+
+describe("RENDERS_CHILDREN", () => {
+  it("lists each built-in that renders its children", () => {
+    for (const tag of RENDERS_CHILDREN) {
+      expect({ renders: rendersSlot(tag), tag }).toStrictEqual({
+        renders: true,
+        tag,
+      });
+    }
+    for (const tag of BUILTIN_MDX_TAGS) {
+      if (componentFile(tag) && rendersSlot(tag)) {
+        expect({ listed: RENDERS_CHILDREN.has(tag), tag }).toStrictEqual({
+          listed: true,
+          tag,
+        });
+      }
+    }
   });
 });
 
@@ -294,6 +338,77 @@ describe(extractComponentAnchors, () => {
     expect(extractComponentAnchors(body)).toStrictEqual([]);
   });
 
+  it("reads the page's statements when an export holds JSX", () => {
+    const body = [
+      "export const Note = () => <span>x</span>;",
+      "",
+      '<AccordionItem title="Slow installs">a</AccordionItem>',
+      '<Note><AccordionItem id="in-note" title="x">b</AccordionItem></Note>',
+    ].join("\n");
+    expect(extractComponentAnchors(body)).toStrictEqual(["slow-installs"]);
+  });
+
+  it("finds every name a declaration or a typed import binds", () => {
+    const body = [
+      'import { type AccordionItem, Tab } from "./ui.js";',
+      "export const { Expandable, list: [Tabs] } = ui;",
+      "export function Visibility() {}",
+      "export class Prompt {}",
+      "",
+      '<AccordionItem title="Type only">a</AccordionItem>',
+      '<Tab id="mine">b</Tab>',
+      '<Expandable title="Destructured">c</Expandable>',
+      '<Tabs><Tab id="nested">d</Tab></Tabs>',
+      '<Visibility><AccordionItem id="declared" title="x">e</AccordionItem></Visibility>',
+      '<Prompt><AccordionItem id="class" title="x">f</AccordionItem></Prompt>',
+    ].join("\n");
+    // Only a type-only import leaves its tag the built-in.
+    expect(extractComponentAnchors(body)).toStrictEqual(["type-only"]);
+  });
+
+  it("skips the project's own components, and what they hold", () => {
+    const body = [
+      '<AccordionItem title="Overridden">a</AccordionItem>',
+      '<Callout><Expandable title="In a callout">b</Expandable></Callout>',
+      '<Tree><Tree.Folder name="a"><Tab id="in-tree">c</Tab></Tree.Folder></Tree>',
+      '<Tree.Folder name="b"><Tab id="in-folder">d</Tab></Tree.Folder>',
+      '<Expandable title="Built in">e</Expandable>',
+    ].join("\n");
+    expect(
+      extractComponentAnchors(body, {
+        ownComponents: new Set(["AccordionItem", "Callout", "Tree"]),
+      })
+    ).toStrictEqual(["built-in"]);
+    expect(extractComponentAnchors(body)).toStrictEqual([
+      "overridden",
+      "in-a-callout",
+      "built-in",
+      "in-tree",
+      "in-folder",
+    ]);
+  });
+
+  it("walks into the field, tree, and color built-ins", () => {
+    const body = [
+      '<ResponseField name="user" type="object">',
+      '  <Expandable title="User properties">',
+      '    <ParamField path="id"><Tab id="param">a</Tab></ParamField>',
+      "  </Expandable>",
+      "</ResponseField>",
+      '<Color><Color.Row title="Brand"><Tab id="color">b</Tab></Color.Row></Color>',
+      '<FileTree><Tab id="file-tree">c</Tab></FileTree>',
+      '<TypeTable type={{}}><Tab id="type-table">d</Tab></TypeTable>',
+      '<Diff><Tab id="diff">e</Tab></Diff>',
+    ].join("\n");
+    expect(extractComponentAnchors(body)).toStrictEqual([
+      "user-properties",
+      "param",
+      "color",
+      "file-tree",
+      "type-table",
+    ]);
+  });
+
   it("suffixes repeated accordion ids, as the accordion script does", () => {
     const body = [
       '<AccordionItem title="Bug fixes">a</AccordionItem>',
@@ -318,7 +433,9 @@ describe(extractComponentAnchors, () => {
       "<AccordionItem title={frontmatter.faq}>e</AccordionItem>",
     ].join("\n");
     expect(
-      extractComponentAnchors(body, { faq: "From front matter" })
+      extractComponentAnchors(body, {
+        frontmatter: { faq: "From front matter" },
+      })
     ).toStrictEqual([
       "double",
       "single",
@@ -415,7 +532,7 @@ describe("normalizeEntry component anchors", () => {
     "</Accordion>",
     "",
   ].join("\n");
-  const anchorsOf = (format: "md" | "mdx") =>
+  const anchorsOf = (format: "md" | "mdx", forValidate = true) =>
     normalizeEntry(
       {
         body: { format, text: body },
@@ -423,7 +540,13 @@ describe("normalizeEntry component anchors", () => {
         ref: `guide.${format}`,
         sourcePath: `/docs/guide.${format}`,
       },
-      ctx
+      forValidate
+        ? {
+            ...ctx,
+            mdxAnchors: (text, frontmatter) =>
+              extractComponentAnchors(text, { frontmatter }),
+          }
+        : ctx
     ).pages[0]?.anchors;
 
   it("adds the ids built-in components render on .mdx pages", () => {
@@ -436,5 +559,9 @@ describe("normalizeEntry component anchors", () => {
 
   it("leaves .md pages, which render no components, to raw HTML ids", () => {
     expect(anchorsOf("md")).toStrictEqual(["raw"]);
+  });
+
+  it("reads no component ids on a scan that doesn't validate links", () => {
+    expect(anchorsOf("mdx", false)).toStrictEqual(["raw"]);
   });
 });

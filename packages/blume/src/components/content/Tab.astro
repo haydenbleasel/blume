@@ -1,6 +1,6 @@
 ---
 import Icon from "../Icon.astro";
-import { componentSlug } from "../slug.ts";
+import { componentAnchorId } from "../slug.ts";
 
 interface Props {
   class?: string;
@@ -11,7 +11,7 @@ interface Props {
 }
 
 const { class: className, icon, id, style, title } = Astro.props;
-const tabId = id ?? componentSlug(title);
+const tabId = componentAnchorId(id, title);
 ---
 
 {/*

@@ -1,3 +1,4 @@
+import type { EvaluatedValue } from "../../ai/component-markdown.ts";
 import type {
   FolderMeta,
   FrontmatterExtend,
@@ -193,6 +194,12 @@ export interface ContentSource {
 }
 
 /** Context passed to `normalizeEntry`, describing the owning source. */
+/** Reads extra fragment targets from an `.mdx` body and its front matter. */
+export type MdxAnchorReader = (
+  body: string,
+  frontmatter: Record<string, EvaluatedValue>
+) => string[];
+
 export interface NormalizeContext {
   source: {
     monolingual?: boolean;
@@ -207,6 +214,13 @@ export interface NormalizeContext {
   /** Opt-in custom frontmatter keys (`frontmatter.extend`), schema per key. */
   frontmatterExtend?: FrontmatterExtend;
   i18n?: ResolvedI18nConfig;
+  /**
+   * Reads the fragments an `.mdx` body answers to beyond its headings and raw
+   * HTML ids (`extractComponentAnchors`), added to the page's `anchors`. Only
+   * `blume validate` checks links against those, so only its scan passes
+   * this, and every other scan skips the MDX parse it costs.
+   */
+  mdxAnchors?: MdxAnchorReader;
   /**
    * Per-type custom frontmatter keys (`content.types.<type>.frontmatter`),
    * applied to a page only when its resolved `type` matches.

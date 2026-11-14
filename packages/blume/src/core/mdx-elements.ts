@@ -15,9 +15,6 @@ import type { ElementUse } from "./types.ts";
  * - `prop`: a built-in that shows its children (see `BUILTIN_CHILD_PROPS`),
  *   used without any, with props it doesn't take. Those are ignored, so the
  *   element renders without the content they carry.
- *
- * {@link parseMdxBody} parses a body once for this walk and for
- * `component-anchors.ts`.
  */
 
 /** A JSX element in an `.mdx` body's tree, flow or inline. */
@@ -116,28 +113,6 @@ const elementUse = (
     : undefined;
 };
 
-// The last body parsed and its tree, `null` when MDX couldn't parse it.
-let lastParse: { body: string; tree: Nodes | null } | undefined;
-
-/**
- * An `.mdx` body's tree, or `null` for a body MDX can't parse (it fails to
- * render with its own error). The last body's tree is kept, because a scan
- * hands the same body to this module's walk and to `extractComponentAnchors`
- * (`component-anchors.ts`) in a row. Callers only read the tree.
- */
-export const parseMdxBody = (body: string): Nodes | null => {
-  if (lastParse?.body !== body) {
-    let tree: Nodes | null;
-    try {
-      tree = mdxToMdast(body, { features: MDX_BODY_FEATURES });
-    } catch {
-      tree = null;
-    }
-    lastParse = { body, tree };
-  }
-  return lastParse.tree;
-};
-
 /**
  * Every element in an `.mdx` body whose props don't render as written (see
  * the module comment), in source order, its line shifted by `lineOffset`. The
@@ -151,8 +126,10 @@ export const extractElementUses = (
   if (!(HANDLER_HINT.test(body) || CHILDLESS_HINT.test(body))) {
     return [];
   }
-  const tree = parseMdxBody(body);
-  if (!tree) {
+  let tree: Nodes;
+  try {
+    tree = mdxToMdast(body, { features: MDX_BODY_FEATURES });
+  } catch {
     return [];
   }
   const uses: ElementUse[] = [];
@@ -172,6 +149,12 @@ export const extractElementUses = (
       }
     }
   };
-  walk(tree);
+  try {
+    walk(tree);
+  } catch {
+    // Nesting deep enough to overflow the stack: report none rather than
+    // fail the scan.
+    return [];
+  }
   return uses;
 };

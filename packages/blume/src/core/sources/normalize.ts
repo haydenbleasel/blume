@@ -11,7 +11,6 @@ import { MARKDOWN_FEATURES } from "../../markdown/features.ts";
 import { mountBasePath } from "../base-path.ts";
 import { nextFenceState } from "../code-fences.ts";
 import type { FenceState } from "../code-fences.ts";
-import { extractComponentAnchors } from "../component-anchors.ts";
 import { diagnosticsFromIssues, diagnosticsFromZod } from "../diagnostics.ts";
 import {
   headingSlug,
@@ -2525,14 +2524,14 @@ export const normalizeEntry = (
   const bodyText = entry.expanded?.text ?? entry.body.text;
   const scanned = scanBody(bodyText);
   const { curlyMarkers, headings } = scanned;
-  // Fragments built-in components answer to (`<AccordionItem id>`), and
-  // components exist only in `.mdx`.
+  // On a scan for `blume validate`, the fragments built-in components answer
+  // to (`<AccordionItem id>`) too; components exist only in `.mdx`.
   const anchors =
-    format === "mdx"
+    format === "mdx" && ctx.mdxAnchors
       ? [
           ...new Set([
             ...scanned.anchors,
-            ...extractComponentAnchors(
+            ...ctx.mdxAnchors(
               bodyText,
               // SAFETY: front matter is parsed data (YAML, or a source's
               // JSON), which the static reader only walks to a value; nothing
