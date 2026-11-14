@@ -22,6 +22,7 @@ import {
   updateDevLockPort,
 } from "../dev-lock.ts";
 import { refuseIfEjected } from "../eject-scripts.ts";
+import { leaveUnhandledRejectionsToAstro } from "../fatal-errors.ts";
 import { normalizeHost } from "../host-args.ts";
 import {
   logger,
@@ -160,6 +161,10 @@ export const devCommand = defineCommand({
       reportDiagnostics(await astroBuildDiagnostics(error, { root }), root);
       process.exit(1);
     }
+    // Astro's dev server now handles unhandled rejections itself and keeps
+    // serving, as `astro dev` does. Since Astro 7.3.3 a config restart can
+    // strand a request while the dev app is still compiling.
+    leaveUnhandledRejectionsToAstro();
 
     // Vite bumps to the next free port when the default is taken, so record
     // the port the server actually bound — the lock's URL is what a refused
