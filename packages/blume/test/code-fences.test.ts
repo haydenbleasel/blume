@@ -12,6 +12,15 @@ const depths = (lines: string[]): (number | null)[] => {
   });
 };
 
+/** Whether a fence is open after each of `lines`, with or without math. */
+const open = (lines: string[], math: boolean): boolean[] => {
+  let fence: FenceState = null;
+  return lines.map((line) => {
+    fence = nextFenceState(line, fence, math);
+    return fence !== null;
+  });
+};
+
 describe(nextFenceState, () => {
   it("reads a fence inside a block quote past its markers", () => {
     expect(
@@ -63,6 +72,32 @@ describe(nextFenceState, () => {
       0,
       null,
       null,
+    ]);
+  });
+
+  it("reads `$$` block math as a fence only when asked", () => {
+    const block = ["$$", String.raw`\sum_{i=1}^{n}`, "$$", "after"];
+    expect(open(block, true)).toStrictEqual([true, true, false, false]);
+    expect(open(block, false)).toStrictEqual([false, false, false, false]);
+    // A `$` after the run makes the line inline math, and a closer must be a
+    // bare run at least as long as the opener.
+    expect(
+      open(["$$x$$", "$$ tex", "$$ x", "$$$", "$$$$", "$$"], true)
+    ).toStrictEqual([false, true, true, false, true, true]);
+    // Math and code each hold the other's delimiter as content.
+    expect(open(["$$", "```", "$$", "```", "$$", "```"], true)).toStrictEqual([
+      true,
+      true,
+      false,
+      true,
+      true,
+      false,
+    ]);
+    // A quoted math block ends with its quote.
+    expect(open(["> $$", "> x", "after"], true)).toStrictEqual([
+      true,
+      true,
+      false,
     ]);
   });
 });
