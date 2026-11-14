@@ -171,7 +171,7 @@
   },
   "dependencies": {
     "@astrojs/check": "^0.9.10",
-    "@astrojs/markdown-satteri": "^0.4.1",
+    "@astrojs/markdown-satteri": "^0.4.3",
     "@astrojs/mdx": "^8.0.2",
     "@astrojs/node": "^11.1.9",
     "@astrojs/react": "^7.0.0",
@@ -195,7 +195,7 @@
     "@vercel/analytics": "^2.0.1",
     "@vitejs/plugin-react": "6.1.1",
     "ai": "^7.0.157",
-    "astro": "^7.3.2",
+    "astro": "^7.3.6",
     "chokidar": "^5.0.0",
     "citty": "^0.2.2",
     "consola": "^3.4.2",
