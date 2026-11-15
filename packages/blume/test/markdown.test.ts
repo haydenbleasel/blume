@@ -133,6 +133,24 @@ describe(toPackageCommands, () => {
     );
   });
 
+  it("normalizes --save-exact and --exact to -E", () => {
+    // Yarn Berry rejects `--save-exact`, pnpm rejects `--exact`, and npm
+    // ignores `--exact`; `-E` pins an exact version on all of them.
+    expect(
+      toPackageCommands("npm install --save-dev --save-exact @biomejs/biome")
+    ).toStrictEqual({
+      aube: "aube add -D -E @biomejs/biome",
+      bun: "bun add -D -E @biomejs/biome",
+      npm: "npm install -D -E @biomejs/biome",
+      nub: "nub add -D -E @biomejs/biome",
+      pnpm: "pnpm add -D -E @biomejs/biome",
+      yarn: "yarn add -D -E @biomejs/biome",
+    });
+    expect(toPackageCommands("yarn add --exact react").npm).toBe(
+      "npm install -E react"
+    );
+  });
+
   it("handles a bare `npm install` as install-all", () => {
     expect(toPackageCommands("npm install")).toStrictEqual({
       aube: "aube install",
@@ -190,6 +208,38 @@ describe(toPackageCommands, () => {
     });
   });
 
+  it("puts a `--` before initializer flags on npm only", () => {
+    // npm reads flags after the initializer as its own config; the others
+    // forward them as written and would pass a `--` through to the
+    // initializer, which then ignores the flags after it.
+    const fromNpm = toPackageCommands(
+      "npm create vite@latest my-app -- --template react-ts"
+    );
+    expect(fromNpm).toStrictEqual({
+      aube: "aube create vite@latest my-app --template react-ts",
+      bun: "bun create vite@latest my-app --template react-ts",
+      npm: "npm create vite@latest my-app -- --template react-ts",
+      nub: "nub create vite@latest my-app --template react-ts",
+      pnpm: "pnpm create vite@latest my-app --template react-ts",
+      yarn: "yarn create vite@latest my-app --template react-ts",
+    });
+    expect(
+      toPackageCommands("pnpm create vite@latest my-app --template react-ts")
+    ).toStrictEqual(fromNpm);
+  });
+
+  it("leaves create flags before the initializer to the manager", () => {
+    expect(toPackageCommands("npm create -y vite@latest my-app").npm).toBe(
+      "npm create -y vite@latest my-app"
+    );
+  });
+
+  it("passes initializer flags through unrewritten", () => {
+    expect(
+      toPackageCommands("npm create foo@latest -- --save-dev --exact").pnpm
+    ).toBe("pnpm create foo@latest --save-dev --exact");
+  });
+
   it("routes global installs through each manager's global command", () => {
     expect(toPackageCommands("npm i -g vercel")).toStrictEqual({
       aube: "aube add -g vercel",
@@ -214,6 +264,26 @@ describe(toPackageCommands, () => {
 
   it("keeps run scripts on each manager", () => {
     expect(toPackageCommands("npm run build").yarn).toBe("yarn run build");
+  });
+
+  it("forwards script arguments with a single `--` on npm only", () => {
+    // pnpm passes a literal `--` through to the script, and npm would pass
+    // the second of two.
+    const fromNpm = toPackageCommands("npm run dev -- --port 3000");
+    expect(fromNpm).toStrictEqual({
+      aube: "aube run dev --port 3000",
+      bun: "bun run dev --port 3000",
+      npm: "npm run dev -- --port 3000",
+      nub: "nub run dev --port 3000",
+      pnpm: "pnpm run dev --port 3000",
+      yarn: "yarn run dev --port 3000",
+    });
+    expect(toPackageCommands("pnpm run dev --port 3000")).toStrictEqual(
+      fromNpm
+    );
+    expect(toPackageCommands("npm test -- --watch").pnpm).toBe(
+      "pnpm run test --watch"
+    );
   });
 
   it("routes a global uninstall through each manager's global command", () => {
