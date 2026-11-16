@@ -813,6 +813,7 @@ const UNCHECKED = [
   "contains",
   "dependentRequired",
   "dependentSchemas",
+  "format",
   "if",
   "maxProperties",
   "minProperties",

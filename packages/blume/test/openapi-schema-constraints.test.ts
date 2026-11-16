@@ -455,6 +455,7 @@ describe("validation", () => {
     for (const not of [
       { properties: { a: { pattern: "^a$" } } },
       { additionalProperties: false },
+      { format: "email", type: "string" },
     ]) {
       expect(validationSchema({ not }, {})).toStrictEqual({});
     }

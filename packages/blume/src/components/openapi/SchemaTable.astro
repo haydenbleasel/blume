@@ -1,17 +1,13 @@
 ---
 import data from "blume:data";
 
-import {
-  allowedValues,
-  constraints,
-  jsonLiteral,
-  type SchemaLike,
-} from "./helpers.ts";
+import type { SchemaLike } from "./helpers.ts";
 import {
   type SchemaDirection,
   type SchemaNode,
   schemaTree,
 } from "./schema-tree.ts";
+import SchemaLimits from "./SchemaLimits.astro";
 import SchemaProperty from "./SchemaProperty.astro";
 import { aroundPlaceholder, referenceStrings } from "./strings.ts";
 
@@ -41,10 +37,6 @@ const strings = referenceStrings(data, Astro.currentLocale);
 const [circularBefore, circularAfter] = aroundPlaceholder(strings.circular, "{name}");
 const [arrayBefore, arrayAfter] = aroundPlaceholder(strings.arrayOf, "{type}");
 const COMBINATORS = { "Any of": strings.anyOf, "One of": strings.oneOf };
-// A value with no fields (a variant like `{ const: "a" }` or `{ maxLength: 5 }`)
-// lists its limits and allowed values, as a property row does.
-const limits = node.kind === "type" ? constraints(node.schema, strings) : [];
-const values = node.kind === "type" ? allowedValues(node.schema) : undefined;
 ---
 
 {
@@ -70,6 +62,8 @@ const values = node.kind === "type" ? allowedValues(node.schema) : undefined;
           ))}
         </div>
       )}
+      {/* A union's own limits bind every variant, so they read first. */}
+      <SchemaLimits schema={node.schema} />
       {node.groups.map((group) => (
         <>
           <div class="text-muted-foreground text-xs">{COMBINATORS[group.label]}</div>
@@ -96,19 +90,7 @@ const values = node.kind === "type" ? allowedValues(node.schema) : undefined;
       <code class="text-foreground">
         {node.kind === "named" ? node.name : node.label}
       </code>
-      {limits.length > 0 && (
-        <div class="mt-2 text-muted-foreground text-xs">{limits.join(" · ")}</div>
-      )}
-      {values && (
-        <div class="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
-          <span class="text-muted-foreground">{strings.allowed}</span>
-          {values.map((value) => (
-            <code class="rounded bg-muted px-1 py-0.5 text-foreground">
-              {jsonLiteral(value)}
-            </code>
-          ))}
-        </div>
-      )}
+      {node.kind === "type" && <SchemaLimits schema={node.schema} />}
     </div>
   )
 }

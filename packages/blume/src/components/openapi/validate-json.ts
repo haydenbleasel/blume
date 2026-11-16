@@ -121,6 +121,9 @@ const disallowed = (
   value: JsonValue,
   schema: ValidationSchema
 ): string | undefined => {
+  if (schema.enum === undefined && schema.const === undefined) {
+    return undefined;
+  }
   const text = JSON.stringify(value, sortedKeys);
   if (
     schema.enum !== undefined &&

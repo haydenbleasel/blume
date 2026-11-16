@@ -1,0 +1,41 @@
+---
+import data from "blume:data";
+
+import {
+  allowedValues,
+  constraints,
+  jsonLiteral,
+  type SchemaLike,
+} from "./helpers.ts";
+import { referenceStrings } from "./strings.ts";
+
+interface Props {
+  /** The resolved schema whose limits and allowed values are listed. */
+  schema: SchemaLike;
+}
+
+// The lines under a schema row, a parameter, a variant, or a union: its
+// limits (`min length 1 · not "reserved"`), then the values it allows.
+const { schema } = Astro.props;
+const strings = referenceStrings(data, Astro.currentLocale);
+const limits = constraints(schema, strings);
+const values = allowedValues(schema);
+---
+
+{
+  limits.length > 0 && (
+    <div class="mt-2 text-muted-foreground text-xs">{limits.join(" · ")}</div>
+  )
+}
+{
+  values && (
+    <div class="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
+      <span class="text-muted-foreground">{strings.allowed}</span>
+      {values.map((value) => (
+        <code class="rounded bg-muted px-1 py-0.5 text-foreground">
+          {jsonLiteral(value)}
+        </code>
+      ))}
+    </div>
+  )
+}

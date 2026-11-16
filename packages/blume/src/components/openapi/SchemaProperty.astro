@@ -3,15 +3,13 @@ import data from "blume:data";
 
 import Description from "./Description.astro";
 import {
-  constraints,
-  allowedValues,
   isNullable,
-  jsonLiteral,
   resolveSchema,
   type SchemaLike,
   typeLabel,
 } from "./helpers.ts";
 import { rowExpands, type SchemaRow } from "./schema-tree.ts";
+import SchemaLimits from "./SchemaLimits.astro";
 import SchemaTable from "./SchemaTable.astro";
 import { referenceStrings } from "./strings.ts";
 
@@ -32,8 +30,6 @@ const type = typeLabel(schema);
 const description = resolved.description ?? schema.description ?? "";
 const deprecated = resolved.deprecated === true;
 const nullable = isNullable(resolved);
-const enumValues = allowedValues(resolved);
-const limits = constraints(resolved, strings);
 
 // Circles and schemas expanded elsewhere in the tree have no disclosure; the
 // type label names them.
@@ -70,23 +66,7 @@ const children = rowExpands(row) ? row.children : undefined;
       <Description class="mt-2 text-muted-foreground text-sm" text={description} />
     )
   }
-  {
-    limits.length > 0 && (
-      <div class="mt-2 text-muted-foreground text-xs">{limits.join(" · ")}</div>
-    )
-  }
-  {
-    enumValues && (
-      <div class="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
-        <span class="text-muted-foreground">{strings.allowed}</span>
-        {enumValues.map((value) => (
-          <code class="rounded bg-muted px-1 py-0.5 text-foreground">
-            {jsonLiteral(value)}
-          </code>
-        ))}
-      </div>
-    )
-  }
+  <SchemaLimits schema={resolved} />
   {
     children && (
       <details class="mt-3" open={expandAll}>

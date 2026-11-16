@@ -57,6 +57,8 @@ export type SchemaNode =
       kind: "branches";
       /** The schema's `oneOf`, then its `anyOf`: a value satisfies both. */
       groups: BranchGroup[];
+      /** The schema itself, whose own limits bind every variant. */
+      schema: SchemaLike;
       /**
        * Properties the schema declares beside its `oneOf`/`anyOf`, which
        * every variant shares; absent when it declares none.
@@ -272,6 +274,7 @@ export const schemaTree = (
       const node: Extract<SchemaNode, { kind: "branches" }> = {
         groups,
         kind: "branches",
+        schema,
       };
       if (rows.length > 0) {
         node.rows = rows;

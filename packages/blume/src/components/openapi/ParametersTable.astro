@@ -3,13 +3,12 @@ import data from "blume:data";
 
 import Description from "./Description.astro";
 import {
-  constraints,
-  jsonLiteral,
   parameterDescription,
   resolveSchema,
   type SchemaLike,
   typeLabel,
 } from "./helpers.ts";
+import SchemaLimits from "./SchemaLimits.astro";
 import { referenceStrings } from "./strings.ts";
 
 interface ParamLike {
@@ -60,8 +59,6 @@ const groups = SECTIONS.map((section) => ({
         {group.items.map((param) => {
           const resolved = resolveSchema(schemas, param.schema ?? {});
           const type = param.schema ? typeLabel(param.schema) : "string";
-          const limits = constraints(resolved, strings);
-          const enumValues = Array.isArray(resolved.enum) ? resolved.enum : null;
           const description = parameterDescription(param, schemas);
           return (
             <div class="border-border border-t py-4 first:border-t-0">
@@ -82,21 +79,7 @@ const groups = SECTIONS.map((section) => ({
               {description && (
                 <Description class="mt-2 text-muted-foreground text-sm" text={description} />
               )}
-              {limits.length > 0 && (
-                <div class="mt-2 text-muted-foreground text-xs">
-                  {limits.join(" · ")}
-                </div>
-              )}
-              {enumValues && (
-                <div class="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
-                  <span class="text-muted-foreground">{strings.allowed}</span>
-                  {enumValues.map((value) => (
-                    <code class="rounded bg-muted px-1 py-0.5 text-foreground">
-                      {jsonLiteral(value)}
-                    </code>
-                  ))}
-                </div>
-              )}
+              <SchemaLimits schema={resolved} />
             </div>
           );
         })}

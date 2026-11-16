@@ -83,6 +83,7 @@ describe("schemaTree unions with shared properties", () => {
         },
       ],
       kind: "branches",
+      schema: { oneOf: [{ type: "string" }] },
     });
   });
 });
