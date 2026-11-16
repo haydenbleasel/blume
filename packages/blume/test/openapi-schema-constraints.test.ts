@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
 import {
+  allowedValues,
   constraints,
   exampleValue,
   jsonLiteral,
@@ -152,15 +153,31 @@ describe("schema tables", () => {
       [
         "One of",
         [
-          { kind: "type", label: "string" },
-          { kind: "type", label: "string" },
+          {
+            kind: "type",
+            label: "string",
+            schema: { maxLength: 5, type: "string" },
+          },
+          {
+            kind: "type",
+            label: "string",
+            schema: { minLength: 10, type: "string" },
+          },
         ],
       ],
       [
         "Any of",
         [
-          { kind: "type", label: "string<email>" },
-          { kind: "type", label: "string<uri>" },
+          {
+            kind: "type",
+            label: "string<email>",
+            schema: { format: "email", type: "string" },
+          },
+          {
+            kind: "type",
+            label: "string<uri>",
+            schema: { format: "uri", type: "string" },
+          },
         ],
       ],
     ]);
@@ -271,6 +288,45 @@ describe("schema tables", () => {
     expect(constraints({ not: { type: "integer" } }, strings)).toStrictEqual([
       "not integer",
     ]);
+    // A not that narrows further than its wording isn't worded at all:
+    // "not object" would rule out more than `required: [a, b]` does.
+    for (const not of [
+      { required: ["a", "b"] },
+      { anyOf: [{ const: "a" }, { minLength: 3, type: "string" }] },
+    ]) {
+      expect(constraints({ not }, strings)).toStrictEqual([]);
+    }
+    // The values a schema lists: its enum, else its const.
+    expect(allowedValues({ const: null })).toStrictEqual([null]);
+    expect(allowedValues({ enum: ["a"] })).toStrictEqual(["a"]);
+    expect(allowedValues({ type: "string" })).toBeUndefined();
+    // A variant that only lists a value or a limit keeps it on its card.
+    const tagged = branchesOf(
+      schemaTree(
+        { oneOf: [{ const: "a" }, { const: "b" }], type: "string" },
+        {}
+      )
+    );
+    expect(
+      tagged?.groups[0]?.branches.map(({ label, slot }) => [label, slot.node])
+    ).toStrictEqual([
+      [
+        "",
+        {
+          kind: "type",
+          label: "string",
+          schema: { const: "a", type: "string" },
+        },
+      ],
+      [
+        "",
+        {
+          kind: "type",
+          label: "string",
+          schema: { const: "b", type: "string" },
+        },
+      ],
+    ]);
     expect(["", null, "null", 1].map(jsonLiteral)).toStrictEqual([
       '""',
       "null",
@@ -380,6 +436,42 @@ describe("validation", () => {
     expect(
       validateJson("1", STRINGS, { allOf: [{ type: "string" }] })
     ).toHaveLength(1);
+  });
+
+  it("compares const and enum objects whatever their key order", () => {
+    expect(
+      validateJson('{"b": 2, "a": 1}', STRINGS, { const: { a: 1, b: 2 } })
+    ).toStrictEqual([]);
+    expect(
+      validateJson('{"b": 2, "a": 1}', STRINGS, { enum: [{ a: 1, b: 2 }] })
+    ).toStrictEqual([]);
+  });
+
+  it("only loosens a not or a oneOf that holds a check it can't make", () => {
+    // A pattern goes unchecked, so a not of one would rule out every string.
+    expect(
+      validationSchema({ not: { pattern: "^reserved$" }, type: "string" }, {})
+    ).toStrictEqual({ type: "string" });
+    for (const not of [
+      { properties: { a: { pattern: "^a$" } } },
+      { additionalProperties: false },
+    ]) {
+      expect(validationSchema({ not }, {})).toStrictEqual({});
+    }
+    // Variants told apart only by their patterns would all match: the oneOf
+    // then checks that at least one does.
+    const patterned = validationSchema(
+      { oneOf: [{ pattern: "^a" }, { pattern: "^b" }], type: "string" },
+      {}
+    );
+    expect(patterned).toStrictEqual({
+      allOf: [{ anyOf: [{}, {}] }],
+      type: "string",
+    });
+    expect(validateJson('"abc"', STRINGS, patterned)).toStrictEqual([]);
+    expect(
+      exampleValue({ not: { pattern: "^reserved$" }, type: "string" }, {})
+    ).toBe("string");
   });
 
   it("drops a oneOf or not with a variant it can't check", () => {

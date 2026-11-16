@@ -106,19 +106,32 @@ const SILENT: ValidationStrings = {
 };
 
 /** The allowed values `value` isn't among (its `enum`, else its `const`), as JSON. */
+/**
+ * A `JSON.stringify` replacer that sorts object keys, so two equal values
+ * write the same text whatever order their keys came in.
+ */
+const sortedKeys = (_key: string, member: JsonValue): JsonValue =>
+  isJsonObject(member)
+    ? Object.fromEntries(
+        Object.entries(member).toSorted(([a], [b]) => (a < b ? -1 : 1))
+      )
+    : member;
+
 const disallowed = (
   value: JsonValue,
   schema: ValidationSchema
 ): string | undefined => {
-  const text = JSON.stringify(value);
+  const text = JSON.stringify(value, sortedKeys);
   if (
     schema.enum !== undefined &&
-    !schema.enum.some((member) => JSON.stringify(member) === text)
+    !schema.enum.some((member) => JSON.stringify(member, sortedKeys) === text)
   ) {
     return schema.enum.map((member) => JSON.stringify(member)).join(", ");
   }
-  const constant = JSON.stringify(schema.const);
-  return schema.const === undefined || constant === text ? undefined : constant;
+  return schema.const === undefined ||
+    JSON.stringify(schema.const, sortedKeys) === text
+    ? undefined
+    : JSON.stringify(schema.const);
 };
 
 /**

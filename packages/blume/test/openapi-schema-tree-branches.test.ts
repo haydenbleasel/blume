@@ -70,7 +70,13 @@ describe("schemaTree unions with shared properties", () => {
           branches: [
             {
               label: "string",
-              slot: { node: { kind: "type", label: "string" } },
+              slot: {
+                node: {
+                  kind: "type",
+                  label: "string",
+                  schema: { type: "string" },
+                },
+              },
             },
           ],
           label: "One of",

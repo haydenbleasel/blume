@@ -64,7 +64,8 @@ export type SchemaNode =
       rows?: SchemaRow[];
     }
   | { kind: "properties"; rows: SchemaRow[] }
-  | { kind: "type"; label: string };
+  /** A value with no fields; `schema` holds the limits its table lists. */
+  | { kind: "type"; label: string; schema: SchemaLike };
 
 /** One `oneOf` or `anyOf` of a schema and its variants. */
 export interface BranchGroup {
@@ -280,7 +281,7 @@ export const schemaTree = (
     if (rows.length > 0) {
       return { node: { kind: "properties", rows } };
     }
-    return { node: { kind: "type", label: typeLabel(schema) } };
+    return { node: { kind: "type", label: typeLabel(schema), schema } };
   };
 
   const tree = table(root, []);

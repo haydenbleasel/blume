@@ -352,9 +352,7 @@ export const declaresType = (schema: SchemaLike): boolean =>
     schema.additionalProperties ||
     schema.allOf ||
     schema.oneOf ||
-    schema.anyOf ||
-    schema.enum ||
-    schema.const !== undefined
+    schema.anyOf
   );
 
 /**
@@ -431,20 +429,48 @@ export type ConstraintStrings = Pick<
   | "not"
 >;
 
+/** The keywords a `not` can be worded from; any other one narrows it. */
+const WORDED = new Set([
+  "anyOf",
+  "const",
+  "deprecated",
+  "description",
+  "enum",
+  "format",
+  "title",
+  "type",
+]);
+
 /**
  * The values a `not` rules out: its `const`, its `enum`, each of its `anyOf`
- * variants, else its type.
+ * variants, else its type. `undefined` when it narrows them further, as
+ * `not: { required: [a, b] }` does: "not object" would rule out more than
+ * the schema does.
  */
-const excluded = (schema: SchemaLike): string => {
+const excluded = (schema: SchemaLike): string | undefined => {
+  if (Object.keys(schema).some((key) => !WORDED.has(key))) {
+    return undefined;
+  }
   if (schema.const !== undefined) {
     return jsonLiteral(schema.const);
   }
   if (schema.anyOf) {
-    return schema.anyOf.map(excluded).join(" | ");
+    const parts = schema.anyOf.map(excluded);
+    return parts.every((part) => part !== undefined)
+      ? parts.join(" | ")
+      : undefined;
   }
   return schema.enum
     ? schema.enum.map(jsonLiteral).join(" | ")
     : typeLabel(schema);
+};
+
+/** The values a schema allows, when it lists them: its `enum`, or its `const`. */
+export const allowedValues = (schema: SchemaLike): SpecValue[] | undefined => {
+  if (schema.enum) {
+    return schema.enum;
+  }
+  return schema.const === undefined ? undefined : [schema.const];
 };
 
 /** Human-readable validation constraints for a schema, in display order. */
@@ -471,9 +497,9 @@ export const constraints = (
   if (isString(pattern)) {
     out.push(strings.matches.replaceAll("{pattern}", () => pattern));
   }
-  if (schema.not) {
-    const value = excluded(schema.not);
-    out.push(strings.not.replaceAll("{value}", () => value));
+  const ruledOut = schema.not && excluded(schema.not);
+  if (ruledOut !== undefined) {
+    out.push(strings.not.replaceAll("{value}", () => ruledOut));
   }
   if (schema.default !== undefined) {
     const value = JSON.stringify(schema.default);
@@ -779,35 +805,118 @@ const requiredFor = (
 };
 
 /**
- * The `allOf`, `oneOf`, `anyOf`, and `not` checks, each member pruned. Each
- * `allOf` member binds on its own, so a cut one (a cycle, the depth limit)
- * is simply left out. A cut variant would check nothing, so a `oneOf` would
- * count it as a match and a `not` would reject every value: those keywords
- * are left out instead.
+ * Assertions the validator doesn't check. A pruned schema that drops one
+ * accepts values its source rejects, which is harmless on its own but not
+ * inside a `not` or a `oneOf` (see {@link variantRules}).
+ */
+const UNCHECKED = [
+  "contains",
+  "dependentRequired",
+  "dependentSchemas",
+  "if",
+  "maxProperties",
+  "minProperties",
+  "multipleOf",
+  "pattern",
+  "patternProperties",
+  "prefixItems",
+  "propertyNames",
+  "unevaluatedItems",
+  "unevaluatedProperties",
+  "uniqueItems",
+] as const;
+
+/**
+ * Pruned schemas that check less than their source: they drop an
+ * {@link UNCHECKED} assertion or `additionalProperties: false`, or a part of
+ * them was cut (a cycle, the depth limit) or is partial itself.
+ */
+const partial = new WeakSet<ValidationSchema>();
+
+const isDefined = (
+  pruned: ValidationSchema | undefined
+): pruned is ValidationSchema => pruned !== undefined;
+
+/** Whether a pruned schema checks everything its source does. */
+const isComplete = (
+  pruned: ValidationSchema | undefined
+): pruned is ValidationSchema => isDefined(pruned) && !partial.has(pruned);
+
+/**
+ * The `allOf`, `oneOf`, `anyOf`, and `not` checks, each member pruned, and
+ * whether they check less than the source. A cut or partial member accepts
+ * more than it should. That only loosens an `allOf` or an `anyOf` (a cut
+ * `allOf` member is left out, and an `anyOf` with a cut one is), but it would
+ * make a `not` reject valid values and a `oneOf` count too many matches. So
+ * such a `not` is left out, and such a `oneOf` checks only that at least one
+ * variant matches.
  */
 const variantRules = (
   resolved: SchemaLike,
   prune: (member: SchemaLike) => ValidationSchema | undefined
-): ValidationSchema => {
+): [ValidationSchema, boolean] => {
   const out: ValidationSchema = {};
-  const allOf = (resolved.allOf ?? [])
-    .map(prune)
-    .filter((member) => member !== undefined);
+  let loose = false;
+  const pruneAll = (members: SchemaLike[] = []) => {
+    const pruned = members.map(prune);
+    loose ||= !pruned.every(isComplete);
+    return pruned;
+  };
+  const allOf = pruneAll(resolved.allOf).filter(isDefined);
+  const anyOf = pruneAll(resolved.anyOf);
+  if (anyOf.length > 0 && anyOf.every(isDefined)) {
+    out.anyOf = anyOf;
+  }
+  const oneOf = pruneAll(resolved.oneOf);
+  if (oneOf.length > 0 && oneOf.every(isComplete)) {
+    out.oneOf = oneOf;
+  } else if (oneOf.length > 0 && oneOf.every(isDefined)) {
+    allOf.push({ anyOf: oneOf });
+  }
   if (allOf.length > 0) {
     out.allOf = allOf;
   }
-  for (const key of ["oneOf", "anyOf"] as const) {
-    const members = resolved[key] ?? [];
-    const pruned = members.map(prune).filter((member) => member !== undefined);
-    if (pruned.length > 0 && pruned.length === members.length) {
-      out[key] = pruned;
-    }
-  }
-  const not = resolved.not ? prune(resolved.not) : undefined;
-  if (not) {
+  const [not] = pruneAll(resolved.not ? [resolved.not] : []);
+  if (isComplete(not)) {
     out.not = not;
   }
-  return out;
+  return [out, loose];
+};
+
+/**
+ * The checks on an object's properties and a map's or array's members, and
+ * whether they check less than the source.
+ */
+const memberRules = (
+  resolved: SchemaLike,
+  prune: (member: SchemaLike) => ValidationSchema | undefined
+): [ValidationSchema, boolean] => {
+  const out: ValidationSchema = {};
+  let loose = false;
+  const pruneOne = (member: SchemaLike) => {
+    const pruned = prune(member);
+    loose ||= !isComplete(pruned);
+    return pruned;
+  };
+  const properties: Record<string, ValidationSchema> = {};
+  for (const [name, property] of Object.entries(resolved.properties ?? {})) {
+    const pruned = pruneOne(property);
+    if (pruned) {
+      properties[name] = pruned;
+    }
+  }
+  if (Object.keys(properties).length > 0) {
+    out.properties = properties;
+  }
+  const values = resolved.additionalProperties;
+  const additional = isRecord(values) ? pruneOne(values) : undefined;
+  if (additional) {
+    out.additionalProperties = additional;
+  }
+  if (resolved.items) {
+    out.items = pruneOne(resolved.items);
+  }
+  return [out, loose];
 };
 
 /**
@@ -836,33 +945,24 @@ const pruneSchema = (
   const prune = (member: SchemaLike | undefined) =>
     pruneSchema(member, schemas, depth + 1, visited, direction);
   const resolved = resolveSchema(schemas, schema);
+  const [variants, looseVariants] = variantRules(resolved, prune);
+  const [members, looseMembers] = memberRules(resolved, prune);
   const out: ValidationSchema = {
     ...valueRules(resolved),
-    ...variantRules(resolved, prune),
+    ...variants,
+    ...members,
   };
   const required = requiredFor(resolved, schemas, direction);
   if (required.length > 0) {
     out.required = required;
   }
-  if (resolved.properties) {
-    const properties: Record<string, ValidationSchema> = {};
-    for (const [name, property] of Object.entries(resolved.properties)) {
-      const pruned = prune(property);
-      if (pruned) {
-        properties[name] = pruned;
-      }
-    }
-    if (Object.keys(properties).length > 0) {
-      out.properties = properties;
-    }
-  }
-  const values = resolved.additionalProperties;
-  const additional = isRecord(values) ? prune(values) : undefined;
-  if (additional) {
-    out.additionalProperties = additional;
-  }
-  if (resolved.items) {
-    out.items = prune(resolved.items);
+  if (
+    looseVariants ||
+    looseMembers ||
+    resolved.additionalProperties === false ||
+    UNCHECKED.some((key) => resolved[key] !== undefined)
+  ) {
+    partial.add(out);
   }
   return out;
 };

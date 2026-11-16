@@ -219,10 +219,15 @@ describe("schemaTree", () => {
     expect(schemaTree(ref("Missing"), schemas)).toStrictEqual({
       kind: "type",
       label: "Missing",
+      schema: ref("Missing"),
     });
     expect(
       schemaTree({ format: "uuid", type: "string" }, schemas)
-    ).toStrictEqual({ kind: "type", label: "string<uuid>" });
+    ).toStrictEqual({
+      kind: "type",
+      label: "string<uuid>",
+      schema: { format: "uuid", type: "string" },
+    });
   });
 
   it("gives an inline object row a disclosure and a scalar row none", () => {

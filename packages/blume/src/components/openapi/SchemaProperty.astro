@@ -4,6 +4,7 @@ import data from "blume:data";
 import Description from "./Description.astro";
 import {
   constraints,
+  allowedValues,
   isNullable,
   jsonLiteral,
   resolveSchema,
@@ -31,7 +32,7 @@ const type = typeLabel(schema);
 const description = resolved.description ?? schema.description ?? "";
 const deprecated = resolved.deprecated === true;
 const nullable = isNullable(resolved);
-const enumValues = Array.isArray(resolved.enum) ? resolved.enum : null;
+const enumValues = allowedValues(resolved);
 const limits = constraints(resolved, strings);
 
 // Circles and schemas expanded elsewhere in the tree have no disclosure; the
