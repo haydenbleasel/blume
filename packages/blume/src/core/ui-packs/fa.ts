@@ -230,6 +230,7 @@ export const fa: UIStringsOverride = {
     noAuthorizationOn: "در {servers} نیازی به مجوز نیست.",
     noExamplePayload: "محموله نمونه‌ای وجود ندارد.",
     noExampleResponse: "پاسخ نمونه‌ای وجود ندارد.",
+    not: "نه {value}",
     notAllowed: "{path} باید یکی از این مقادیر باشد: {values}",
     notConnected: "متصل نیست.",
     notConnectedStream:
@@ -260,6 +261,7 @@ export const fa: UIStringsOverride = {
     response: "پاسخ",
     responses: "پاسخ‌ها",
     returns: "برمی‌گرداند",
+    schemaMismatch: "{path} با طرح‌واره‌اش منطبق نیست",
     scopes: "دامنه‌ها:",
     send: "ارسال",
     sending: "در حال ارسال…",

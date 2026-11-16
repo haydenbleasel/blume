@@ -229,6 +229,7 @@ export const vi: UIStringsOverride = {
     noAuthorizationOn: "Không cần xác thực trên {servers}.",
     noExamplePayload: "Không có payload mẫu.",
     noExampleResponse: "Không có phản hồi mẫu.",
+    not: "không phải {value}",
     notAllowed: "{path} phải là một trong: {values}",
     notConnected: "Chưa kết nối.",
     notConnectedStream:
@@ -259,6 +260,7 @@ export const vi: UIStringsOverride = {
     response: "Phản hồi",
     responses: "Phản hồi",
     returns: "Trả về",
+    schemaMismatch: "{path} không khớp với lược đồ",
     scopes: "Phạm vi:",
     send: "Gửi",
     sending: "Đang gửi…",

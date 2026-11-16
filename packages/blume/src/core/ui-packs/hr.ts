@@ -231,6 +231,7 @@ export const hr: UIStringsOverride = {
     noAuthorizationOn: "Autorizacija nije potrebna na {servers}.",
     noExamplePayload: "Nema primjera sadržaja.",
     noExampleResponse: "Nema primjera odgovora.",
+    not: "nije {value}",
     notAllowed: "Vrijednost {path} mora biti jedna od: {values}",
     notConnected: "Nije povezano.",
     notConnectedStream:
@@ -261,6 +262,7 @@ export const hr: UIStringsOverride = {
     response: "Odgovor",
     responses: "Odgovori",
     returns: "Vraća",
+    schemaMismatch: "Vrijednost {path} ne odgovara svojoj shemi",
     scopes: "Opsezi:",
     send: "Pošalji",
     sending: "Slanje…",

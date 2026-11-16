@@ -1,8 +1,8 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "bun:test";
 
+import { validationSchema } from "../src/components/openapi/helpers.ts";
 import { operationModel } from "../src/components/openapi/operation-model.ts";
 import { initPlayground } from "../src/components/openapi/playground-client.ts";
-import { validationSchema } from "../src/components/openapi/playground-schema.ts";
 import type { PlaygroundModel } from "../src/components/openapi/request.ts";
 import { validateJson } from "../src/components/openapi/validate-json.ts";
 import { EN_UI } from "../src/core/i18n-ui.ts";

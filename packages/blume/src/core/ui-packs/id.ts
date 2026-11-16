@@ -230,6 +230,7 @@ export const id: UIStringsOverride = {
     noAuthorizationOn: "Tidak perlu otorisasi di {servers}.",
     noExamplePayload: "Tidak ada contoh payload.",
     noExampleResponse: "Tidak ada contoh respons.",
+    not: "bukan {value}",
     notAllowed: "{path} harus salah satu dari: {values}",
     notConnected: "Tidak terhubung.",
     notConnectedStream:
@@ -260,6 +261,7 @@ export const id: UIStringsOverride = {
     response: "Respons",
     responses: "Respons",
     returns: "Mengembalikan",
+    schemaMismatch: "{path} tidak cocok dengan skemanya",
     scopes: "Cakupan:",
     send: "Kirim",
     sending: "Mengirim…",

@@ -7,6 +7,7 @@ import {
   parameterDescription,
   resolveSchema,
   toJson,
+  validationSchema,
 } from "./helpers.ts";
 import type {
   ComponentsLike,
@@ -14,12 +15,7 @@ import type {
   SchemaLike,
   SpecValue,
 } from "./helpers.ts";
-import {
-  declaredTypes,
-  inputValue,
-  scalarType,
-  validationSchema,
-} from "./playground-schema.ts";
+import { declaredTypes, inputValue, scalarType } from "./playground-schema.ts";
 import { bodyEncoding } from "./request.ts";
 import type {
   ParamSerialization,
@@ -184,14 +180,13 @@ const jsonContentType = (
 const bodyFields = (
   schema: SchemaLike | undefined,
   schemas: Record<string, SchemaLike>,
-  example: SpecValue
+  example: Record<string, SpecValue>
 ): PlaygroundBodyField[] | undefined => {
   const resolved = resolveSchema(schemas, schema);
   if (declaredTypes(resolved.type).some((type) => type !== "object")) {
     return undefined;
   }
   const { properties, required } = objectProperties(resolved, schemas);
-  const defaults = isExampleObject(example) ? example : undefined;
   const fields: PlaygroundBodyField[] = [];
   for (const [name, property] of properties) {
     const propertySchema = resolveSchema(schemas, property);
@@ -212,7 +207,7 @@ const bodyFields = (
       name,
       required: required.has(name),
       type,
-      value: inputValue(defaults?.[name]),
+      value: inputValue(example[name]),
     });
   }
   return fields.length > 0 ? fields : undefined;
@@ -241,9 +236,12 @@ const modelBody = (
     contentType,
     example:
       raw && isString(exampleData) ? exampleData : (toJson(exampleData) ?? ""),
-    fields: raw
-      ? undefined
-      : bodyFields(mediaType.schema, schemas, exampleData),
+    // Without an example object, typed fields would send every field empty,
+    // so the raw editor starts the body as it starts the samples: blank.
+    fields:
+      raw || !isExampleObject(exampleData)
+        ? undefined
+        : bodyFields(mediaType.schema, schemas, exampleData),
     schema: validationSchema(mediaType.schema, schemas),
   };
   const fieldEncoding =

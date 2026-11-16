@@ -232,6 +232,7 @@ export const el: UIStringsOverride = {
     noAuthorizationOn: "Δεν απαιτείται εξουσιοδότηση σε {servers}.",
     noExamplePayload: "Δεν υπάρχει παράδειγμα ωφέλιμου φορτίου.",
     noExampleResponse: "Δεν υπάρχει παράδειγμα απόκρισης.",
+    not: "όχι {value}",
     notAllowed: "Το {path} πρέπει να είναι ένα από: {values}",
     notConnected: "Χωρίς σύνδεση.",
     notConnectedStream:
@@ -262,6 +263,7 @@ export const el: UIStringsOverride = {
     response: "Απόκριση",
     responses: "Αποκρίσεις",
     returns: "Επιστρέφει",
+    schemaMismatch: "Το {path} δεν ταιριάζει με το σχήμα του",
     scopes: "Εμβέλειες:",
     send: "Αποστολή",
     sending: "Γίνεται αποστολή…",

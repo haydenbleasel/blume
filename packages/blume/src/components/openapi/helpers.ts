@@ -1,6 +1,9 @@
 import { sample } from "openapi-sampler";
 
+import type { ValidationSchema } from "./request.ts";
 import type { ReferenceStrings } from "./strings.ts";
+import { matchesSchema } from "./validate-json.ts";
+import type { JsonValue } from "./validate-json.ts";
 
 /**
  * Runtime helpers for the OpenAPI components. These operate on the parsed spec
@@ -26,6 +29,13 @@ const isString = (value: SpecValue): value is string =>
 const isNumber = (value: SpecValue): value is number =>
   typeof value === "number";
 
+const isRecord = (value: SpecValue): value is Record<string, SpecValue> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+/** A value as JSON writes it, so `""` shows and `null` differs from `"null"`. */
+export const jsonLiteral = (value: SpecValue): string =>
+  JSON.stringify(value) ?? "undefined";
+
 /** A permissive view of an OpenAPI 3.1 schema — only the fields we render. */
 export interface SchemaLike {
   $ref?: string;
@@ -44,6 +54,7 @@ export interface SchemaLike {
   allOf?: SchemaLike[];
   oneOf?: SchemaLike[];
   anyOf?: SchemaLike[];
+  not?: SchemaLike;
   additionalProperties?: boolean | SchemaLike;
   nullable?: boolean;
   deprecated?: boolean;
@@ -149,13 +160,115 @@ export const soleAllOfMember = (schema: SchemaLike): SchemaLike | undefined =>
     ? schema.allOf[0]
     : undefined;
 
+/** Bounds where two schemas on one value keep the larger, then the smaller. */
+const LOWER_BOUNDS = [
+  "exclusiveMinimum",
+  "minimum",
+  "minItems",
+  "minLength",
+  "minProperties",
+] as const;
+
+const UPPER_BOUNDS = [
+  "exclusiveMaximum",
+  "maximum",
+  "maxItems",
+  "maxLength",
+  "maxProperties",
+] as const;
+
+/**
+ * The `anyOf`, `oneOf`, and `const` of `base` that `over` replaces with a
+ * different one, each as an `allOf` member so both still bind. Tables show
+ * `over`'s, the property's own; validation checks both.
+ */
+const replacedAssertions = (base: SchemaLike, over: SchemaLike): SchemaLike[] =>
+  (["anyOf", "const", "oneOf"] as const).flatMap((key) =>
+    base[key] !== undefined &&
+    over[key] !== undefined &&
+    jsonLiteral(base[key]) !== jsonLiteral(over[key])
+      ? [{ [key]: base[key] }]
+      : []
+  );
+
+/** Two different `not`s as one that rules out what either does. */
+const bothNots = (
+  first: SchemaLike | undefined,
+  second: SchemaLike | undefined
+): SchemaLike | undefined =>
+  first && second && jsonLiteral(first) !== jsonLiteral(second)
+    ? { anyOf: [first, second] }
+    : undefined;
+
+/**
+ * Two schemas that both apply to one value, as one schema: the `required`
+ * names and `properties` of both (a property both declare merged the same
+ * way), the tighter of two bounds, the values two `enum`s share, and the
+ * `allOf` members of both. A different `anyOf`, `oneOf`, or `const` keeps
+ * both (see {@link replacedAssertions}), and two `not`s rule out what either
+ * does: a `$ref` that rules out `"reserved"` and a sibling that rules out
+ * `"forbidden"` rule out both. Any other keyword both declare takes `over`'s
+ * value, so the `description` beside a `$ref` is the property's. Two
+ * different `$ref`s can't share one node, so they stay an `allOf`.
+ */
+export const mergeSchemas = (
+  base: SchemaLike,
+  over: SchemaLike
+): SchemaLike => {
+  if (isString(base.$ref) && isString(over.$ref) && base.$ref !== over.$ref) {
+    return { allOf: [base, over] };
+  }
+  const merged: SchemaLike = { ...base, ...over };
+  if (base.required && over.required) {
+    merged.required = [...new Set([...base.required, ...over.required])];
+  }
+  if (base.properties && over.properties) {
+    const properties = { ...base.properties };
+    for (const [name, property] of Object.entries(over.properties)) {
+      const earlier = properties[name];
+      properties[name] = earlier ? mergeSchemas(earlier, property) : property;
+    }
+    merged.properties = properties;
+  }
+  for (const [keys, pick] of [
+    [LOWER_BOUNDS, Math.max],
+    [UPPER_BOUNDS, Math.min],
+  ] as const) {
+    for (const key of keys) {
+      const [first, second] = [base[key], over[key]];
+      if (isNumber(first) && isNumber(second)) {
+        merged[key] = pick(first, second);
+      }
+    }
+  }
+  if (base.enum && over.enum) {
+    const allowed = new Set(over.enum.map(jsonLiteral));
+    merged.enum = base.enum.filter((value) => allowed.has(jsonLiteral(value)));
+  }
+  const allOf = [
+    ...(base.allOf ?? []),
+    ...(over.allOf ?? []),
+    ...replacedAssertions(base, over),
+  ];
+  if (allOf.length > 0) {
+    merged.allOf = allOf;
+  }
+  const not = bothNots(base.not, over.not);
+  if (not) {
+    merged.not = not;
+  }
+  return merged;
+};
+
 /**
  * Resolve one level of `$ref` against the document's component schemas. A
  * single-member `allOf` wrapper resolves like its member, with the wrapper's
  * own keywords on top: its `description` is about this field. So does a
  * `$ref` with keywords beside it, which OpenAPI 3.1 allows and .NET writes
  * for every enum-typed property: the `description` beside the `$ref` is the
- * property's, the referenced one the type's.
+ * property's, the referenced one the type's. The keywords beside it add to
+ * the referenced schema's rather than replace them (see {@link mergeSchemas}):
+ * a `required` beside a `$ref` adds names to the ones the schema requires.
  */
 export const resolveSchema = (
   schemas: Record<string, SchemaLike>,
@@ -167,14 +280,14 @@ export const resolveSchema = (
   const member = soleAllOfMember(schema);
   if (member) {
     const { allOf: _wrapped, ...own } = schema;
-    return { ...resolveSchema(schemas, member), ...own };
+    return mergeSchemas(resolveSchema(schemas, member), own);
   }
   if (isString(schema.$ref)) {
     const name = REF_PATTERN.exec(schema.$ref)?.groups?.name;
     const target = name ? schemas[name] : undefined;
     if (target) {
       const { $ref: _ref, ...own } = schema;
-      return Object.keys(own).length > 0 ? { ...target, ...own } : target;
+      return Object.keys(own).length > 0 ? mergeSchemas(target, own) : target;
     }
   }
   return schema;
@@ -211,25 +324,63 @@ const isNullType = (schema: SchemaLike): boolean => {
 };
 
 /**
+ * The schema of a map's values: an object that names no properties of its own
+ * but takes `additionalProperties` (`true` is any value).
+ */
+const mapValues = (
+  schema: SchemaLike,
+  types: string[]
+): SchemaLike | undefined => {
+  const values = schema.additionalProperties;
+  if (schema.properties || !values || (types[0] ?? "object") !== "object") {
+    return undefined;
+  }
+  return values === true ? {} : values;
+};
+
+/**
+ * Whether a `oneOf`/`anyOf` variant says what type its value is. One that
+ * doesn't, like `{ required: ["card"] }`, narrows the schema it sits in, so
+ * it has that schema's type.
+ */
+export const declaresType = (schema: SchemaLike): boolean =>
+  Boolean(
+    schema.$ref ||
+    schema.type ||
+    schema.properties ||
+    schema.items ||
+    schema.additionalProperties ||
+    schema.allOf ||
+    schema.oneOf ||
+    schema.anyOf ||
+    schema.enum ||
+    schema.const !== undefined
+  );
+
+/**
  * A short, human-readable type label for a schema row. `$ref`s label by name
  * (`Pet`, `Pet[]`) without resolving — which also means circular refs through
  * array items can't recurse forever. A `null` member stays out of a union's
- * label: rows mark it with {@link isNullable}, as they do `type: [T, "null"]`.
- * A single-member `allOf` wrapper labels as its member; a real composition is
- * an `object`.
+ * label: rows mark it with {@link isNullable}, as they do `type: [T, "null"]`,
+ * and a variant that declares no type has the schema's own. A single-member
+ * `allOf` wrapper labels as its member; a real composition is an `object`.
+ * An object whose values are all one schema is a `map<string, T>`.
  */
 export const typeLabel = (schema: SchemaLike): string => {
   if (isString(schema.$ref)) {
     return refName(schema.$ref);
   }
-  if (schema.oneOf || schema.anyOf) {
-    const branches = schema.oneOf ?? schema.anyOf ?? [];
+  const branches = schema.oneOf ?? schema.anyOf;
+  if (branches) {
+    const { anyOf: _anyOf, oneOf: _oneOf, ...own } = schema;
     const members = branches.filter((branch) => !isNullType(branch));
     if (members.length === 0 && branches.length > 0) {
       return "null";
     }
-    const labels = members.map((branch) => typeLabel(branch));
-    return [...new Set(labels)].join(" | ") || "any";
+    const labels = members.map((branch) =>
+      typeLabel(declaresType(branch) ? branch : own)
+    );
+    return [...new Set(labels)].join(" | ") || typeLabel(own);
   }
   if (schema.allOf) {
     const member = soleAllOfMember(schema);
@@ -248,6 +399,10 @@ export const typeLabel = (schema: SchemaLike): string => {
   }
   if (types.length === 0 && isNullType(schema)) {
     return "null";
+  }
+  const values = mapValues(schema, types);
+  if (values) {
+    return `map<string, ${typeLabel(values)}>`;
   }
   const base = types[0] ?? (schema.properties ? "object" : "any");
   return schema.format ? `${base}<${schema.format}>` : base;
@@ -273,7 +428,24 @@ export type ConstraintStrings = Pick<
   | "min"
   | "minItems"
   | "minLength"
+  | "not"
 >;
+
+/**
+ * The values a `not` rules out: its `const`, its `enum`, each of its `anyOf`
+ * variants, else its type.
+ */
+const excluded = (schema: SchemaLike): string => {
+  if (schema.const !== undefined) {
+    return jsonLiteral(schema.const);
+  }
+  if (schema.anyOf) {
+    return schema.anyOf.map(excluded).join(" | ");
+  }
+  return schema.enum
+    ? schema.enum.map(jsonLiteral).join(" | ")
+    : typeLabel(schema);
+};
 
 /** Human-readable validation constraints for a schema, in display order. */
 export const constraints = (
@@ -299,6 +471,10 @@ export const constraints = (
   if (isString(pattern)) {
     out.push(strings.matches.replaceAll("{pattern}", () => pattern));
   }
+  if (schema.not) {
+    const value = excluded(schema.not);
+    out.push(strings.not.replaceAll("{value}", () => value));
+  }
   if (schema.default !== undefined) {
     const value = JSON.stringify(schema.default);
     out.push(strings.defaultValue.replaceAll("{value}", () => value));
@@ -314,8 +490,9 @@ export interface ObjectPropertySet {
 
 /**
  * The object properties a schema exposes, merging `allOf` branches so an
- * `allOf`-composed model still lists every field. Returns the properties plus
- * the merged required set.
+ * `allOf`-composed model still lists every field. A property several members
+ * declare keeps every member's constraints (see {@link mergeSchemas}).
+ * Returns the properties plus the merged required set.
  */
 export const objectProperties = (
   schema: SchemaLike,
@@ -339,7 +516,8 @@ export const objectProperties = (
       required.add(name);
     }
     for (const [name, prop] of Object.entries(resolved.properties ?? {})) {
-      properties.set(name, prop);
+      const earlier = properties.get(name);
+      properties.set(name, earlier ? mergeSchemas(earlier, prop) : prop);
     }
     for (const branch of resolved.allOf ?? []) {
       collect(branch);
@@ -353,9 +531,6 @@ export const objectProperties = (
 /** Which way an example travels: to the API, or back from it. */
 export type ExampleDirection = "request" | "response";
 
-const isRecord = (value: SpecValue): value is Record<string, SpecValue> =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
-
 /** Keywords whose values are data, not schemas, so never rewritten. */
 const DATA_KEYWORDS = new Set([
   "const",
@@ -368,25 +543,107 @@ const DATA_KEYWORDS = new Set([
 /** Keywords beside a `$ref` that give the value an example of its own. */
 const VALUE_KEYWORDS = ["const", "default", "example", "examples"];
 
+/** The keywords that hold an author's example of a value. */
+const EXAMPLE_KEYWORDS = new Set(["example", "examples"]);
+
+const requiredNames = (schema: SpecValue): string[] =>
+  isRecord(schema) && Array.isArray(schema.required)
+    ? schema.required.filter(isString)
+    : [];
+
+/**
+ * A `oneOf` narrowed to its first variant, without the properties only the
+ * other variants require. The sampler fills every declared property, so
+ * beside `oneOf: [{ required: [card] }, { required: [iban] }]` it sent both,
+ * a value that matches both variants and so neither `oneOf` allows.
+ */
+const firstVariant = (schema: Record<string, SpecValue>) => {
+  const { oneOf, properties } = schema;
+  if (!(Array.isArray(oneOf) && oneOf.length > 1 && isRecord(properties))) {
+    return schema;
+  }
+  const [first, ...others] = oneOf;
+  const kept = new Set([...requiredNames(schema), ...requiredNames(first)]);
+  const exclusive = new Set(
+    others.flatMap(requiredNames).filter((name) => !kept.has(name))
+  );
+  return {
+    ...schema,
+    oneOf: [first],
+    properties: Object.fromEntries(
+      Object.entries(properties).filter(([name]) => !exclusive.has(name))
+    ),
+  };
+};
+
+/**
+ * How one sample is built: `narrow` narrows every `oneOf` to its first
+ * variant (see {@link firstVariant}); without `declared`, the schemas'
+ * `example` and `examples` are left out, so the value is built from types,
+ * formats, `enum`s, `const`s, and `default`s alone.
+ */
+interface SampleMode {
+  declared: boolean;
+  narrow: boolean;
+}
+
+/**
+ * The candidates {@link exampleValue} tries, in order: the sample as built,
+ * then narrowed, then also without the schemas' own examples,
+ * which an example that breaks its schema (an `enum` value it no longer
+ * lists) would otherwise keep out of every sample.
+ */
+const SAMPLE_MODES: SampleMode[] = [
+  { declared: true, narrow: false },
+  { declared: true, narrow: true },
+  { declared: false, narrow: true },
+];
+
+/** A name-to-value map with `change` applied to each value. */
+const mapEntries = (
+  map: Record<string, SpecValue>,
+  change: (value: SpecValue) => SpecValue
+): Record<string, SpecValue> =>
+  Object.fromEntries(
+    Object.entries(map).map(([name, value]) => [name, change(value)])
+  );
+
+/** Keywords whose value maps names to schemas, rather than being one. */
+const SCHEMA_MAPS = new Set([
+  "$defs",
+  "definitions",
+  "dependentSchemas",
+  "patternProperties",
+  "properties",
+]);
+
 /**
  * A schema as openapi-sampler should read it: each `$ref` with an example
  * value beside it (`example`, `examples`, `default`, `const`) wrapped as a
  * single-member `allOf`, so the value is used. The sampler follows a `$ref`
  * before it looks at anything beside it, which OpenAPI 3.1 allows and .NET
  * writes, so `{ $ref: Status, example: "active" }` sampled the referenced
- * enum's first member instead.
+ * enum's first member instead. The `mode` rewrites it further.
  */
-const sampleable = (schema: SpecValue): SpecValue => {
+const sampleable = (schema: SpecValue, mode: SampleMode): SpecValue => {
   if (Array.isArray(schema)) {
-    return schema.map(sampleable);
+    return schema.map((member) => sampleable(member, mode));
   }
   if (!isRecord(schema)) {
     return schema;
   }
-  const out: Record<string, SpecValue> = {};
+  const rewritten: Record<string, SpecValue> = {};
   for (const [key, value] of Object.entries(schema)) {
-    out[key] = DATA_KEYWORDS.has(key) ? value : sampleable(value);
+    if (!DATA_KEYWORDS.has(key)) {
+      rewritten[key] =
+        SCHEMA_MAPS.has(key) && isRecord(value)
+          ? mapEntries(value, (member) => sampleable(member, mode))
+          : sampleable(value, mode);
+    } else if (mode.declared || !EXAMPLE_KEYWORDS.has(key)) {
+      rewritten[key] = value;
+    }
   }
+  const out = mode.narrow ? firstVariant(rewritten) : rewritten;
   const { $ref: ref, ...own } = out;
   if (!(isString(ref) && VALUE_KEYWORDS.some((key) => key in own))) {
     return out;
@@ -395,23 +652,28 @@ const sampleable = (schema: SpecValue): SpecValue => {
   return { ...own, allOf: [{ $ref: ref }, ...members] };
 };
 
-/** {@link sampleable} component schemas, once per document. */
-const sampleableSchemas = new WeakMap<
-  Record<string, SchemaLike>,
-  Record<string, SchemaLike>
->();
+/** {@link sampleable} component schemas, once per document and mode. */
+const sampleableSchemas = new Map(
+  SAMPLE_MODES.map((mode) => [
+    mode,
+    new WeakMap<Record<string, SchemaLike>, Record<string, SchemaLike>>(),
+  ])
+);
 
 const sampleableComponents = (
-  schemas: Record<string, SchemaLike>
+  schemas: Record<string, SchemaLike>,
+  mode: SampleMode
 ): Record<string, SchemaLike> => {
-  const cached = sampleableSchemas.get(schemas);
+  const cache = sampleableSchemas.get(mode);
+  const cached = cache?.get(schemas);
   if (cached) {
     return cached;
   }
-  // SAFETY: rewriting a `$ref` node into an `allOf` wrapper keeps every
-  // entry a schema.
-  const rewritten = sampleable(schemas) as Record<string, SchemaLike>;
-  sampleableSchemas.set(schemas, rewritten);
+  // SAFETY: each rewrite keeps every entry a schema.
+  const rewritten = mapEntries(schemas, (schema) =>
+    sampleable(schema, mode)
+  ) as Record<string, SchemaLike>;
+  cache?.set(schemas, rewritten);
   return rewritten;
 };
 
@@ -458,6 +720,164 @@ export const forDirection = (
   return out;
 };
 
+/** Recursion limit for pruned validation schemas — deep enough for real specs. */
+const MAX_SCHEMA_DEPTH = 6;
+
+/** The bounds the validator checks, copied as written. */
+const BOUNDS = [...LOWER_BOUNDS, ...UPPER_BOUNDS].filter(
+  (key) => key !== "minProperties" && key !== "maxProperties"
+);
+
+/** The checks on a value itself: its type, `null`, `enum`, `const`, and bounds. */
+const valueRules = (resolved: SchemaLike): ValidationSchema => {
+  const out: ValidationSchema = {};
+  for (const key of BOUNDS) {
+    const bound = resolved[key];
+    if (isNumber(bound)) {
+      out[key] = bound;
+    }
+  }
+  // Only a single declared type is checked: a 3.1 type array like
+  // `["string", "integer"]` accepts either, which one `type` can't say.
+  const types = nonNullTypes(resolved.type);
+  if (types.length === 1) {
+    [out.type] = types;
+  } else if (isNullType(resolved)) {
+    out.type = "null";
+  }
+  if (isNullable(resolved)) {
+    out.nullable = true;
+  }
+  if (resolved.enum) {
+    out.enum = resolved.enum;
+  }
+  if (resolved.const !== undefined) {
+    out.const = resolved.const;
+  }
+  return out;
+};
+
+/**
+ * The names a value travelling `direction` must carry. A `readOnly`
+ * property's `required` binds responses only: the server generates it, so a
+ * request body — which the prefilled example already leaves it out of —
+ * must not be told it is missing. A `writeOnly` one binds requests only.
+ */
+const requiredFor = (
+  resolved: SchemaLike,
+  schemas: Record<string, SchemaLike>,
+  direction: ExampleDirection
+): string[] => {
+  const omitted = direction === "request" ? "readOnly" : "writeOnly";
+  return (resolved.required ?? []).filter((name) => {
+    const property = resolved.properties?.[name];
+    return !(
+      property?.[omitted] === true ||
+      resolveSchema(schemas, property)[omitted] === true
+    );
+  });
+};
+
+/**
+ * The `allOf`, `oneOf`, `anyOf`, and `not` checks, each member pruned. Each
+ * `allOf` member binds on its own, so a cut one (a cycle, the depth limit)
+ * is simply left out. A cut variant would check nothing, so a `oneOf` would
+ * count it as a match and a `not` would reject every value: those keywords
+ * are left out instead.
+ */
+const variantRules = (
+  resolved: SchemaLike,
+  prune: (member: SchemaLike) => ValidationSchema | undefined
+): ValidationSchema => {
+  const out: ValidationSchema = {};
+  const allOf = (resolved.allOf ?? [])
+    .map(prune)
+    .filter((member) => member !== undefined);
+  if (allOf.length > 0) {
+    out.allOf = allOf;
+  }
+  for (const key of ["oneOf", "anyOf"] as const) {
+    const members = resolved[key] ?? [];
+    const pruned = members.map(prune).filter((member) => member !== undefined);
+    if (pruned.length > 0 && pruned.length === members.length) {
+      out[key] = pruned;
+    }
+  }
+  const not = resolved.not ? prune(resolved.not) : undefined;
+  if (not) {
+    out.not = not;
+  }
+  return out;
+};
+
+/**
+ * Prune a spec schema into the subset `validate-json.ts` understands: `$ref`s
+ * resolved inline, cycles cut (the visited set is copied per branch so a ref
+ * reused by siblings still prunes fully), depth capped. Structure beyond the
+ * cut simply goes unvalidated, so it can never block a send.
+ */
+const pruneSchema = (
+  schema: SchemaLike | undefined,
+  schemas: Record<string, SchemaLike>,
+  depth: number,
+  seen: ReadonlySet<string>,
+  direction: ExampleDirection
+): ValidationSchema | undefined => {
+  if (!schema || depth >= MAX_SCHEMA_DEPTH) {
+    return undefined;
+  }
+  let visited = seen;
+  if (isString(schema.$ref)) {
+    if (seen.has(schema.$ref)) {
+      return undefined;
+    }
+    visited = new Set(seen).add(schema.$ref);
+  }
+  const prune = (member: SchemaLike | undefined) =>
+    pruneSchema(member, schemas, depth + 1, visited, direction);
+  const resolved = resolveSchema(schemas, schema);
+  const out: ValidationSchema = {
+    ...valueRules(resolved),
+    ...variantRules(resolved, prune),
+  };
+  const required = requiredFor(resolved, schemas, direction);
+  if (required.length > 0) {
+    out.required = required;
+  }
+  if (resolved.properties) {
+    const properties: Record<string, ValidationSchema> = {};
+    for (const [name, property] of Object.entries(resolved.properties)) {
+      const pruned = prune(property);
+      if (pruned) {
+        properties[name] = pruned;
+      }
+    }
+    if (Object.keys(properties).length > 0) {
+      out.properties = properties;
+    }
+  }
+  const values = resolved.additionalProperties;
+  const additional = isRecord(values) ? prune(values) : undefined;
+  if (additional) {
+    out.additionalProperties = additional;
+  }
+  if (resolved.items) {
+    out.items = prune(resolved.items);
+  }
+  return out;
+};
+
+/**
+ * The validator-ready view of a spec schema for a value travelling
+ * `direction`; undefined when there is none.
+ */
+export const validationSchema = (
+  schema: SchemaLike | undefined,
+  schemas: Record<string, SchemaLike>,
+  direction: ExampleDirection = "request"
+): ValidationSchema | undefined =>
+  pruneSchema(schema, schemas, 0, new Set(), direction);
+
 /**
  * Build a representative example value for a schema via openapi-sampler
  * (Redoc's generator): declared `example`/`const`/`default`/`enum` values
@@ -468,6 +888,12 @@ export const forDirection = (
  * one); a response sample leaves out `writeOnly` fields (a password the
  * client sends never comes back) and keeps the `readOnly` ones. That holds
  * inside a declared value the sampler copies too (see {@link forDirection}).
+ *
+ * The sampler knows no `oneOf` or `not` rules, so every sample is checked
+ * against the whole schema, and one that fails it is never shown: the first
+ * of the {@link SAMPLE_MODES} candidates that passes, else `undefined` — no
+ * example, which a schema that only allows `null` (an example of `null`)
+ * never returns.
  */
 export const exampleValue = (
   schema: SchemaLike | undefined,
@@ -475,23 +901,30 @@ export const exampleValue = (
   direction: ExampleDirection = "request"
 ): SpecValue => {
   if (!schema) {
-    return null;
+    return undefined;
   }
   const response = direction === "response";
-  try {
-    // SAFETY: SchemaLike structurally covers the JSONSchema7 fields the
-    // sampler reads, and the sampler only ever assembles JSON values.
-    const value = sample(
-      sampleable(schema) as Parameters<typeof sample>[0],
-      { quiet: true, skipReadOnly: !response, skipWriteOnly: response },
-      { components: { schemas: sampleableComponents(schemas) } }
-    ) as SpecValue;
-    return forDirection(value, schema, schemas, direction);
-  } catch {
-    // An unresolvable $ref or malformed schema is a spec problem the schema
-    // tables already surface; a sample is best-effort.
-    return null;
+  const rules = validationSchema(schema, schemas, direction);
+  for (const mode of SAMPLE_MODES) {
+    try {
+      // SAFETY: SchemaLike structurally covers the JSONSchema7 fields the
+      // sampler reads, and the sampler only ever assembles JSON values.
+      const sampled = sample(
+        sampleable(schema, mode) as Parameters<typeof sample>[0],
+        { quiet: true, skipReadOnly: !response, skipWriteOnly: response },
+        { components: { schemas: sampleableComponents(schemas, mode) } }
+      ) as SpecValue;
+      const value = forDirection(sampled, schema, schemas, direction);
+      // SAFETY: a sampled value is assembled JSON, never `undefined` inside.
+      if (value !== undefined && matchesSchema(value as JsonValue, rules)) {
+        return value;
+      }
+    } catch {
+      // An unresolvable $ref or malformed schema is a spec problem the
+      // schema tables already surface; a sample is best-effort.
+    }
   }
+  return undefined;
 };
 
 /** Where an author can declare an example: a parameter or a media type. */

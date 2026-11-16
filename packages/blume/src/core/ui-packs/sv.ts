@@ -230,6 +230,7 @@ export const sv: UIStringsOverride = {
     noAuthorizationOn: "Ingen auktorisering krävs på {servers}.",
     noExamplePayload: "Ingen exempelpayload.",
     noExampleResponse: "Inget exempelsvar.",
+    not: "inte {value}",
     notAllowed: "{path} måste vara något av: {values}",
     notConnected: "Inte ansluten.",
     notConnectedStream:
@@ -260,6 +261,7 @@ export const sv: UIStringsOverride = {
     response: "Svar",
     responses: "Svar",
     returns: "Returnerar",
+    schemaMismatch: "{path} matchar inte sitt schema",
     scopes: "Scopes:",
     send: "Skicka",
     sending: "Skickar…",

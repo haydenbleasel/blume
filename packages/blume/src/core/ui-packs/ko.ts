@@ -229,6 +229,7 @@ export const ko: UIStringsOverride = {
     noAuthorizationOn: "{servers}에서는 인증이 필요하지 않습니다.",
     noExamplePayload: "예시 페이로드가 없습니다.",
     noExampleResponse: "예시 응답이 없습니다.",
+    not: "{value} 제외",
     notAllowed: "{path} 값은 다음 중 하나여야 합니다: {values}",
     notConnected: "연결되지 않았습니다.",
     notConnectedStream:
@@ -259,6 +260,7 @@ export const ko: UIStringsOverride = {
     response: "응답",
     responses: "응답",
     returns: "반환",
+    schemaMismatch: "{path} 값이 스키마와 일치하지 않습니다",
     scopes: "범위:",
     send: "보내기",
     sending: "보내는 중…",

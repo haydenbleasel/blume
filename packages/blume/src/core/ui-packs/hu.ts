@@ -232,6 +232,7 @@ export const hu: UIStringsOverride = {
       "Ezeken a szervereken nincs szükség hitelesítésre: {servers}.",
     noExamplePayload: "Nincs példa a hasznos adatra.",
     noExampleResponse: "Nincs példaválasz.",
+    not: "nem {value}",
     notAllowed: "{path} értéke csak a következők egyike lehet: {values}",
     notConnected: "Nincs kapcsolat.",
     notConnectedStream:
@@ -262,6 +263,7 @@ export const hu: UIStringsOverride = {
     response: "Válasz",
     responses: "Válaszok",
     returns: "Visszatérési érték",
+    schemaMismatch: "{path} nem felel meg a sémájának",
     scopes: "Hatókörök:",
     send: "Küldés",
     sending: "Küldés…",

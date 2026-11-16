@@ -2336,11 +2336,13 @@ describe("helpers", () => {
     );
     expect(exampleValue({ examples: [42] }, schemas)).toBe(42);
     expect(exampleValue({ default: "d" }, schemas)).toBe("d");
-    expect(exampleValue(undefined, schemas)).toBeNull();
-    // An unresolvable $ref makes the sampler throw; the sample is best-effort.
+    // No schema, or one the sampler can't build (an unresolvable $ref makes
+    // it throw), is no example; a schema that only allows `null` has one.
+    expect(exampleValue(undefined, schemas)).toBeUndefined();
     expect(
       exampleValue({ $ref: "#/components/schemas/Missing" }, {})
-    ).toBeNull();
+    ).toBeUndefined();
+    expect(exampleValue({ type: "null" }, schemas)).toBeNull();
     expect(toJson({ a: 1 })).toContain('"a": 1');
   });
 
@@ -2348,10 +2350,16 @@ describe("helpers", () => {
     expect(exampleValue({ const: "dog", type: "string" }, schemas)).toBe("dog");
     // const is the only valid value, so it outranks default and enum...
     expect(
-      exampleValue({ const: "dog", default: "cat", enum: ["cat"] }, schemas)
+      exampleValue(
+        { const: "dog", default: "cat", enum: ["cat", "dog"] },
+        schemas
+      )
     ).toBe("dog");
-    // ...but a declared example still wins.
-    expect(exampleValue({ const: "dog", example: "pup" }, schemas)).toBe("pup");
+    // ...and a declared example that breaks it gives way to the const.
+    expect(exampleValue({ const: "dog", example: "pup" }, schemas)).toBe("dog");
+    expect(exampleValue({ example: "pup", type: "string" }, schemas)).toBe(
+      "pup"
+    );
   });
 });
 

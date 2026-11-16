@@ -232,6 +232,7 @@ export const ro: UIStringsOverride = {
     noAuthorizationOn: "Nu este necesară autorizarea pe {servers}.",
     noExamplePayload: "Niciun exemplu de payload.",
     noExampleResponse: "Niciun exemplu de răspuns.",
+    not: "nu {value}",
     notAllowed: "{path} trebuie să fie una dintre valorile: {values}",
     notConnected: "Neconectat.",
     notConnectedStream:
@@ -262,6 +263,7 @@ export const ro: UIStringsOverride = {
     response: "Răspuns",
     responses: "Răspunsuri",
     returns: "Returnează",
+    schemaMismatch: "{path} nu corespunde schemei sale",
     scopes: "Scope-uri:",
     send: "Trimite",
     sending: "Se trimite…",

@@ -230,6 +230,7 @@ export const fi: UIStringsOverride = {
     noAuthorizationOn: "Valtuutusta ei tarvita palvelimilla {servers}.",
     noExamplePayload: "Ei esimerkkihyötykuormaa.",
     noExampleResponse: "Ei esimerkkivastausta.",
+    not: "ei {value}",
     notAllowed: "Kentän {path} on oltava jokin seuraavista: {values}",
     notConnected: "Ei yhteyttä.",
     notConnectedStream:
@@ -260,6 +261,7 @@ export const fi: UIStringsOverride = {
     response: "Vastaus",
     responses: "Vastaukset",
     returns: "Palauttaa",
+    schemaMismatch: "Kenttä {path} ei vastaa skeemaansa",
     scopes: "Laajuudet:",
     send: "Lähetä",
     sending: "Lähetetään…",

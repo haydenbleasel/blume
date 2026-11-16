@@ -232,6 +232,7 @@ export const ja: UIStringsOverride = {
     noAuthorizationOn: "{servers} では認証は不要です。",
     noExamplePayload: "ペイロードの例はありません。",
     noExampleResponse: "レスポンスの例はありません。",
+    not: "{value} 以外",
     notAllowed: "{path} は次のいずれかである必要があります: {values}",
     notConnected: "接続されていません。",
     notConnectedStream:
@@ -262,6 +263,7 @@ export const ja: UIStringsOverride = {
     response: "レスポンス",
     responses: "レスポンス",
     returns: "戻り値",
+    schemaMismatch: "{path} がスキーマに一致しません",
     scopes: "スコープ:",
     send: "送信",
     sending: "送信中…",

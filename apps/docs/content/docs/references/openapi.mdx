@@ -120,7 +120,9 @@ Schema tables follow the way the data travels, as the examples do: a request bod
 
 A body or response whose `examples` map names two or more examples shows each one, labeled by its `summary`, or by its key when it has none. A response gets a tab per example after its status (`200 · A cat`), a webhook payload one per example after its media type, and a request body an **Examples** block under its schema. The code samples and Try it start from the first.
 
-A property written as a `$ref` with keywords beside it, which OpenAPI 3.1 allows, reads those keywords over the referenced schema's. Its own `description` is the one its row shows, and its own `example` or `default` is the one the samples use.
+A property written as a `$ref` with keywords beside it, which OpenAPI 3.1 allows, reads those keywords over the referenced schema's. Its own `description` is the one its row shows, and its own `example` or `default` is the one the samples use. A `required` beside it adds to the names the referenced schema requires.
+
+A sampled example is checked against its schema, including `oneOf`, `anyOf`, `not`, `const`, and bounds, so a sample never sends both sides of a `oneOf`. When no sample passes, the page shows no example, and the code samples and Try it start without a body. Examples written into a media type's `example` or `examples` show as written.
 
 ### Your own samples
 

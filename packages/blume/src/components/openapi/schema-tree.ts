@@ -1,4 +1,5 @@
 import {
+  declaresType,
   objectProperties,
   refName,
   resolveSchema,
@@ -54,10 +55,8 @@ export type SchemaNode =
   | { kind: "array"; itemsLabel: string; items?: SchemaSlot }
   | {
       kind: "branches";
-      /** Which combinator: worded in the page's language by `SchemaTable`. */
-      label: "One of" | "Any of";
-      /** Each variant, labeled by its type (`""` when it has none). */
-      branches: { label: string; slot: SchemaSlot }[];
+      /** The schema's `oneOf`, then its `anyOf`: a value satisfies both. */
+      groups: BranchGroup[];
       /**
        * Properties the schema declares beside its `oneOf`/`anyOf`, which
        * every variant shares; absent when it declares none.
@@ -67,8 +66,27 @@ export type SchemaNode =
   | { kind: "properties"; rows: SchemaRow[] }
   | { kind: "type"; label: string };
 
+/** One `oneOf` or `anyOf` of a schema and its variants. */
+export interface BranchGroup {
+  /** Which combinator: worded in the page's language by `SchemaTable`. */
+  label: "One of" | "Any of";
+  /**
+   * Each variant, labeled by its type; `""` when it declares none, like a
+   * variant that only requires some of the schema's properties.
+   */
+  branches: { label: string; slot: SchemaSlot }[];
+}
+
+/** The row an object's `additionalProperties` schema renders as. */
+export const ADDITIONAL_PROPERTIES = "[key: string]";
+
 const isString = (value: SpecValue): value is string =>
   typeof value === "string";
+
+/** An `additionalProperties` that is a schema, not `true` or `false`. */
+const isSchema = (
+  value: boolean | SchemaLike | undefined
+): value is SchemaLike => typeof value === "object";
 
 /**
  * The `$ref` a schema stands for: its own, or its member's when it is a
@@ -82,15 +100,21 @@ const refOf = (schema: SchemaLike): string | undefined => {
 const typesOf = (schema: SchemaLike): (string | undefined)[] =>
   Array.isArray(schema.type) ? schema.type : [schema.type];
 
-/** Whether a schema has nested fields a row can disclose. */
-const hasNestedFields = (candidate: SchemaLike): boolean =>
-  Boolean(
+/**
+ * Whether a schema has nested fields a row can disclose: its own, or those of
+ * the values of a map.
+ */
+const hasNestedFields = (candidate: SchemaLike): boolean => {
+  const values = candidate.additionalProperties;
+  return Boolean(
     candidate.properties ||
     candidate.allOf ||
     candidate.oneOf ||
     candidate.anyOf ||
-    isString(candidate.$ref)
+    isString(candidate.$ref) ||
+    (isSchema(values) && hasNestedFields(values))
   );
+};
 
 /** A named schema waiting for its breadth-first turn. */
 interface PendingRef {
@@ -177,7 +201,12 @@ export const schemaTree = (
         : undefined;
     };
     const { properties, required } = objectProperties(schema, schemas);
-    const rows: SchemaRow[] = properties
+    // A map's values render as one more row, after the named properties.
+    const values = schema.additionalProperties;
+    const listed: [string, SchemaLike][] = isSchema(values)
+      ? [...properties, [ADDITIONAL_PROPERTIES, values]]
+      : properties;
+    const rows: SchemaRow[] = listed
       .filter(([, property]) => !hidden(property))
       .map(([name, property]) => ({
         children: rowChildren(property),
@@ -185,20 +214,63 @@ export const schemaTree = (
         required: required.has(name),
         schema: property,
       }));
+    /**
+     * A variant as its table shows it. One that declares no type of its own
+     * narrows this schema, so it has this schema's type, and the properties
+     * of this schema it requires are rows of its table: `{ required: [card] }`
+     * lists `card` as required rather than reading as `any`.
+     */
+    const variant = (branch: SchemaLike): SchemaLike => {
+      if (refOf(branch)) {
+        return branch;
+      }
+      const shared = new Map(properties);
+      const borrowed = (branch.required ?? []).flatMap((name) => {
+        const property = shared.get(name);
+        return property && !branch.properties?.[name]
+          ? [[name, property] as const]
+          : [];
+      });
+      const shown: SchemaLike = { ...branch };
+      if (!declaresType(branch) && schema.type) {
+        shown.type = schema.type;
+      }
+      if (borrowed.length > 0) {
+        shown.properties = {
+          ...Object.fromEntries(borrowed),
+          ...branch.properties,
+        };
+      }
+      return shown;
+    };
     // Shared properties beside a `oneOf`/`anyOf` (`amount` and `currency`
     // next to `Card | BankAccount`) render above the variants, planned first
-    // as they read first.
-    const branches = schema.oneOf ?? schema.anyOf;
-    if (branches) {
+    // as they read first. A schema with both keeps both: a value satisfies
+    // its `oneOf` and its `anyOf`.
+    const groups: BranchGroup[] = (
+      [
+        ["One of", schema.oneOf],
+        ["Any of", schema.anyOf],
+      ] as const
+    ).flatMap(([label, branches]) =>
+      branches
+        ? [
+            {
+              // An unlabeled variant renders as its position ("Option 2"),
+              // worded in the page's language by `SchemaTable`.
+              branches: branches.map((branch) => ({
+                label: declaresType(branch) ? typeLabel(branch) : "",
+                slot: table(variant(branch), ancestors),
+              })),
+              label,
+            },
+          ]
+        : []
+    );
+    if (groups.length > 0) {
       const node: Extract<SchemaNode, { kind: "branches" }> = {
-        // An unlabeled variant renders as its position ("Option 2"), worded
-        // in the page's language by `SchemaTable`.
-        branches: branches.map((branch) => ({
-          label: typeLabel(branch),
-          slot: table(branch, ancestors),
-        })),
+        groups,
         kind: "branches",
-        label: schema.oneOf ? "One of" : "Any of",
       };
       if (rows.length > 0) {
         node.rows = rows;

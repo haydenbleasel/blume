@@ -117,7 +117,7 @@ const bodyMarkdown = (
           )
         )
       : [
-          single === null || single === undefined
+          single === undefined
             ? ""
             : exampleBlock(`${heading} example`, single),
         ];

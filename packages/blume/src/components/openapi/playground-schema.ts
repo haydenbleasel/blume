@@ -1,13 +1,13 @@
-import { isNullable, resolveSchema } from "./helpers.ts";
+import { resolveSchema } from "./helpers.ts";
 import type { SchemaLike, SpecValue } from "./helpers.ts";
-import type { ValidationSchema } from "./request.ts";
 
 /**
  * Spec-schema lowering shared by both playground models — the HTTP request
  * model (`operation-model.ts`) and the event message model
- * (`message-model.ts`). Both need the same three things from a spec schema: a
- * short type label for an input, a stringified default, and a pruned schema
- * the client-side validator understands. Keeping them here is what lets the
+ * (`message-model.ts`). Both need the same things from a spec schema: a short
+ * type label for an input and a stringified default; the pruned schema the
+ * client-side validator understands is `validationSchema` in `helpers.ts`,
+ * which checks generated examples too. Keeping them here is what lets the
  * OpenAPI and AsyncAPI panels behave identically on the parts that are
  * genuinely identical.
  */
@@ -46,83 +46,3 @@ export const inputValue = (value: SpecValue): string => {
   }
   return isString(value) ? value : JSON.stringify(value);
 };
-
-/** Recursion limit for pruned validation schemas — deep enough for real specs. */
-const MAX_SCHEMA_DEPTH = 6;
-
-/** Whether a property is `readOnly`, on the property or the schema it refs. */
-const isReadOnly = (
-  property: SchemaLike | undefined,
-  schemas: Record<string, SchemaLike>
-): boolean =>
-  property?.readOnly === true ||
-  resolveSchema(schemas, property).readOnly === true;
-
-/**
- * Prune a spec schema into the tiny subset `validate-json.ts` understands:
- * `$ref`s resolved inline, cycles cut (the visited set is copied per branch so
- * a ref reused by siblings still prunes fully), depth capped. Structure beyond
- * the cut simply goes unvalidated, so it can never block a send.
- */
-const pruneSchema = (
-  schema: SchemaLike | undefined,
-  schemas: Record<string, SchemaLike>,
-  depth: number,
-  seen: ReadonlySet<string>
-): ValidationSchema | undefined => {
-  if (!schema || depth >= MAX_SCHEMA_DEPTH) {
-    return undefined;
-  }
-  let visited = seen;
-  if (isString(schema.$ref)) {
-    if (seen.has(schema.$ref)) {
-      return undefined;
-    }
-    visited = new Set(seen).add(schema.$ref);
-  }
-  const resolved = resolveSchema(schemas, schema);
-  const out: ValidationSchema = {};
-  // Only a single declared type is checked: a 3.1 type array like
-  // `["string", "integer"]` accepts either, which one `type` can't say.
-  const types = declaredTypes(resolved.type);
-  if (types.length === 1) {
-    [out.type] = types;
-  }
-  if (isNullable(resolved)) {
-    out.nullable = true;
-  }
-  if (resolved.enum) {
-    out.enum = resolved.enum;
-  }
-  // A `readOnly` property's `required` binds responses only: the server
-  // generates it, so a request body — which the prefilled example already
-  // leaves it out of — must not be told it is missing.
-  const required = (resolved.required ?? []).filter(
-    (name) => !isReadOnly(resolved.properties?.[name], schemas)
-  );
-  if (required.length > 0) {
-    out.required = required;
-  }
-  if (resolved.properties) {
-    const properties: Record<string, ValidationSchema> = {};
-    for (const [name, property] of Object.entries(resolved.properties)) {
-      const pruned = pruneSchema(property, schemas, depth + 1, visited);
-      if (pruned) {
-        properties[name] = pruned;
-      }
-    }
-    if (Object.keys(properties).length > 0) {
-      out.properties = properties;
-    }
-  }
-  if (resolved.items) {
-    out.items = pruneSchema(resolved.items, schemas, depth + 1, visited);
-  }
-  return out;
-};
-
-/** The validator-ready view of a spec schema; undefined when there is none. */
-export const validationSchema = (
-  schema: SchemaLike | undefined,
-  schemas: Record<string, SchemaLike>
-): ValidationSchema | undefined => pruneSchema(schema, schemas, 0, new Set());

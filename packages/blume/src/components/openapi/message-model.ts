@@ -10,7 +10,7 @@ import {
   payloadSchema,
   resolvedServerSecurity,
 } from "./async.ts";
-import { exampleValue, toJson } from "./helpers.ts";
+import { exampleValue, toJson, validationSchema } from "./helpers.ts";
 import type { ParameterLike, SchemaLike } from "./helpers.ts";
 import type {
   MessageModel,
@@ -18,7 +18,7 @@ import type {
   MessagePayload,
   MessageServerOption,
 } from "./message.ts";
-import { inputValue, validationSchema } from "./playground-schema.ts";
+import { inputValue } from "./playground-schema.ts";
 
 /**
  * Server-side derivation of the event composer's message model — the AsyncAPI
@@ -66,17 +66,16 @@ const messagePayload = (
   }
   const schema = payloadSchema(message);
   // `undefined` means the message declares no example, `null` means it declares
-  // an empty one — only the former falls back to a schema sample. The sampler's
-  // own `null` is its no-schema/failure sentinel, not a value a reader typed:
-  // it degrades to an empty editor (which samples and sends `{}`) rather than
-  // prefilling the literal `null`.
+  // an empty one — only the former falls back to a schema sample. A sample
+  // that is `undefined` (no schema, or none that passes it) degrades to an
+  // empty editor (which samples and sends `{}`); one that is `null` is the
+  // value its schema allows.
   const declared = message.examples?.[0]?.payload;
   const example =
     declared === undefined ? exampleValue(schema, schemas) : declared;
   return {
     contentType: message.contentType,
-    example:
-      declared === undefined && example === null ? "" : (toJson(example) ?? ""),
+    example: toJson(example) ?? "",
     schema: validationSchema(schema, schemas),
   };
 };

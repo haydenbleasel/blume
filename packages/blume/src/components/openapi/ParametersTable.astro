@@ -4,6 +4,7 @@ import data from "blume:data";
 import Description from "./Description.astro";
 import {
   constraints,
+  jsonLiteral,
   parameterDescription,
   resolveSchema,
   type SchemaLike,
@@ -91,7 +92,7 @@ const groups = SECTIONS.map((section) => ({
                   <span class="text-muted-foreground">{strings.allowed}</span>
                   {enumValues.map((value) => (
                     <code class="rounded bg-muted px-1 py-0.5 text-foreground">
-                      {String(value)}
+                      {jsonLiteral(value)}
                     </code>
                   ))}
                 </div>

@@ -230,6 +230,7 @@ export const no: UIStringsOverride = {
     noAuthorizationOn: "Ingen autorisasjon nødvendig på {servers}.",
     noExamplePayload: "Ingen eksempelpayload.",
     noExampleResponse: "Ingen eksempelsvar.",
+    not: "ikke {value}",
     notAllowed: "{path} må være én av: {values}",
     notConnected: "Ikke tilkoblet.",
     notConnectedStream:
@@ -260,6 +261,7 @@ export const no: UIStringsOverride = {
     response: "Svar",
     responses: "Svar",
     returns: "Returnerer",
+    schemaMismatch: "{path} samsvarer ikke med skjemaet sitt",
     scopes: "Scopes:",
     send: "Send",
     sending: "Sender…",

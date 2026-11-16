@@ -5,6 +5,7 @@ import Description from "./Description.astro";
 import {
   constraints,
   isNullable,
+  jsonLiteral,
   resolveSchema,
   type SchemaLike,
   typeLabel,
@@ -79,7 +80,7 @@ const children = rowExpands(row) ? row.children : undefined;
         <span class="text-muted-foreground">{strings.allowed}</span>
         {enumValues.map((value) => (
           <code class="rounded bg-muted px-1 py-0.5 text-foreground">
-            {String(value)}
+            {jsonLiteral(value)}
           </code>
         ))}
       </div>

@@ -61,15 +61,19 @@ const COMBINATORS = { "Any of": strings.anyOf, "One of": strings.oneOf };
           ))}
         </div>
       )}
-      <div class="text-muted-foreground text-xs">{COMBINATORS[node.label]}</div>
-      {node.branches.map((branch, index) => (
-        <div class="rounded-blume border border-border p-3">
-          <div class="mb-2 font-medium text-foreground text-xs">
-            {branch.label ||
-              strings.option.replaceAll("{n}", () => String(index + 1))}
-          </div>
-          <Astro.self node={branch.slot.node} schemas={schemas} expandAll={expandAll} />
-        </div>
+      {node.groups.map((group) => (
+        <>
+          <div class="text-muted-foreground text-xs">{COMBINATORS[group.label]}</div>
+          {group.branches.map((branch, index) => (
+            <div class="rounded-blume border border-border p-3">
+              <div class="mb-2 font-medium text-foreground text-xs">
+                {branch.label ||
+                  strings.option.replaceAll("{n}", () => String(index + 1))}
+              </div>
+              <Astro.self node={branch.slot.node} schemas={schemas} expandAll={expandAll} />
+            </div>
+          ))}
+        </>
       ))}
     </div>
   ) : node.kind === "properties" ? (

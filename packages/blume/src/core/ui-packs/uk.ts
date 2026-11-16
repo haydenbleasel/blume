@@ -232,6 +232,7 @@ export const uk: UIStringsOverride = {
     noAuthorizationOn: "На {servers} авторизація не потрібна.",
     noExamplePayload: "Немає прикладу корисного навантаження.",
     noExampleResponse: "Немає прикладу відповіді.",
+    not: "не {value}",
     notAllowed: "Значення {path} має бути одним із: {values}",
     notConnected: "Немає підключення.",
     notConnectedStream:
@@ -262,6 +263,7 @@ export const uk: UIStringsOverride = {
     response: "Відповідь",
     responses: "Відповіді",
     returns: "Повертає",
+    schemaMismatch: "Значення {path} не відповідає своїй схемі",
     scopes: "Області доступу:",
     send: "Надіслати",
     sending: "Надсилання…",

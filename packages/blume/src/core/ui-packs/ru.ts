@@ -232,6 +232,7 @@ export const ru: UIStringsOverride = {
     noAuthorizationOn: "На {servers} авторизация не требуется.",
     noExamplePayload: "Нет примера полезной нагрузки.",
     noExampleResponse: "Нет примера ответа.",
+    not: "не {value}",
     notAllowed: "Значение {path} должно быть одним из: {values}",
     notConnected: "Нет подключения.",
     notConnectedStream:
@@ -262,6 +263,7 @@ export const ru: UIStringsOverride = {
     response: "Ответ",
     responses: "Ответы",
     returns: "Возвращает",
+    schemaMismatch: "Значение {path} не соответствует своей схеме",
     scopes: "Области доступа:",
     send: "Отправить",
     sending: "Отправка…",

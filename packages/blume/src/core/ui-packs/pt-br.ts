@@ -232,6 +232,7 @@ export const ptBR: UIStringsOverride = {
     noAuthorizationOn: "Nenhuma autorização necessária em {servers}.",
     noExamplePayload: "Nenhum payload de exemplo.",
     noExampleResponse: "Nenhuma resposta de exemplo.",
+    not: "não {value}",
     notAllowed: "{path} deve ser um de: {values}",
     notConnected: "Não conectado.",
     notConnectedStream:
@@ -262,6 +263,7 @@ export const ptBR: UIStringsOverride = {
     response: "Resposta",
     responses: "Respostas",
     returns: "Retorna",
+    schemaMismatch: "{path} não corresponde ao seu esquema",
     scopes: "Escopos:",
     send: "Enviar",
     sending: "Enviando…",

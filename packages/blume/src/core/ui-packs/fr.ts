@@ -233,6 +233,7 @@ export const fr: UIStringsOverride = {
     noAuthorizationOn: "Aucune autorisation requise sur {servers}.",
     noExamplePayload: "Aucun exemple de charge utile.",
     noExampleResponse: "Aucun exemple de réponse.",
+    not: "pas {value}",
     notAllowed: "{path} doit être l'une des valeurs suivantes : {values}",
     notConnected: "Non connecté.",
     notConnectedStream:
@@ -263,6 +264,7 @@ export const fr: UIStringsOverride = {
     response: "Réponse",
     responses: "Réponses",
     returns: "Renvoie",
+    schemaMismatch: "{path} ne correspond pas à son schéma",
     scopes: "Portées :",
     send: "Envoyer",
     sending: "Envoi…",

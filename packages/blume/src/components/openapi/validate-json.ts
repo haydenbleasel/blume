@@ -6,9 +6,12 @@ import type { ReferenceStrings } from "./strings.ts";
  * and dependency-free by design: the server prunes the operation's schema into
  * the tiny `ValidationSchema` subset (`operation-model.ts`), so a full
  * draft-2020 validator would be dead weight in the browser bundle. The checks
- * catch the common "typo'd a required field" mistakes, and any error they
- * report blocks the Try it send (`playground-client.ts`) and the event
- * composer's connect and send (`message-composer.ts`).
+ * catch the common "typo'd a required field" mistakes and values that break
+ * a `oneOf`, `anyOf`, or `not`, and any error they report blocks the Try it
+ * send (`playground-client.ts`) and the event composer's connect and send
+ * (`message-composer.ts`). The server runs the same checks on the examples
+ * it generates (`exampleValue` in `helpers.ts`), so it never shows one the
+ * schema rejects.
  */
 
 /**
@@ -18,7 +21,11 @@ import type { ReferenceStrings } from "./strings.ts";
  */
 export type ValidationStrings = Pick<
   ReferenceStrings,
-  "invalidJson" | "notAllowed" | "requiredMissing" | "wrongType"
+  | "invalidJson"
+  | "notAllowed"
+  | "requiredMissing"
+  | "schemaMismatch"
+  | "wrongType"
 >;
 
 /** An already-parsed JSON object — string keys, parsed-JSON values. */
@@ -27,7 +34,13 @@ interface JsonObject {
 }
 
 /** Already-parsed JSON — everything `JSON.parse` can produce. */
-type JsonValue = string | number | boolean | null | JsonValue[] | JsonObject;
+export type JsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | JsonValue[]
+  | JsonObject;
 
 // `typeof` checks live in named predicates (the form the oxlint anti-slop
 // config sanctions); each narrows the parsed-JSON union at its call site.
@@ -73,11 +86,103 @@ const matchesType = (value: JsonValue, type: string): boolean => {
     case "boolean": {
       return isBoolean(value);
     }
+    case "null": {
+      return value === null;
+    }
     default: {
-      // A keyword the pruned subset doesn't model (e.g. "null"): no opinion.
+      // A keyword the pruned subset doesn't model: no opinion.
       return true;
     }
   }
+};
+
+/** Messages for a check whose verdict is all that matters. */
+const SILENT: ValidationStrings = {
+  invalidJson: "",
+  notAllowed: "",
+  requiredMissing: "",
+  schemaMismatch: "",
+  wrongType: "",
+};
+
+/** The allowed values `value` isn't among (its `enum`, else its `const`), as JSON. */
+const disallowed = (
+  value: JsonValue,
+  schema: ValidationSchema
+): string | undefined => {
+  const text = JSON.stringify(value);
+  if (
+    schema.enum !== undefined &&
+    !schema.enum.some((member) => JSON.stringify(member) === text)
+  ) {
+    return schema.enum.map((member) => JSON.stringify(member)).join(", ");
+  }
+  const constant = JSON.stringify(schema.const);
+  return schema.const === undefined || constant === text ? undefined : constant;
+};
+
+/**
+ * Whether a value breaks its schema's `oneOf` (exactly one variant must
+ * match), `anyOf` (at least one), or `not` (none), given which variants it
+ * `passes`. A variant's own errors would only say why it isn't the one.
+ */
+const mismatched = (
+  schema: ValidationSchema,
+  passes: (variant: ValidationSchema) => boolean
+): boolean => {
+  const matching = (variants: ValidationSchema[]): number =>
+    variants.filter(passes).length;
+  return (
+    (schema.oneOf !== undefined && matching(schema.oneOf) !== 1) ||
+    (schema.anyOf !== undefined && matching(schema.anyOf) === 0) ||
+    (schema.not !== undefined && passes(schema.not))
+  );
+};
+
+const beyond = (size: number, min?: number, max?: number): boolean =>
+  (min !== undefined && size < min) || (max !== undefined && size > max);
+
+/**
+ * Whether a number, string, or array falls outside its schema's bounds. A
+ * `pattern` goes unchecked: the sampler writes `"string"` for a patterned
+ * value, a placeholder the reader replaces, and can't build a string to
+ * match most real patterns.
+ */
+const outOfBounds = (value: JsonValue, schema: ValidationSchema): boolean => {
+  if (isNumber(value)) {
+    return (
+      beyond(value, schema.minimum, schema.maximum) ||
+      (schema.exclusiveMinimum !== undefined &&
+        value <= schema.exclusiveMinimum) ||
+      (schema.exclusiveMaximum !== undefined &&
+        value >= schema.exclusiveMaximum)
+    );
+  }
+  if (isString(value)) {
+    return beyond([...value].length, schema.minLength, schema.maxLength);
+  }
+  return (
+    Array.isArray(value) &&
+    beyond(value.length, schema.minItems, schema.maxItems)
+  );
+};
+
+/** The members of an object or array, each with its schema and its path. */
+const members = (
+  value: JsonValue,
+  schema: ValidationSchema,
+  path: string
+): [JsonValue, ValidationSchema | undefined, string][] => {
+  if (isJsonObject(value)) {
+    return Object.entries(value).map(([name, member]) => [
+      member,
+      schema.properties?.[name] ?? schema.additionalProperties,
+      `${path}.${name}`,
+    ]);
+  }
+  return Array.isArray(value)
+    ? value.map((item, index) => [item, schema.items, `${path}[${index}]`])
+    : [];
 };
 
 const walk = (
@@ -101,20 +206,24 @@ const walk = (
     );
     return;
   }
-  if (
-    schema.enum !== undefined &&
-    !schema.enum.some(
-      (member) => JSON.stringify(member) === JSON.stringify(value)
-    )
-  ) {
-    const values = schema.enum
-      .map((member) => JSON.stringify(member))
-      .join(", ");
+  const values = disallowed(value, schema);
+  if (values !== undefined) {
     errors.push(
       strings.notAllowed
         .replaceAll("{path}", () => path)
         .replaceAll("{values}", () => values)
     );
+  }
+  for (const member of schema.allOf ?? []) {
+    walk(value, member, path, errors, strings);
+  }
+  const passes = (variant: ValidationSchema): boolean => {
+    const found: string[] = [];
+    walk(value, variant, path, found, SILENT);
+    return found.length === 0;
+  };
+  if (mismatched(schema, passes) || outOfBounds(value, schema)) {
+    errors.push(strings.schemaMismatch.replaceAll("{path}", () => path));
   }
   if (isJsonObject(value)) {
     for (const name of schema.required ?? []) {
@@ -124,26 +233,24 @@ const walk = (
         );
       }
     }
-    for (const [name, property] of Object.entries(schema.properties ?? {})) {
-      if (name in value) {
-        // SAFETY: `name in value` above proves the key exists, and parsed
-        // JSON never holds `undefined` — the lookup is always a `JsonValue`
-        // that `noUncheckedIndexedAccess` alone cannot see.
-        walk(
-          value[name] as JsonValue,
-          property,
-          `${path}.${name}`,
-          errors,
-          strings
-        );
-      }
-    }
   }
-  if (Array.isArray(value) && schema.items) {
-    for (const [index, item] of value.entries()) {
-      walk(item, schema.items, `${path}[${index}]`, errors, strings);
-    }
+  for (const [member, memberSchema, memberPath] of members(
+    value,
+    schema,
+    path
+  )) {
+    walk(member, memberSchema, memberPath, errors, strings);
   }
+};
+
+/** Whether an already-parsed value passes every check of a pruned schema. */
+export const matchesSchema = (
+  value: JsonValue,
+  schema: ValidationSchema | undefined
+): boolean => {
+  const errors: string[] = [];
+  walk(value, schema, "", errors, SILENT);
+  return errors.length === 0;
 };
 
 /**

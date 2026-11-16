@@ -229,6 +229,7 @@ export const cs: UIStringsOverride = {
     noAuthorizationOn: "Na {servers} není potřeba autorizace.",
     noExamplePayload: "Žádný příklad datové části.",
     noExampleResponse: "Žádný příklad odpovědi.",
+    not: "ne {value}",
     notAllowed: "{path} musí být jedna z hodnot: {values}",
     notConnected: "Nepřipojeno.",
     notConnectedStream:
@@ -259,6 +260,7 @@ export const cs: UIStringsOverride = {
     response: "Odpověď",
     responses: "Odpovědi",
     returns: "Vrací",
+    schemaMismatch: "{path} neodpovídá svému schématu",
     scopes: "Rozsahy:",
     send: "Odeslat",
     sending: "Odesílání…",
