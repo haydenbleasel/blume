@@ -21,8 +21,17 @@ import type { ReferenceStrings } from "./strings.ts";
  */
 export type ValidationStrings = Pick<
   ReferenceStrings,
+  | "exclusiveMax"
+  | "exclusiveMin"
   | "invalidJson"
+  | "max"
+  | "maxItems"
+  | "maxLength"
+  | "min"
+  | "minItems"
+  | "minLength"
   | "notAllowed"
+  | "outOfRange"
   | "requiredMissing"
   | "schemaMismatch"
   | "wrongType"
@@ -98,14 +107,22 @@ const matchesType = (value: JsonValue, type: string): boolean => {
 
 /** Messages for a check whose verdict is all that matters. */
 const SILENT: ValidationStrings = {
+  exclusiveMax: "",
+  exclusiveMin: "",
   invalidJson: "",
+  max: "",
+  maxItems: "",
+  maxLength: "",
+  min: "",
+  minItems: "",
+  minLength: "",
   notAllowed: "",
+  outOfRange: "",
   requiredMissing: "",
   schemaMismatch: "",
   wrongType: "",
 };
 
-/** The allowed values `value` isn't among (its `enum`, else its `const`), as JSON. */
 /**
  * A `JSON.stringify` replacer that sorts object keys, so two equal values
  * write the same text whatever order their keys came in.
@@ -117,6 +134,7 @@ const sortedKeys = (_key: string, member: JsonValue): JsonValue =>
       )
     : member;
 
+/** The allowed values `value` isn't among (its `enum`, else its `const`), as JSON. */
 const disallowed = (
   value: JsonValue,
   schema: ValidationSchema
@@ -155,33 +173,86 @@ const mismatched = (
   );
 };
 
-const beyond = (size: number, min?: number, max?: number): boolean =>
-  (min !== undefined && size < min) || (max !== undefined && size > max);
+/**
+ * The bounds the schema tables list and the validator checks, each with the
+ * string that words it, in display order.
+ */
+export const BOUND_LABELS = [
+  ["minimum", "min"],
+  ["exclusiveMinimum", "exclusiveMin"],
+  ["maximum", "max"],
+  ["exclusiveMaximum", "exclusiveMax"],
+  ["minLength", "minLength"],
+  ["maxLength", "maxLength"],
+  ["minItems", "minItems"],
+  ["maxItems", "maxItems"],
+] as const;
+
+type BoundKey = (typeof BOUND_LABELS)[number][0];
+
+const length = (value: JsonValue): number | undefined =>
+  isString(value) ? [...value].length : undefined;
+
+const count = (value: JsonValue): number | undefined =>
+  Array.isArray(value) ? value.length : undefined;
+
+const amount = (value: JsonValue): number | undefined =>
+  isNumber(value) ? value : undefined;
 
 /**
- * Whether a number, string, or array falls outside its schema's bounds. A
- * `pattern` goes unchecked: the sampler writes `"string"` for a patterned
- * value, a placeholder the reader replaces, and can't build a string to
- * match most real patterns.
+ * Each bound: what it measures (a number, a string's characters, an array's
+ * items) and whether a measure breaks it. A value it doesn't measure, like
+ * a string under a `minimum`, passes.
  */
-const outOfBounds = (value: JsonValue, schema: ValidationSchema): boolean => {
-  if (isNumber(value)) {
-    return (
-      beyond(value, schema.minimum, schema.maximum) ||
-      (schema.exclusiveMinimum !== undefined &&
-        value <= schema.exclusiveMinimum) ||
-      (schema.exclusiveMaximum !== undefined &&
-        value >= schema.exclusiveMaximum)
-    );
-  }
-  if (isString(value)) {
-    return beyond([...value].length, schema.minLength, schema.maxLength);
-  }
-  return (
-    Array.isArray(value) &&
-    beyond(value.length, schema.minItems, schema.maxItems)
-  );
+const BOUNDS: Record<
+  BoundKey,
+  [
+    (value: JsonValue) => number | undefined,
+    (size: number, bound: number) => boolean,
+  ]
+> = {
+  exclusiveMaximum: [amount, (size, bound) => size >= bound],
+  exclusiveMinimum: [amount, (size, bound) => size <= bound],
+  maxItems: [count, (size, bound) => size > bound],
+  maxLength: [length, (size, bound) => size > bound],
+  maximum: [amount, (size, bound) => size > bound],
+  minItems: [count, (size, bound) => size < bound],
+  minLength: [length, (size, bound) => size < bound],
+  minimum: [amount, (size, bound) => size < bound],
 };
+
+/**
+ * The bounds `value` falls outside of, worded as the schema tables word
+ * them (`min length 3`). A `pattern` goes unchecked: the sampler writes
+ * `"string"` for a patterned value, a placeholder the reader replaces, and
+ * can't build a string to match most real patterns.
+ */
+const brokenBounds = (
+  value: JsonValue,
+  schema: ValidationSchema,
+  strings: ValidationStrings
+): string[] =>
+  BOUND_LABELS.flatMap(([key, label]) => {
+    const bound = schema[key];
+    const [measure, breaks] = BOUNDS[key];
+    const size = measure(value);
+    return bound !== undefined && size !== undefined && breaks(size, bound)
+      ? [strings[label].replaceAll("{n}", () => String(bound))]
+      : [];
+  });
+
+/**
+ * The schema a member named `name` must match: its own property's, else the
+ * one for the values of other names. A property the pruned schema keeps no
+ * check for has an empty one, so it isn't taken for one of those.
+ */
+const propertySchema = (
+  schema: ValidationSchema,
+  name: string
+): ValidationSchema | undefined =>
+  schema.properties && Object.hasOwn(schema.properties, name)
+    ? schema.properties[name]
+    : schema.additionalProperties;
 
 /** The members of an object or array, each with its schema and its path. */
 const members = (
@@ -192,7 +263,7 @@ const members = (
   if (isJsonObject(value)) {
     return Object.entries(value).map(([name, member]) => [
       member,
-      schema.properties?.[name] ?? schema.additionalProperties,
+      propertySchema(schema, name),
       `${path}.${name}`,
     ]);
   }
@@ -238,8 +309,16 @@ const walk = (
     walk(value, variant, path, found, SILENT);
     return found.length === 0;
   };
-  if (mismatched(schema, passes) || outOfBounds(value, schema)) {
+  if (mismatched(schema, passes)) {
     errors.push(strings.schemaMismatch.replaceAll("{path}", () => path));
+  }
+  const bounds = brokenBounds(value, schema, strings);
+  if (bounds.length > 0) {
+    errors.push(
+      strings.outOfRange
+        .replaceAll("{path}", () => path)
+        .replaceAll("{limits}", () => bounds.join(" · "))
+    );
   }
   if (isJsonObject(value)) {
     for (const name of schema.required ?? []) {

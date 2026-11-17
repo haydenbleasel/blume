@@ -191,6 +191,8 @@ export const nl: UIStringsOverride = {
       "Het eindpunt is gewijzigd. Maak opnieuw verbinding om het te gebruiken.",
     example: "Voorbeeld",
     examples: "Voorbeelden",
+    exclusiveMax: "kleiner dan {n}",
+    exclusiveMin: "groter dan {n}",
     fields: "Velden",
     fillParameters:
       "Vul alle kanaalparameters in voordat je verbinding maakt: {names}.",
@@ -249,6 +251,7 @@ export const nl: UIStringsOverride = {
     operations: "Bewerkingen",
     option: "Optie {n}",
     or: "of",
+    outOfRange: "{path} valt buiten het bereik ({limits})",
     overview: "Overzicht",
     parameters: "Parameters",
     pathParameters: "Padparameters",

@@ -189,6 +189,8 @@ export const ro: UIStringsOverride = {
       "Endpoint-ul s-a schimbat. Conectează-te din nou ca să-l folosești.",
     example: "Exemplu",
     examples: "Exemple",
+    exclusiveMax: "mai mic decât {n}",
+    exclusiveMin: "mai mare decât {n}",
     fields: "Câmpuri",
     fillParameters:
       "Completează toți parametrii canalului înainte de conectare: {names}.",
@@ -247,6 +249,7 @@ export const ro: UIStringsOverride = {
     operations: "Operații",
     option: "Opțiunea {n}",
     or: "sau",
+    outOfRange: "{path} este în afara intervalului ({limits})",
     overview: "Prezentare generală",
     parameters: "Parametri",
     pathParameters: "Parametri de cale",

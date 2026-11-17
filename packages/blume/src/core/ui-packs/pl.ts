@@ -189,6 +189,8 @@ export const pl: UIStringsOverride = {
       "Punkt końcowy się zmienił. Połącz się ponownie, aby go użyć.",
     example: "Przykład",
     examples: "Przykłady",
+    exclusiveMax: "mniejsze niż {n}",
+    exclusiveMin: "większe niż {n}",
     fields: "Pola",
     fillParameters:
       "Przed połączeniem wypełnij wszystkie parametry kanału: {names}.",
@@ -247,6 +249,7 @@ export const pl: UIStringsOverride = {
     operations: "Operacje",
     option: "Opcja {n}",
     or: "lub",
+    outOfRange: "Pole {path} jest poza zakresem ({limits})",
     overview: "Przegląd",
     parameters: "Parametry",
     pathParameters: "Parametry ścieżki",

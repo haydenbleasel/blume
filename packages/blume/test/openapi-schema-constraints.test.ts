@@ -1,12 +1,16 @@
 import { describe, expect, it } from "bun:test";
 
+import { operationDetails } from "../src/ai/operation-details.ts";
 import {
   allowedValues,
+  anyOneOf,
   constraints,
   exampleValue,
   jsonLiteral,
+  mediaExample,
   mergeSchemas,
   objectProperties,
+  playgroundRules,
   resolveSchema,
   typeLabel,
   validationSchema,
@@ -15,6 +19,7 @@ import type {
   SchemaLike,
   SpecValue,
 } from "../src/components/openapi/helpers.ts";
+import type { ValidationSchema } from "../src/components/openapi/request.ts";
 import { schemaTree } from "../src/components/openapi/schema-tree.ts";
 import type { SchemaNode } from "../src/components/openapi/schema-tree.ts";
 import { validateJson } from "../src/components/openapi/validate-json.ts";
@@ -91,8 +96,12 @@ describe("schema tables", () => {
     expect(typeLabel({ additionalProperties: ref("Person") })).toBe(
       "map<string, Person>"
     );
+    // `true` and `{}` allow any value, which `object` already says.
     expect(typeLabel({ additionalProperties: true, type: "object" })).toBe(
-      "map<string, any>"
+      "object"
+    );
+    expect(typeLabel({ additionalProperties: {}, type: "object" })).toBe(
+      "object"
     );
     expect(typeLabel({ additionalProperties: false, type: "object" })).toBe(
       "object"
@@ -418,18 +427,25 @@ describe("validation", () => {
       validateJson('"b"', STRINGS, { const: "a" }, "payload")
     ).toStrictEqual(['payload not in "a"']);
     expect(validateJson("1", STRINGS, { type: "null" })).toHaveLength(1);
-    // Bounds on numbers, strings, and arrays.
-    for (const [text, schema] of [
-      ["0", { exclusiveMinimum: 0 }],
-      ["5", { exclusiveMaximum: 5 }],
-      ["9", { maximum: 8 }],
-      ['"ab"', { minLength: 3 }],
-      ["[1, 2]", { maxItems: 1 }],
+    // Bounds on numbers, strings, and arrays, each named as the tables word
+    // it.
+    for (const [text, schema, limits] of [
+      ["0", { exclusiveMinimum: 0 }, "greater than 0"],
+      ["5", { exclusiveMaximum: 5 }, "less than 5"],
+      ["0", { minimum: 1 }, "min 1"],
+      ["9", { maximum: 8 }, "max 8"],
+      ['"ab"', { minLength: 3 }, "min length 3"],
+      ['"abcd"', { maxLength: 3 }, "max length 3"],
+      ["[]", { minItems: 1 }, "min items 1"],
+      ["[1, 2]", { maxItems: 1 }, "max items 1"],
     ] as const) {
       expect(validateJson(text, STRINGS, schema)).toStrictEqual([
-        "body mismatch",
+        `body is out of range (${limits})`,
       ]);
     }
+    expect(
+      validateJson('"abcd"', STRINGS, { maxLength: 3, minLength: 5 })
+    ).toStrictEqual(["body is out of range (min length 5 · max length 3)"]);
     expect(validateJson("true", STRINGS, { minimum: 1 })).toStrictEqual([]);
     // A type the subset doesn't model checks nothing.
     expect(validateJson("1", STRINGS, { type: "file" })).toStrictEqual([]);
@@ -499,5 +515,393 @@ describe("validation", () => {
     expect(validationSchema(schema, {}, "response")?.required).toStrictEqual([
       "id",
     ]);
+  });
+});
+
+describe("oneOf variants that overlap", () => {
+  const pets = {
+    Cat: {
+      allOf: [
+        ref("Pet"),
+        { properties: { name: { type: "string" } }, type: "object" },
+      ],
+    },
+    Dog: {
+      allOf: [
+        ref("Pet"),
+        { properties: { bark: { type: "string" } }, type: "object" },
+      ],
+    },
+    Pet: {
+      properties: { petType: { type: "string" } },
+      required: ["petType"],
+      type: "object",
+    },
+  } satisfies Record<string, SchemaLike>;
+
+  it("checks a discriminated oneOf for one match or more", () => {
+    // A Cat and a Dog are both a Pet, so a cat matches both variants; the
+    // discriminator, not the match count, says which it is.
+    const body: SchemaLike = {
+      discriminator: { propertyName: "petType" },
+      oneOf: [ref("Cat"), ref("Dog")],
+    };
+    expect(exampleValue(body, pets)).toStrictEqual({
+      name: "string",
+      petType: "string",
+    });
+    const rules = validationSchema(body, pets);
+    expect(
+      validateJson('{"name": "Tom", "petType": "Cat"}', STRINGS, rules)
+    ).toStrictEqual([]);
+    expect(validateJson("{}", STRINGS, rules)).toStrictEqual(["body mismatch"]);
+  });
+
+  it("samples overlapping variants for one match, and Try it takes the sample", () => {
+    const body: SchemaLike = { oneOf: [ref("Cat"), ref("Dog")] };
+    const example = exampleValue(body, pets);
+    expect(example).toStrictEqual({ name: "string", petType: "string" });
+    const text = JSON.stringify(example);
+    expect(
+      validateJson(text, STRINGS, validationSchema(body, pets))
+    ).toStrictEqual(["body mismatch"]);
+    const rules = playgroundRules(body, pets, example);
+    expect(validateJson(text, STRINGS, rules)).toStrictEqual([]);
+    expect(validateJson("{}", STRINGS, rules)).toStrictEqual(["body mismatch"]);
+    expect(
+      exampleValue({ oneOf: [{ type: "integer" }, { type: "number" }] }, {})
+    ).toBe(0);
+  });
+
+  it("keeps a oneOf exact when its example tells the variants apart", () => {
+    const order = ref("Order");
+    const rules = validationSchema(order, SCHEMAS);
+    // Pruned once, however many times the page asks.
+    expect(validationSchema(order, SCHEMAS)).toBe(rules);
+    const example = exampleValue(order, SCHEMAS);
+    expect(playgroundRules(order, SCHEMAS, example)).toBe(rules);
+    // No example, or one the loosened rules reject too, keeps them exact.
+    expect(playgroundRules(order, SCHEMAS)).toBe(rules);
+    expect(playgroundRules(order, SCHEMAS, "text")).toBe(rules);
+    expect(playgroundRules(undefined, SCHEMAS, {})).toBeUndefined();
+  });
+
+  it("loosens every oneOf but the ones a not rules out", () => {
+    const strict: ValidationSchema = {
+      additionalProperties: { oneOf: [{}, {}] },
+      allOf: [{ type: "object" }],
+      anyOf: [{ oneOf: [{}] }],
+      items: { oneOf: [{}] },
+      not: { oneOf: [{ type: "string" }, {}] },
+      oneOf: [{ required: ["a"] }],
+      properties: { a: { oneOf: [{}] }, b: { type: "string" } },
+    };
+    expect(anyOneOf(strict)).toStrictEqual({
+      additionalProperties: { allOf: [{ anyOf: [{}, {}] }] },
+      allOf: [{ type: "object" }, { anyOf: [{ required: ["a"] }] }],
+      anyOf: [{ allOf: [{ anyOf: [{}] }] }],
+      items: { allOf: [{ anyOf: [{}] }] },
+      not: { oneOf: [{ type: "string" }, {}] },
+      properties: { a: { allOf: [{ anyOf: [{}] }] }, b: { type: "string" } },
+    });
+    const plain: ValidationSchema = { properties: { b: { type: "string" } } };
+    expect(anyOneOf(plain)).toBe(plain);
+  });
+
+  it("tries each variant until one samples a value the schema takes", () => {
+    const schemas = {
+      Bank: {
+        properties: { iban: { type: "string" } },
+        required: ["iban"],
+        type: "object",
+      },
+      // The sampler writes 0, which the not rules out.
+      Card: {
+        properties: { n: { not: { const: 0 }, type: "integer" } },
+        required: ["n"],
+        type: "object",
+      },
+    } satisfies Record<string, SchemaLike>;
+    expect(
+      exampleValue({ oneOf: [ref("Card"), ref("Bank")] }, schemas)
+    ).toStrictEqual({ iban: "string" });
+    expect(
+      exampleValue(
+        {
+          oneOf: [{ required: ["a", "b"] }, { required: ["a"] }],
+          properties: { a: { type: "string" }, b: { type: "string" } },
+          type: "object",
+        },
+        {}
+      )
+    ).toStrictEqual({ a: "string" });
+    // A narrower oneOf beside a wider one keeps its first variant.
+    expect(
+      exampleValue(
+        {
+          oneOf: [
+            { not: {} },
+            { not: {} },
+            {
+              properties: {
+                x: { oneOf: [{ type: "string" }, { type: "integer" }] },
+              },
+              required: ["x"],
+              type: "object",
+            },
+          ],
+        },
+        {}
+      )
+    ).toStrictEqual({ x: "string" });
+  });
+});
+
+/** How many nodes a pruned schema holds, the way its budget counts them. */
+const nodes = (schema: ValidationSchema | undefined): number =>
+  schema
+    ? 1 +
+      [
+        ...Object.values(schema.properties ?? {}),
+        ...(schema.allOf ?? []),
+        ...(schema.anyOf ?? []),
+        schema.items,
+      ].reduce((sum, member) => sum + nodes(member), 0)
+    : 0;
+
+describe("validation alongside other schemas on the value", () => {
+  it("checks a cut property as itself, not as one of the other names", () => {
+    const schemas = {
+      Node: {
+        additionalProperties: { type: "string" },
+        properties: { child: ref("Node"), name: { type: "string" } },
+        type: "object",
+      },
+    } satisfies Record<string, SchemaLike>;
+    const rules = validationSchema(ref("Node"), schemas);
+    expect(
+      validateJson(
+        '{"child": {"child": {"name": "c"}, "name": "b"}, "name": "a"}',
+        STRINGS,
+        rules
+      )
+    ).toStrictEqual([]);
+    expect(validateJson('{"tag": 1}', STRINGS, rules)).toStrictEqual([
+      "body.tag should be string, got number",
+    ]);
+    expect(exampleValue(ref("Node"), schemas)).toMatchObject({
+      name: "string",
+    });
+    // Nor is a name a patternProperties schema takes, which goes unchecked.
+    expect(
+      validationSchema(
+        {
+          additionalProperties: { type: "string" },
+          patternProperties: { "^x-": { type: "integer" } },
+          type: "object",
+        },
+        {}
+      )
+    ).toStrictEqual({ type: "object" });
+    // A name like an object's own key is a name like any other.
+    expect(
+      validateJson('{"constructor": 1}', STRINGS, {
+        additionalProperties: { type: "string" },
+      })
+    ).toStrictEqual(["body.constructor should be string, got number"]);
+  });
+
+  it("leaves the names other allOf members declare to those members", () => {
+    const schemas = {
+      Base: { properties: { id: { type: "integer" } }, type: "object" },
+    } satisfies Record<string, SchemaLike>;
+    const tagged: SchemaLike = {
+      allOf: [
+        ref("Base"),
+        { additionalProperties: { type: "string" }, type: "object" },
+      ],
+    };
+    const rules = validationSchema(tagged, schemas);
+    expect(validateJson('{"id": 1, "tag": "x"}', STRINGS, rules)).toStrictEqual(
+      []
+    );
+    expect(validateJson('{"id": 1, "tag": 2}', STRINGS, rules)).toStrictEqual([
+      "body.tag should be string, got number",
+    ]);
+    expect(validateJson('{"id": "1"}', STRINGS, rules)).toStrictEqual([
+      "body.id should be integer, got string",
+    ]);
+    expect(exampleValue(tagged, schemas)).toMatchObject({ id: 0 });
+  });
+
+  it("knows a name an allOf member requires is another member's readOnly one", () => {
+    const schemas = {
+      Base: {
+        properties: {
+          id: { readOnly: true, type: "integer" },
+          name: { type: "string" },
+          serial: ref("Serial"),
+        },
+        type: "object",
+      },
+      Pet: { allOf: [ref("Base"), { required: ["id", "name", "serial"] }] },
+      Serial: { readOnly: true, type: "string" },
+    } satisfies Record<string, SchemaLike>;
+    expect(exampleValue(ref("Pet"), schemas)).toStrictEqual({ name: "string" });
+    const rules = validationSchema(ref("Pet"), schemas);
+    expect(validateJson('{"name": "Rex"}', STRINGS, rules)).toStrictEqual([]);
+    expect(validateJson("{}", STRINGS, rules)).toStrictEqual([
+      "body.name missing",
+    ]);
+    // A response carries them.
+    expect(
+      validateJson(
+        '{"name": "Rex"}',
+        STRINGS,
+        validationSchema(ref("Pet"), schemas, "response")
+      )
+    ).toStrictEqual(["body.id missing", "body.serial missing"]);
+  });
+
+  it("keeps a schema whose anyOfs reach other models within its budget", () => {
+    // Stripe's expandable fields: most properties are an id or the model.
+    const schemas: Record<string, SchemaLike> = {};
+    for (let model = 0; model < 30; model += 1) {
+      const properties: Record<string, SchemaLike> = {};
+      for (let field = 0; field < 50; field += 1) {
+        properties[`p${field}`] =
+          field % 3 === 1
+            ? { type: "string" }
+            : {
+                anyOf: [
+                  { maxLength: 5000, type: "string" },
+                  ref(`S${(model * 7 + field) % 30}`),
+                ],
+              };
+      }
+      schemas[`S${model}`] = { properties, required: ["p1"], type: "object" };
+    }
+    const rules = validationSchema(ref("S0"), schemas, "response");
+    expect(nodes(rules)).toBeLessThanOrEqual(1000);
+    // A level short of the one that would pass it, the same everywhere: each
+    // field's model is checked for itself, not for its own fields.
+    expect(rules?.properties?.p48).toStrictEqual({
+      anyOf: [
+        { maxLength: 5000, type: "string" },
+        { required: ["p1"], type: "object" },
+      ],
+    });
+    expect(rules?.properties?.p3).toStrictEqual(rules?.properties?.p48);
+    expect(exampleValue(ref("S0"), schemas, "response")).toMatchObject({
+      p1: "string",
+    });
+  });
+});
+
+describe("authored values and hand-written mistakes", () => {
+  it("leaves out only the authored values their own schema rejects", () => {
+    expect(
+      exampleValue(
+        {
+          properties: {
+            age: { example: "42", type: "integer" },
+            email: { example: "ada@example.com", type: "string" },
+          },
+          type: "object",
+        },
+        {}
+      )
+    ).toStrictEqual({ age: 0, email: "ada@example.com" });
+    expect(exampleValue({ default: "20", type: "integer" }, {})).toBe(0);
+    expect(
+      exampleValue({ default: 5, example: "x", type: "integer" }, {})
+    ).toBe(5);
+    expect(exampleValue({ examples: ["x", 3], type: "integer" }, {})).toBe(3);
+    expect(exampleValue({ examples: ["x"], type: "integer" }, {})).toBe(0);
+    // An `examples` that isn't a list is the sampler's to ignore.
+    expect(
+      exampleValue(
+        JSON.parse('{"example": "x", "examples": {"a": 1}, "type": "integer"}'),
+        {}
+      )
+    ).toBe(0);
+  });
+
+  it("doesn't hold a formatted string to lengths the sampler can't write", () => {
+    const login: SchemaLike = {
+      properties: {
+        pin: { format: "password", maxLength: 4, minLength: 4, type: "string" },
+      },
+      required: ["pin"],
+      type: "object",
+    };
+    expect(exampleValue(login, {})).toStrictEqual({ pin: "pa$$word" });
+    expect(validationSchema(login, {})?.properties?.pin).toStrictEqual({
+      type: "string",
+    });
+    expect(
+      validationSchema({ maxLength: 4, type: "string" }, {})
+    ).toStrictEqual({ maxLength: 4, type: "string" });
+  });
+
+  it("samples and prunes Swagger 2's required: true on a property", () => {
+    const schemas: Record<string, SchemaLike> = JSON.parse(
+      '{"Id": {"enum": ["a"], "required": ["x"], "type": "string"}}'
+    );
+    const malformed: SchemaLike = JSON.parse(
+      '{"properties": {"id": {"$ref": "#/components/schemas/Id", "required": true}, "name": {"required": true, "type": "string"}}, "type": "object"}'
+    );
+    expect(exampleValue(malformed, schemas, "response")).toStrictEqual({
+      id: "a",
+      name: "string",
+    });
+    expect(objectProperties(malformed, schemas).required.size).toBe(0);
+    // Other list keywords that aren't lists check nothing.
+    const odd: SchemaLike = JSON.parse(
+      '{"allOf": "x", "anyOf": 5, "items": [1], "not": "y", "oneOf": 5, "properties": "z", "required": true}'
+    );
+    expect(validationSchema(odd, {})).toStrictEqual({});
+    // Nor does a member that isn't a schema.
+    expect(
+      validationSchema(
+        JSON.parse('{"allOf": [5], "properties": {"a": 5}, "type": "object"}'),
+        {}
+      )
+    ).toStrictEqual({ type: "object" });
+    expect(validationSchema(JSON.parse('"text"'), {})).toBeUndefined();
+  });
+
+  it("words exclusive bounds", () => {
+    expect(
+      constraints(
+        { exclusiveMaximum: 10, exclusiveMinimum: 0 },
+        EN_UI.reference
+      )
+    ).toStrictEqual(["greater than 0", "less than 10"]);
+  });
+
+  it("tells a body Blume built without an example from one to sample", () => {
+    const schema: SchemaLike = { type: "string" };
+    expect(
+      mediaExample({ example: undefined, schema }, {}, "request")
+    ).toBeUndefined();
+    expect(mediaExample({ schema }, {}, "request")).toBe("string");
+  });
+
+  it("copies a null response example into the Markdown", () => {
+    const text = operationDetails(
+      { info: { title: "API", version: "1" }, openapi: "3.1.0", paths: {} },
+      {
+        responses: {
+          "200": {
+            content: { "application/json": { schema: { type: "null" } } },
+            description: "Nothing.",
+          },
+        },
+      },
+      false
+    ).join("\n");
+    expect(text).toContain("Response example, 200:");
+    expect(text).toContain("null");
   });
 });

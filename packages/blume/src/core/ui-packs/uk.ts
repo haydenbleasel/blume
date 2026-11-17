@@ -189,6 +189,8 @@ export const uk: UIStringsOverride = {
       "Ендпоінт змінився. Підключіться знову, щоб його використовувати.",
     example: "Приклад",
     examples: "Приклади",
+    exclusiveMax: "менше {n}",
+    exclusiveMin: "більше {n}",
     fields: "Поля",
     fillParameters:
       "Перед підключенням заповніть усі параметри каналу: {names}.",
@@ -247,6 +249,7 @@ export const uk: UIStringsOverride = {
     operations: "Операції",
     option: "Варіант {n}",
     or: "або",
+    outOfRange: "Значення {path} поза допустимим діапазоном ({limits})",
     overview: "Огляд",
     parameters: "Параметри",
     pathParameters: "Параметри шляху",

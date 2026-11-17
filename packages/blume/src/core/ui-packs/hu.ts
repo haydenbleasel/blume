@@ -188,6 +188,8 @@ export const hu: UIStringsOverride = {
       "A végpont megváltozott. A használatához újra kell kapcsolódni.",
     example: "Példa",
     examples: "Példák",
+    exclusiveMax: "kisebb, mint {n}",
+    exclusiveMin: "nagyobb, mint {n}",
     fields: "Mezők",
     fillParameters:
       "Kapcsolódás előtt minden csatornaparamétert ki kell tölteni: {names}.",
@@ -247,6 +249,7 @@ export const hu: UIStringsOverride = {
     operations: "Műveletek",
     option: "{n}. lehetőség",
     or: "vagy",
+    outOfRange: "{path} a megengedett tartományon kívül esik ({limits})",
     overview: "Áttekintés",
     parameters: "Paraméterek",
     pathParameters: "Útvonal-paraméterek",

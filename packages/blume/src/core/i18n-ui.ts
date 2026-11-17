@@ -330,6 +330,10 @@ const uiStringsObject = z.object({
         .default("The endpoint changed. Connect again to use it."),
       example: z.string().default("Example"),
       examples: z.string().default("Examples"),
+      // A schema row's exclusive bounds, beside `min` and `max`: the value
+      // must be less than, or greater than, `{n}`.
+      exclusiveMax: z.string().default("less than {n}"),
+      exclusiveMin: z.string().default("greater than {n}"),
       fields: z.string().default("Fields"),
       fillParameters: z
         .string()
@@ -415,6 +419,9 @@ const uiStringsObject = z.object({
       option: z.string().default("Option {n}"),
       // Between alternative ways to authorize.
       or: z.string().default("or"),
+      // A Try it body or event payload value outside its schema's bounds;
+      // `{limits}` lists the bounds it breaks, worded like `min` and `max`.
+      outOfRange: z.string().default("{path} is out of range ({limits})"),
       // The sidebar label of a reference's overview page.
       overview: z.string().default("Overview"),
       parameters: z.string().default("Parameters"),
@@ -436,7 +443,8 @@ const uiStringsObject = z.object({
       responses: z.string().default("Responses"),
       returns: z.string().default("Returns"),
       // A Try it body or event payload that matches none of its `anyOf`
-      // variants, not exactly one of its `oneOf` variants, or its `not`.
+      // variants, not exactly one of its `oneOf` variants, or its `not`
+      // (bounds have `outOfRange`).
       schemaMismatch: z.string().default("{path} doesn't match its schema"),
       scopes: z.string().default("Scopes:"),
       send: z.string().default("Send"),

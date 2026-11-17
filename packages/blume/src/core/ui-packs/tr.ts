@@ -188,6 +188,8 @@ export const tr: UIStringsOverride = {
     endpointChanged: "Uç nokta değişti. Kullanmak için yeniden bağlanın.",
     example: "Örnek",
     examples: "Örnekler",
+    exclusiveMax: "{n} değerinden küçük",
+    exclusiveMin: "{n} değerinden büyük",
     fields: "Alanlar",
     fillParameters:
       "Bağlanmadan önce tüm kanal parametrelerini doldurun: {names}.",
@@ -245,6 +247,7 @@ export const tr: UIStringsOverride = {
     operations: "İşlemler",
     option: "Seçenek {n}",
     or: "veya",
+    outOfRange: "{path} aralığın dışında ({limits})",
     overview: "Genel bakış",
     parameters: "Parametreler",
     pathParameters: "Yol parametreleri",

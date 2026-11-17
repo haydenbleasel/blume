@@ -190,6 +190,8 @@ export const fr: UIStringsOverride = {
       "Le point de terminaison a changé. Reconnectez-vous pour l'utiliser.",
     example: "Exemple",
     examples: "Exemples",
+    exclusiveMax: "inférieur à {n}",
+    exclusiveMin: "supérieur à {n}",
     fields: "Champs",
     fillParameters:
       "Renseignez tous les paramètres du canal avant de vous connecter : {names}.",
@@ -248,6 +250,7 @@ export const fr: UIStringsOverride = {
     operations: "Opérations",
     option: "Option {n}",
     or: "ou",
+    outOfRange: "{path} est hors limites ({limits})",
     overview: "Vue d'ensemble",
     parameters: "Paramètres",
     pathParameters: "Paramètres de chemin",

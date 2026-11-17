@@ -2,7 +2,7 @@ import { sample } from "openapi-sampler";
 
 import type { ValidationSchema } from "./request.ts";
 import type { ReferenceStrings } from "./strings.ts";
-import { matchesSchema } from "./validate-json.ts";
+import { BOUND_LABELS, matchesSchema } from "./validate-json.ts";
 import type { JsonValue } from "./validate-json.ts";
 
 /**
@@ -31,6 +31,13 @@ const isNumber = (value: SpecValue): value is number =>
 
 const isRecord = (value: SpecValue): value is Record<string, SpecValue> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
+
+/**
+ * A keyword's list, or an empty one when a hand-written spec puts something
+ * else there, like Swagger 2's `required: true` on a property.
+ */
+const listOf = <T>(value: T[] | undefined): T[] =>
+  Array.isArray(value) ? value : [];
 
 /** A value as JSON writes it, so `""` shows and `null` differs from `"null"`. */
 export const jsonLiteral = (value: SpecValue): string =>
@@ -219,10 +226,10 @@ export const mergeSchemas = (
     return { allOf: [base, over] };
   }
   const merged: SchemaLike = { ...base, ...over };
-  if (base.required && over.required) {
+  if (Array.isArray(base.required) && Array.isArray(over.required)) {
     merged.required = [...new Set([...base.required, ...over.required])];
   }
-  if (base.properties && over.properties) {
+  if (isRecord(base.properties) && isRecord(over.properties)) {
     const properties = { ...base.properties };
     for (const [name, property] of Object.entries(over.properties)) {
       const earlier = properties[name];
@@ -241,13 +248,13 @@ export const mergeSchemas = (
       }
     }
   }
-  if (base.enum && over.enum) {
+  if (Array.isArray(base.enum) && Array.isArray(over.enum)) {
     const allowed = new Set(over.enum.map(jsonLiteral));
     merged.enum = base.enum.filter((value) => allowed.has(jsonLiteral(value)));
   }
   const allOf = [
-    ...(base.allOf ?? []),
-    ...(over.allOf ?? []),
+    ...listOf(base.allOf),
+    ...listOf(over.allOf),
     ...replacedAssertions(base, over),
   ];
   if (allOf.length > 0) {
@@ -324,19 +331,25 @@ const isNullType = (schema: SchemaLike): boolean => {
 };
 
 /**
+ * An `additionalProperties` that says what the values are. `true` and `{}`
+ * allow any value, which is what a free-form `object` already says.
+ */
+export const valuesSchema = (
+  values: boolean | SchemaLike | undefined
+): SchemaLike | undefined =>
+  isRecord(values) && Object.keys(values).length > 0 ? values : undefined;
+
+/**
  * The schema of a map's values: an object that names no properties of its own
- * but takes `additionalProperties` (`true` is any value).
+ * but takes `additionalProperties` that say what its values are.
  */
 const mapValues = (
   schema: SchemaLike,
   types: string[]
-): SchemaLike | undefined => {
-  const values = schema.additionalProperties;
-  if (schema.properties || !values || (types[0] ?? "object") !== "object") {
-    return undefined;
-  }
-  return values === true ? {} : values;
-};
+): SchemaLike | undefined =>
+  schema.properties || (types[0] ?? "object") !== "object"
+    ? undefined
+    : valuesSchema(schema.additionalProperties);
 
 /**
  * Whether a `oneOf`/`anyOf` variant says what type its value is. One that
@@ -413,12 +426,14 @@ export const typeLabel = (schema: SchemaLike): string => {
 export const isNullable = (schema: SchemaLike): boolean =>
   schema.nullable === true ||
   (Array.isArray(schema.type) && schema.type.includes("null")) ||
-  [...(schema.oneOf ?? []), ...(schema.anyOf ?? [])].some(isNullType);
+  [...listOf(schema.oneOf), ...listOf(schema.anyOf)].some(isNullType);
 
 /** The labels {@link constraints} words its lines with. */
 export type ConstraintStrings = Pick<
   ReferenceStrings,
   | "defaultValue"
+  | "exclusiveMax"
+  | "exclusiveMin"
   | "matches"
   | "max"
   | "maxItems"
@@ -479,18 +494,10 @@ export const constraints = (
   strings: ConstraintStrings
 ): string[] => {
   const out: string[] = [];
-  const numeric: [keyof SchemaLike, string][] = [
-    ["minimum", strings.min],
-    ["maximum", strings.max],
-    ["minLength", strings.minLength],
-    ["maxLength", strings.maxLength],
-    ["minItems", strings.minItems],
-    ["maxItems", strings.maxItems],
-  ];
-  for (const [key, label] of numeric) {
+  for (const [key, label] of BOUND_LABELS) {
     const value = schema[key];
     if (isNumber(value)) {
-      out.push(label.replaceAll("{n}", () => String(value)));
+      out.push(strings[label].replaceAll("{n}", () => String(value)));
     }
   }
   const { pattern } = schema;
@@ -538,14 +545,15 @@ export const objectProperties = (
       seen.add(node.$ref);
     }
     const resolved = resolveSchema(schemas, node);
-    for (const name of resolved.required ?? []) {
+    for (const name of listOf(resolved.required)) {
       required.add(name);
     }
-    for (const [name, prop] of Object.entries(resolved.properties ?? {})) {
+    const own = isRecord(resolved.properties) ? resolved.properties : {};
+    for (const [name, prop] of Object.entries(own)) {
       const earlier = properties.get(name);
       properties.set(name, earlier ? mergeSchemas(earlier, prop) : prop);
     }
-    for (const branch of resolved.allOf ?? []) {
+    for (const branch of listOf(resolved.allOf)) {
       collect(branch);
     }
   };
@@ -556,6 +564,435 @@ export const objectProperties = (
 
 /** Which way an example travels: to the API, or back from it. */
 export type ExampleDirection = "request" | "response";
+
+/** Recursion limit for pruned validation schemas — deep enough for real specs. */
+const MAX_SCHEMA_DEPTH = 6;
+
+/**
+ * The most nodes a pruned schema holds. Every Try it page embeds its body's,
+ * and a schema whose `anyOf`s point at other models (Stripe's expandable
+ * fields) multiplies at every level, so {@link validationSchema} keeps the
+ * deepest prune that stays within it.
+ */
+const MAX_SCHEMA_NODES = 1000;
+
+/** The bounds the validator checks, copied as written. */
+const BOUNDS = BOUND_LABELS.map(([key]) => key);
+
+const LENGTH_BOUNDS = new Set(["maxLength", "minLength"]);
+
+/**
+ * The checks on a value itself: its type, `null`, `enum`, `const`, and
+ * bounds. A string's length bounds beside a `format` go unchecked, as the
+ * `format` does: the sampler writes one fixed value per format (`"pa$$word"`,
+ * a UUID) whatever lengths the schema allows.
+ */
+const valueRules = (resolved: SchemaLike): ValidationSchema => {
+  const out: ValidationSchema = {};
+  const formatted = isString(resolved.format);
+  for (const key of BOUNDS) {
+    const bound = resolved[key];
+    if (isNumber(bound) && !(formatted && LENGTH_BOUNDS.has(key))) {
+      out[key] = bound;
+    }
+  }
+  // Only a single declared type is checked: a 3.1 type array like
+  // `["string", "integer"]` accepts either, which one `type` can't say.
+  const types = nonNullTypes(resolved.type);
+  if (types.length === 1) {
+    [out.type] = types;
+  } else if (isNullType(resolved)) {
+    out.type = "null";
+  }
+  if (isNullable(resolved)) {
+    out.nullable = true;
+  }
+  if (Array.isArray(resolved.enum)) {
+    out.enum = resolved.enum;
+  }
+  if (resolved.const !== undefined) {
+    out.const = resolved.const;
+  }
+  return out;
+};
+
+/**
+ * Assertions the validator doesn't check. A pruned schema that drops one
+ * accepts values its source rejects, which is harmless on its own but not
+ * inside a `not` or a `oneOf` (see {@link variantRules}).
+ */
+const UNCHECKED = [
+  "contains",
+  "dependentRequired",
+  "dependentSchemas",
+  "format",
+  "if",
+  "maxProperties",
+  "minProperties",
+  "multipleOf",
+  "pattern",
+  "patternProperties",
+  "prefixItems",
+  "propertyNames",
+  "unevaluatedItems",
+  "unevaluatedProperties",
+  "uniqueItems",
+] as const;
+
+/**
+ * Pruned schemas that check less than their source: they drop an
+ * {@link UNCHECKED} assertion or `additionalProperties: false`, or a part of
+ * them was cut (a cycle, the depth limit) or is partial itself.
+ */
+const partial = new WeakSet<ValidationSchema>();
+
+const isDefined = (
+  pruned: ValidationSchema | undefined
+): pruned is ValidationSchema => pruned !== undefined;
+
+/** Whether a pruned schema checks everything its source does. */
+const isComplete = (
+  pruned: ValidationSchema | undefined
+): pruned is ValidationSchema => isDefined(pruned) && !partial.has(pruned);
+
+/** One prune of a schema: its depth limit, and the nodes it has left. */
+interface Pruning {
+  direction: ExampleDirection;
+  limit: number;
+  nodes: number;
+  schemas: Record<string, SchemaLike>;
+}
+
+/**
+ * The properties declared for the object a schema applies to, by name: by
+ * the schema and its `allOf` members, and by the schema it is a member or
+ * variant of.
+ */
+type Declared = ReadonlyMap<string, SchemaLike>;
+
+const NOTHING_DECLARED: Declared = new Map();
+
+/**
+ * What `resolved` declares for its object, added to what the schema it is
+ * part of does. An `allOf` member that lists `required: [id]` beside a base
+ * that declares `id` `readOnly` is checked knowing that.
+ */
+const declaredOn = (
+  resolved: SchemaLike,
+  around: Declared,
+  schemas: Record<string, SchemaLike>
+): Declared => {
+  const own =
+    listOf(resolved.allOf).length > 0
+      ? objectProperties(resolved, schemas).properties
+      : Object.entries(
+          isRecord(resolved.properties) ? resolved.properties : {}
+        );
+  if (own.length === 0) {
+    return around;
+  }
+  return around.size === 0 ? new Map(own) : new Map([...around, ...own]);
+};
+
+/** Whether the object declares `name` as a property that doesn't travel this way. */
+const omits = (declared: Declared, name: string, pruning: Pruning): boolean => {
+  const property = declared.get(name);
+  const key = pruning.direction === "request" ? "readOnly" : "writeOnly";
+  return (
+    property !== undefined &&
+    (property[key] === true ||
+      resolveSchema(pruning.schemas, property)[key] === true)
+  );
+};
+
+/**
+ * The `allOf`, `oneOf`, `anyOf`, and `not` checks, each member pruned, and
+ * whether they check less than the source. A cut or partial member accepts
+ * more than it should. That only loosens an `allOf` or an `anyOf` (a cut
+ * `allOf` member is left out, and an `anyOf` with a cut one is), but it would
+ * make a `not` reject valid values and a `oneOf` count too many matches. So
+ * such a `not` is left out, and such a `oneOf` checks only that at least one
+ * variant matches. So does a `oneOf` with a `discriminator`, which picks its
+ * variant by a property's value: variants that share a base (a `Cat` and a
+ * `Dog` that are both a `Pet`) can each match the whole value.
+ */
+const variantRules = (
+  resolved: SchemaLike,
+  prune: (member: SchemaLike) => ValidationSchema | undefined
+): [ValidationSchema, boolean] => {
+  const out: ValidationSchema = {};
+  let loose = false;
+  const pruneAll = (members: SchemaLike[] | undefined) => {
+    const pruned = listOf(members).map(prune);
+    loose ||= !pruned.every(isComplete);
+    return pruned;
+  };
+  const allOf = pruneAll(resolved.allOf).filter(isDefined);
+  const anyOf = pruneAll(resolved.anyOf);
+  if (anyOf.length > 0 && anyOf.every(isDefined)) {
+    out.anyOf = anyOf;
+  }
+  const oneOf = pruneAll(resolved.oneOf);
+  const exact = resolved.discriminator === undefined;
+  if (oneOf.length > 0 && exact && oneOf.every(isComplete)) {
+    out.oneOf = oneOf;
+  } else if (oneOf.length > 0 && oneOf.every(isDefined)) {
+    allOf.push({ anyOf: oneOf });
+    loose = true;
+  }
+  if (allOf.length > 0) {
+    out.allOf = allOf;
+  }
+  const [not] = pruneAll(isRecord(resolved.not) ? [resolved.not] : []);
+  if (isComplete(not)) {
+    out.not = not;
+  }
+  return [out, loose];
+};
+
+/**
+ * The checks on an object's properties and a map's or array's members, and
+ * whether they check less than the source. Beside a schema for the values
+ * of other names (`additionalProperties`), each name `declared` for the
+ * object, by this schema or another on it, gets a check of its own, empty if
+ * need be: it isn't one of those other names. That includes a property whose
+ * schema was cut, and an `allOf` member's values schema leaves alone the
+ * names the other members declare, as the authors of such a composition
+ * mean. With `patternProperties`, which the validator doesn't check, the
+ * values schema is left out too.
+ */
+const memberRules = (
+  resolved: SchemaLike,
+  prune: (member: SchemaLike) => ValidationSchema | undefined,
+  declared: Declared
+): [ValidationSchema, boolean] => {
+  const out: ValidationSchema = {};
+  let loose = false;
+  const pruneOne = (member: SchemaLike) => {
+    const pruned = prune(member);
+    loose ||= !isComplete(pruned);
+    return pruned;
+  };
+  const properties: Record<string, ValidationSchema> = {};
+  const own = isRecord(resolved.properties) ? resolved.properties : {};
+  for (const [name, property] of Object.entries(own)) {
+    const pruned = pruneOne(property);
+    if (pruned) {
+      properties[name] = pruned;
+    }
+  }
+  const values = valuesSchema(resolved.additionalProperties);
+  const additional =
+    values && resolved.patternProperties === undefined
+      ? pruneOne(values)
+      : undefined;
+  if (additional) {
+    out.additionalProperties = additional;
+    for (const name of [...Object.keys(own), ...declared.keys()]) {
+      if (!Object.hasOwn(properties, name)) {
+        properties[name] = {};
+        loose = true;
+      }
+    }
+  }
+  if (Object.keys(properties).length > 0) {
+    out.properties = properties;
+  }
+  if (isRecord(resolved.items)) {
+    out.items = pruneOne(resolved.items);
+  }
+  return [out, loose];
+};
+
+/**
+ * Prune a spec schema into the subset `validate-json.ts` understands: `$ref`s
+ * resolved inline, cycles cut (the visited set is copied per branch so a ref
+ * reused by siblings still prunes fully), depth and size capped. Structure
+ * beyond the cut simply goes unvalidated, so it can never block a send. A
+ * value's members (properties, items, map values) are values of their own;
+ * the members and variants of a schema apply to the same value, so they
+ * share what it `declared`.
+ */
+const pruneSchema = (
+  schema: SchemaLike | undefined,
+  pruning: Pruning,
+  depth: number,
+  seen: ReadonlySet<string>,
+  declared: Declared
+): ValidationSchema | undefined => {
+  if (!isRecord(schema)) {
+    return undefined;
+  }
+  if (depth >= pruning.limit) {
+    return undefined;
+  }
+  pruning.nodes -= 1;
+  if (pruning.nodes < 0) {
+    return undefined;
+  }
+  let visited = seen;
+  if (isString(schema.$ref)) {
+    if (seen.has(schema.$ref)) {
+      return undefined;
+    }
+    visited = new Set(seen).add(schema.$ref);
+  }
+  const resolved = resolveSchema(pruning.schemas, schema);
+  const onObject = declaredOn(resolved, declared, pruning.schemas);
+  const [variants, looseVariants] = variantRules(resolved, (member) =>
+    pruneSchema(member, pruning, depth + 1, visited, onObject)
+  );
+  const [members, looseMembers] = memberRules(
+    resolved,
+    (member) =>
+      pruneSchema(member, pruning, depth + 1, visited, NOTHING_DECLARED),
+    onObject
+  );
+  const out: ValidationSchema = {
+    ...valueRules(resolved),
+    ...variants,
+    ...members,
+  };
+  // A `readOnly` property's `required` binds responses only: the server
+  // generates it, so a request body, which the prefilled example already
+  // leaves it out of, must not be told it is missing. A `writeOnly` one
+  // binds requests only.
+  const required = listOf(resolved.required).filter(
+    (name) => isString(name) && !omits(onObject, name, pruning)
+  );
+  if (required.length > 0) {
+    out.required = required;
+  }
+  if (
+    looseVariants ||
+    looseMembers ||
+    resolved.additionalProperties === false ||
+    UNCHECKED.some((key) => resolved[key] !== undefined)
+  ) {
+    partial.add(out);
+  }
+  return out;
+};
+
+/**
+ * {@link validationSchema}s, once per document, direction, and schema; a bare
+ * `$ref` by the name it points at, which every operation's error response
+ * shares.
+ */
+const prunedSchemas = new WeakMap<
+  Record<string, SchemaLike>,
+  Record<
+    ExampleDirection,
+    Map<string | SchemaLike, ValidationSchema | undefined>
+  >
+>();
+
+/**
+ * The validator-ready view of a spec schema for a value traveling
+ * `direction`; undefined when there is none. It is pruned a level shallower
+ * at a time until it fits in {@link MAX_SCHEMA_NODES}, so every property is
+ * checked to the same depth.
+ */
+export const validationSchema = (
+  schema: SchemaLike | undefined,
+  schemas: Record<string, SchemaLike>,
+  direction: ExampleDirection = "request"
+): ValidationSchema | undefined => {
+  if (!isRecord(schema)) {
+    return undefined;
+  }
+  let byDirection = prunedSchemas.get(schemas);
+  if (!byDirection) {
+    byDirection = { request: new Map(), response: new Map() };
+    prunedSchemas.set(schemas, byDirection);
+  }
+  const pruned = byDirection[direction];
+  const { $ref: ref, ...own } = schema;
+  const key = isString(ref) && Object.keys(own).length === 0 ? ref : schema;
+  if (pruned.has(key)) {
+    return pruned.get(key);
+  }
+  let out: ValidationSchema | undefined;
+  // A prune that runs out of nodes stops there, so the ones that don't fit
+  // cost little; at a limit of one, the root alone always fits.
+  for (let limit = MAX_SCHEMA_DEPTH; limit > 0; limit -= 1) {
+    const pruning: Pruning = {
+      direction,
+      limit,
+      nodes: MAX_SCHEMA_NODES,
+      schemas,
+    };
+    out = pruneSchema(schema, pruning, 0, new Set(), NOTHING_DECLARED);
+    if (pruning.nodes >= 0) {
+      break;
+    }
+  }
+  pruned.set(key, out);
+  return out;
+};
+
+/**
+ * A pruned schema whose `oneOf`s ask for one match or more, the way an
+ * `anyOf` does; the same object when it has none. A `not` keeps its own:
+ * loosening what it rules out would rule out more.
+ */
+export const anyOneOf = (schema: ValidationSchema): ValidationSchema => {
+  let changed = false;
+  const loosen = (member: ValidationSchema): ValidationSchema => {
+    const out = anyOneOf(member);
+    changed ||= out !== member;
+    return out;
+  };
+  const { oneOf, ...out } = schema;
+  if (schema.properties) {
+    out.properties = Object.fromEntries(
+      Object.entries(schema.properties).map(([name, property]) => [
+        name,
+        loosen(property),
+      ])
+    );
+  }
+  if (schema.additionalProperties) {
+    out.additionalProperties = loosen(schema.additionalProperties);
+  }
+  if (schema.items) {
+    out.items = loosen(schema.items);
+  }
+  if (schema.anyOf) {
+    out.anyOf = schema.anyOf.map(loosen);
+  }
+  const allOf = (schema.allOf ?? []).map(loosen);
+  if (oneOf) {
+    changed = true;
+    allOf.push({ anyOf: oneOf.map(loosen) });
+  }
+  if (allOf.length > 0) {
+    out.allOf = allOf;
+  }
+  return changed ? out : schema;
+};
+
+/**
+ * The rules Try it checks a body against, given the `example` it starts
+ * from: the schema's, with every `oneOf` asking for one match or more when
+ * only that lets the example pass. Variants that overlap (a `Cat` and a
+ * `Dog` with nothing to tell them apart) match most values twice, and the
+ * panel would refuse the body it offers.
+ */
+export const playgroundRules = (
+  schema: SchemaLike | undefined,
+  schemas: Record<string, SchemaLike>,
+  example?: SpecValue
+): ValidationSchema | undefined => {
+  const rules = validationSchema(schema, schemas);
+  // SAFETY: an example is a parsed or sampled JSON value.
+  const value = example as JsonValue;
+  if (!rules || example === undefined || matchesSchema(value, rules)) {
+    return rules;
+  }
+  const loose = anyOneOf(rules);
+  return matchesSchema(value, loose) ? loose : rules;
+};
 
 /** Keywords whose values are data, not schemas, so never rewritten. */
 const DATA_KEYWORDS = new Set([
@@ -569,8 +1006,8 @@ const DATA_KEYWORDS = new Set([
 /** Keywords beside a `$ref` that give the value an example of its own. */
 const VALUE_KEYWORDS = ["const", "default", "example", "examples"];
 
-/** The keywords that hold an author's example of a value. */
-const EXAMPLE_KEYWORDS = new Set(["example", "examples"]);
+/** The keywords that hold an author's value for a schema, beside its `const`. */
+const AUTHORED_VALUES = ["default", "example", "examples"] as const;
 
 const requiredNames = (schema: SpecValue): string[] =>
   isRecord(schema) && Array.isArray(schema.required)
@@ -578,52 +1015,136 @@ const requiredNames = (schema: SpecValue): string[] =>
     : [];
 
 /**
- * A `oneOf` narrowed to its first variant, without the properties only the
- * other variants require. The sampler fills every declared property, so
- * beside `oneOf: [{ required: [card] }, { required: [iban] }]` it sent both,
- * a value that matches both variants and so neither `oneOf` allows.
+ * A `oneOf` narrowed to the variant at `index` (its first, when it has
+ * fewer), without the properties only the other variants require. The
+ * sampler always samples a `oneOf`'s first variant and fills every declared
+ * property, so beside `oneOf: [{ required: [card] }, { required: [iban] }]`
+ * it sent both, a value that matches both variants and so neither `oneOf`
+ * allows.
  */
-const firstVariant = (schema: Record<string, SpecValue>) => {
+const narrowed = (schema: Record<string, SpecValue>, index: number) => {
   const { oneOf, properties } = schema;
-  if (!(Array.isArray(oneOf) && oneOf.length > 1 && isRecord(properties))) {
+  if (!(Array.isArray(oneOf) && oneOf.length > 1)) {
     return schema;
   }
-  const [first, ...others] = oneOf;
-  const kept = new Set([...requiredNames(schema), ...requiredNames(first)]);
+  const at = index < oneOf.length ? index : 0;
+  const kept = new Set([...requiredNames(schema), ...requiredNames(oneOf[at])]);
   const exclusive = new Set(
-    others.flatMap(requiredNames).filter((name) => !kept.has(name))
+    oneOf
+      .filter((_variant, position) => position !== at)
+      .flatMap(requiredNames)
+      .filter((name) => !kept.has(name))
   );
-  return {
-    ...schema,
-    oneOf: [first],
-    properties: Object.fromEntries(
+  const out = { ...schema };
+  out.oneOf = [oneOf[at]];
+  if (isRecord(properties) && exclusive.size > 0) {
+    out.properties = Object.fromEntries(
       Object.entries(properties).filter(([name]) => !exclusive.has(name))
-    ),
-  };
+    );
+  }
+  return out;
 };
 
 /**
- * How one sample is built: `narrow` narrows every `oneOf` to its first
- * variant (see {@link firstVariant}); without `declared`, the schemas'
- * `example` and `examples` are left out, so the value is built from types,
- * formats, `enum`s, `const`s, and `default`s alone.
+ * How one sample is built. With a `variant`, every `oneOf` is narrowed to
+ * it (see {@link narrowed}). With a `direction` to clean for, each schema's
+ * `example`, `default`, and `examples` entry that breaks that schema itself
+ * is left out (see {@link withoutBrokenValues}).
  */
 interface SampleMode {
-  declared: boolean;
-  narrow: boolean;
+  clean: ExampleDirection | null;
+  variant: number | null;
 }
 
 /**
  * The candidates {@link exampleValue} tries, in order: the sample as built,
- * then narrowed, then also without the schemas' own examples,
- * which an example that breaks its schema (an `enum` value it no longer
- * lists) would otherwise keep out of every sample.
+ * then with every `oneOf` narrowed to each of its variants in turn, up to
+ * the most `variants` any `oneOf` has, then all of those again without the
+ * values their schemas reject.
  */
-const SAMPLE_MODES: SampleMode[] = [
-  { declared: true, narrow: false },
-  { declared: true, narrow: true },
-  { declared: false, narrow: true },
-];
+const sampleModes = (
+  direction: ExampleDirection,
+  variants: number
+): SampleMode[] =>
+  [null, direction].flatMap((clean) => [
+    { clean, variant: null },
+    ...Array.from({ length: variants }, (_unused, variant) => ({
+      clean,
+      variant,
+    })),
+  ]);
+
+/** The most variants any `oneOf` in `value` has, past one; else zero. */
+const widestOneOf = (value: SpecValue): number => {
+  if (Array.isArray(value)) {
+    return Math.max(0, ...value.map(widestOneOf));
+  }
+  if (!isRecord(value)) {
+    return 0;
+  }
+  const own = Array.isArray(value.oneOf) ? value.oneOf.length : 0;
+  return Math.max(
+    own > 1 ? own : 0,
+    ...Object.entries(value).map(([key, member]) =>
+      DATA_KEYWORDS.has(key) ? 0 : widestOneOf(member)
+    )
+  );
+};
+
+/** {@link widestOneOf} for a document's component schemas, once per document. */
+const widestComponentOneOf = new WeakMap<Record<string, SchemaLike>, number>();
+
+/**
+ * The variants worth narrowing to for `schema`: as many as the widest
+ * `oneOf` it or the document holds.
+ */
+const oneOfVariants = (
+  schema: SchemaLike,
+  schemas: Record<string, SchemaLike>
+): number => {
+  let components = widestComponentOneOf.get(schemas);
+  if (components === undefined) {
+    components = widestOneOf(schemas);
+    widestComponentOneOf.set(schemas, components);
+  }
+  return Math.max(components, widestOneOf(schema));
+};
+
+/**
+ * A schema's own values without the ones that schema rejects: an `example`
+ * or `default` that breaks it, and each such `examples` entry. The sampler
+ * puts that value in every sample, so `{ type: integer, example: "42" }`
+ * would cost the whole body its example, and leaving out every example to
+ * be rid of it would drop the good ones beside it too.
+ */
+const withoutBrokenValues = (
+  rewritten: Record<string, SpecValue>,
+  original: Record<string, SpecValue>,
+  schemas: Record<string, SchemaLike>,
+  direction: ExampleDirection
+): Record<string, SpecValue> => {
+  if (AUTHORED_VALUES.every((key) => original[key] === undefined)) {
+    return rewritten;
+  }
+  // SAFETY: a record in a schema position is a schema.
+  const rules = validationSchema(original as SchemaLike, schemas, direction);
+  // SAFETY: an authored value is parsed JSON, never `undefined` inside.
+  const fits = (value: SpecValue) => matchesSchema(value as JsonValue, rules);
+  const { default: fallback, example, examples, ...out } = rewritten;
+  if (fallback !== undefined && fits(fallback)) {
+    out.default = fallback;
+  }
+  if (example !== undefined && fits(example)) {
+    out.example = example;
+  }
+  const kept = Array.isArray(examples) ? examples.filter(fits) : [];
+  if (kept.length > 0) {
+    out.examples = kept;
+  } else if (examples !== undefined && !Array.isArray(examples)) {
+    out.examples = examples;
+  }
+  return out;
+};
 
 /** A name-to-value map with `change` applied to each value. */
 const mapEntries = (
@@ -649,27 +1170,36 @@ const SCHEMA_MAPS = new Set([
  * single-member `allOf`, so the value is used. The sampler follows a `$ref`
  * before it looks at anything beside it, which OpenAPI 3.1 allows and .NET
  * writes, so `{ $ref: Status, example: "active" }` sampled the referenced
- * enum's first member instead. The `mode` rewrites it further.
+ * enum's first member instead. The `mode` rewrites it further, `schemas`
+ * being the document's components it cleans against.
  */
-const sampleable = (schema: SpecValue, mode: SampleMode): SpecValue => {
+const sampleable = (
+  schema: SpecValue,
+  mode: SampleMode,
+  schemas: Record<string, SchemaLike>
+): SpecValue => {
   if (Array.isArray(schema)) {
-    return schema.map((member) => sampleable(member, mode));
+    return schema.map((member) => sampleable(member, mode, schemas));
   }
   if (!isRecord(schema)) {
     return schema;
   }
-  const rewritten: Record<string, SpecValue> = {};
+  let rewritten: Record<string, SpecValue> = {};
   for (const [key, value] of Object.entries(schema)) {
-    if (!DATA_KEYWORDS.has(key)) {
+    if (DATA_KEYWORDS.has(key)) {
+      rewritten[key] = value;
+    } else {
       rewritten[key] =
         SCHEMA_MAPS.has(key) && isRecord(value)
-          ? mapEntries(value, (member) => sampleable(member, mode))
-          : sampleable(value, mode);
-    } else if (mode.declared || !EXAMPLE_KEYWORDS.has(key)) {
-      rewritten[key] = value;
+          ? mapEntries(value, (member) => sampleable(member, mode, schemas))
+          : sampleable(value, mode, schemas);
     }
   }
-  const out = mode.narrow ? firstVariant(rewritten) : rewritten;
+  if (mode.clean) {
+    rewritten = withoutBrokenValues(rewritten, schema, schemas, mode.clean);
+  }
+  const out =
+    mode.variant === null ? rewritten : narrowed(rewritten, mode.variant);
   const { $ref: ref, ...own } = out;
   if (!(isString(ref) && VALUE_KEYWORDS.some((key) => key in own))) {
     return out;
@@ -678,28 +1208,34 @@ const sampleable = (schema: SpecValue, mode: SampleMode): SpecValue => {
   return { ...own, allOf: [{ $ref: ref }, ...members] };
 };
 
-/** {@link sampleable} component schemas, once per document and mode. */
-const sampleableSchemas = new Map(
-  SAMPLE_MODES.map((mode) => [
-    mode,
-    new WeakMap<Record<string, SchemaLike>, Record<string, SchemaLike>>(),
-  ])
-);
+/**
+ * {@link sampleable} component schemas, once per document and mode: a mode
+ * is only built when a sample needs it, and then serves every operation.
+ */
+const sampleableSchemas = new WeakMap<
+  Record<string, SchemaLike>,
+  Map<string, Record<string, SchemaLike>>
+>();
 
 const sampleableComponents = (
   schemas: Record<string, SchemaLike>,
   mode: SampleMode
 ): Record<string, SchemaLike> => {
-  const cache = sampleableSchemas.get(mode);
-  const cached = cache?.get(schemas);
+  let modes = sampleableSchemas.get(schemas);
+  if (!modes) {
+    modes = new Map();
+    sampleableSchemas.set(schemas, modes);
+  }
+  const key = `${mode.variant}:${mode.clean}`;
+  const cached = modes.get(key);
   if (cached) {
     return cached;
   }
   // SAFETY: each rewrite keeps every entry a schema.
   const rewritten = mapEntries(schemas, (schema) =>
-    sampleable(schema, mode)
+    sampleable(schema, mode, schemas)
   ) as Record<string, SchemaLike>;
-  cache?.set(schemas, rewritten);
+  modes.set(key, rewritten);
   return rewritten;
 };
 
@@ -746,238 +1282,29 @@ export const forDirection = (
   return out;
 };
 
-/** Recursion limit for pruned validation schemas — deep enough for real specs. */
-const MAX_SCHEMA_DEPTH = 6;
-
-/** The bounds the validator checks, copied as written. */
-const BOUNDS = [...LOWER_BOUNDS, ...UPPER_BOUNDS].filter(
-  (key) => key !== "minProperties" && key !== "maxProperties"
-);
-
-/** The checks on a value itself: its type, `null`, `enum`, `const`, and bounds. */
-const valueRules = (resolved: SchemaLike): ValidationSchema => {
-  const out: ValidationSchema = {};
-  for (const key of BOUNDS) {
-    const bound = resolved[key];
-    if (isNumber(bound)) {
-      out[key] = bound;
-    }
-  }
-  // Only a single declared type is checked: a 3.1 type array like
-  // `["string", "integer"]` accepts either, which one `type` can't say.
-  const types = nonNullTypes(resolved.type);
-  if (types.length === 1) {
-    [out.type] = types;
-  } else if (isNullType(resolved)) {
-    out.type = "null";
-  }
-  if (isNullable(resolved)) {
-    out.nullable = true;
-  }
-  if (resolved.enum) {
-    out.enum = resolved.enum;
-  }
-  if (resolved.const !== undefined) {
-    out.const = resolved.const;
-  }
-  return out;
-};
-
-/**
- * The names a value travelling `direction` must carry. A `readOnly`
- * property's `required` binds responses only: the server generates it, so a
- * request body — which the prefilled example already leaves it out of —
- * must not be told it is missing. A `writeOnly` one binds requests only.
- */
-const requiredFor = (
-  resolved: SchemaLike,
+/** One sample built the way `mode` says, or `undefined` when it can't be. */
+const sampleWith = (
+  schema: SchemaLike,
   schemas: Record<string, SchemaLike>,
+  mode: SampleMode,
   direction: ExampleDirection
-): string[] => {
-  const omitted = direction === "request" ? "readOnly" : "writeOnly";
-  return (resolved.required ?? []).filter((name) => {
-    const property = resolved.properties?.[name];
-    return !(
-      property?.[omitted] === true ||
-      resolveSchema(schemas, property)[omitted] === true
-    );
-  });
-};
-
-/**
- * Assertions the validator doesn't check. A pruned schema that drops one
- * accepts values its source rejects, which is harmless on its own but not
- * inside a `not` or a `oneOf` (see {@link variantRules}).
- */
-const UNCHECKED = [
-  "contains",
-  "dependentRequired",
-  "dependentSchemas",
-  "format",
-  "if",
-  "maxProperties",
-  "minProperties",
-  "multipleOf",
-  "pattern",
-  "patternProperties",
-  "prefixItems",
-  "propertyNames",
-  "unevaluatedItems",
-  "unevaluatedProperties",
-  "uniqueItems",
-] as const;
-
-/**
- * Pruned schemas that check less than their source: they drop an
- * {@link UNCHECKED} assertion or `additionalProperties: false`, or a part of
- * them was cut (a cycle, the depth limit) or is partial itself.
- */
-const partial = new WeakSet<ValidationSchema>();
-
-const isDefined = (
-  pruned: ValidationSchema | undefined
-): pruned is ValidationSchema => pruned !== undefined;
-
-/** Whether a pruned schema checks everything its source does. */
-const isComplete = (
-  pruned: ValidationSchema | undefined
-): pruned is ValidationSchema => isDefined(pruned) && !partial.has(pruned);
-
-/**
- * The `allOf`, `oneOf`, `anyOf`, and `not` checks, each member pruned, and
- * whether they check less than the source. A cut or partial member accepts
- * more than it should. That only loosens an `allOf` or an `anyOf` (a cut
- * `allOf` member is left out, and an `anyOf` with a cut one is), but it would
- * make a `not` reject valid values and a `oneOf` count too many matches. So
- * such a `not` is left out, and such a `oneOf` checks only that at least one
- * variant matches.
- */
-const variantRules = (
-  resolved: SchemaLike,
-  prune: (member: SchemaLike) => ValidationSchema | undefined
-): [ValidationSchema, boolean] => {
-  const out: ValidationSchema = {};
-  let loose = false;
-  const pruneAll = (members: SchemaLike[] = []) => {
-    const pruned = members.map(prune);
-    loose ||= !pruned.every(isComplete);
-    return pruned;
-  };
-  const allOf = pruneAll(resolved.allOf).filter(isDefined);
-  const anyOf = pruneAll(resolved.anyOf);
-  if (anyOf.length > 0 && anyOf.every(isDefined)) {
-    out.anyOf = anyOf;
-  }
-  const oneOf = pruneAll(resolved.oneOf);
-  if (oneOf.length > 0 && oneOf.every(isComplete)) {
-    out.oneOf = oneOf;
-  } else if (oneOf.length > 0 && oneOf.every(isDefined)) {
-    allOf.push({ anyOf: oneOf });
-  }
-  if (allOf.length > 0) {
-    out.allOf = allOf;
-  }
-  const [not] = pruneAll(resolved.not ? [resolved.not] : []);
-  if (isComplete(not)) {
-    out.not = not;
-  }
-  return [out, loose];
-};
-
-/**
- * The checks on an object's properties and a map's or array's members, and
- * whether they check less than the source.
- */
-const memberRules = (
-  resolved: SchemaLike,
-  prune: (member: SchemaLike) => ValidationSchema | undefined
-): [ValidationSchema, boolean] => {
-  const out: ValidationSchema = {};
-  let loose = false;
-  const pruneOne = (member: SchemaLike) => {
-    const pruned = prune(member);
-    loose ||= !isComplete(pruned);
-    return pruned;
-  };
-  const properties: Record<string, ValidationSchema> = {};
-  for (const [name, property] of Object.entries(resolved.properties ?? {})) {
-    const pruned = pruneOne(property);
-    if (pruned) {
-      properties[name] = pruned;
-    }
-  }
-  if (Object.keys(properties).length > 0) {
-    out.properties = properties;
-  }
-  const values = resolved.additionalProperties;
-  const additional = isRecord(values) ? pruneOne(values) : undefined;
-  if (additional) {
-    out.additionalProperties = additional;
-  }
-  if (resolved.items) {
-    out.items = pruneOne(resolved.items);
-  }
-  return [out, loose];
-};
-
-/**
- * Prune a spec schema into the subset `validate-json.ts` understands: `$ref`s
- * resolved inline, cycles cut (the visited set is copied per branch so a ref
- * reused by siblings still prunes fully), depth capped. Structure beyond the
- * cut simply goes unvalidated, so it can never block a send.
- */
-const pruneSchema = (
-  schema: SchemaLike | undefined,
-  schemas: Record<string, SchemaLike>,
-  depth: number,
-  seen: ReadonlySet<string>,
-  direction: ExampleDirection
-): ValidationSchema | undefined => {
-  if (!schema || depth >= MAX_SCHEMA_DEPTH) {
+): SpecValue => {
+  const response = direction === "response";
+  try {
+    // SAFETY: SchemaLike structurally covers the JSONSchema7 fields the
+    // sampler reads, and the sampler only ever assembles JSON values.
+    const sampled = sample(
+      sampleable(schema, mode, schemas) as Parameters<typeof sample>[0],
+      { quiet: true, skipReadOnly: !response, skipWriteOnly: response },
+      { components: { schemas: sampleableComponents(schemas, mode) } }
+    ) as SpecValue;
+    return forDirection(sampled, schema, schemas, direction);
+  } catch {
+    // An unresolvable $ref or malformed schema is a spec problem the
+    // schema tables already surface; a sample is best-effort.
     return undefined;
   }
-  let visited = seen;
-  if (isString(schema.$ref)) {
-    if (seen.has(schema.$ref)) {
-      return undefined;
-    }
-    visited = new Set(seen).add(schema.$ref);
-  }
-  const prune = (member: SchemaLike | undefined) =>
-    pruneSchema(member, schemas, depth + 1, visited, direction);
-  const resolved = resolveSchema(schemas, schema);
-  const [variants, looseVariants] = variantRules(resolved, prune);
-  const [members, looseMembers] = memberRules(resolved, prune);
-  const out: ValidationSchema = {
-    ...valueRules(resolved),
-    ...variants,
-    ...members,
-  };
-  const required = requiredFor(resolved, schemas, direction);
-  if (required.length > 0) {
-    out.required = required;
-  }
-  if (
-    looseVariants ||
-    looseMembers ||
-    resolved.additionalProperties === false ||
-    UNCHECKED.some((key) => resolved[key] !== undefined)
-  ) {
-    partial.add(out);
-  }
-  return out;
 };
-
-/**
- * The validator-ready view of a spec schema for a value travelling
- * `direction`; undefined when there is none.
- */
-export const validationSchema = (
-  schema: SchemaLike | undefined,
-  schemas: Record<string, SchemaLike>,
-  direction: ExampleDirection = "request"
-): ValidationSchema | undefined =>
-  pruneSchema(schema, schemas, 0, new Set(), direction);
 
 /**
  * Build a representative example value for a schema via openapi-sampler
@@ -992,7 +1319,9 @@ export const validationSchema = (
  *
  * The sampler knows no `oneOf` or `not` rules, so every sample is checked
  * against the whole schema, and one that fails it is never shown: the first
- * of the {@link SAMPLE_MODES} candidates that passes, else `undefined` — no
+ * of the {@link sampleModes} candidates that passes, else the first that
+ * passes with every `oneOf` asking for one match or more (variants that
+ * overlap, which no value matches exactly once), else `undefined` — no
  * example, which a schema that only allows `null` (an example of `null`)
  * never returns.
  */
@@ -1004,28 +1333,24 @@ export const exampleValue = (
   if (!schema) {
     return undefined;
   }
-  const response = direction === "response";
   const rules = validationSchema(schema, schemas, direction);
-  for (const mode of SAMPLE_MODES) {
-    try {
-      // SAFETY: SchemaLike structurally covers the JSONSchema7 fields the
-      // sampler reads, and the sampler only ever assembles JSON values.
-      const sampled = sample(
-        sampleable(schema, mode) as Parameters<typeof sample>[0],
-        { quiet: true, skipReadOnly: !response, skipWriteOnly: response },
-        { components: { schemas: sampleableComponents(schemas, mode) } }
-      ) as SpecValue;
-      const value = forDirection(sampled, schema, schemas, direction);
-      // SAFETY: a sampled value is assembled JSON, never `undefined` inside.
-      if (value !== undefined && matchesSchema(value as JsonValue, rules)) {
-        return value;
-      }
-    } catch {
-      // An unresolvable $ref or malformed schema is a spec problem the
-      // schema tables already surface; a sample is best-effort.
+  const samples: SpecValue[] = [];
+  for (const mode of sampleModes(direction, oneOfVariants(schema, schemas))) {
+    const value = sampleWith(schema, schemas, mode, direction);
+    // SAFETY: a sampled value is assembled JSON, never `undefined` inside.
+    if (value !== undefined && matchesSchema(value as JsonValue, rules)) {
+      return value;
     }
+    samples.push(value);
   }
-  return undefined;
+  const loose = rules && anyOneOf(rules);
+  // SAFETY: a sampled value is assembled JSON, never `undefined` inside.
+  return loose === rules
+    ? undefined
+    : samples.find(
+        (value) =>
+          value !== undefined && matchesSchema(value as JsonValue, loose)
+      );
 };
 
 /** Where an author can declare an example: a parameter or a media type. */
@@ -1069,7 +1394,7 @@ export const declaredExample = (
 export type MediaLike = ExampleCarrier & { schema?: SchemaLike };
 
 /**
- * A media type's example for a body travelling `direction`: the declared
+ * A media type's example for a body traveling `direction`: the declared
  * one, else a sample built from its schema, with the properties that don't
  * travel that way left out (see {@link forDirection}).
  */
@@ -1080,9 +1405,16 @@ export const mediaExample = (
   components?: ComponentsLike
 ): SpecValue => {
   const declared = declaredExample(media, components);
-  return declared === undefined
-    ? exampleValue(media.schema, schemas, direction)
-    : forDirection(declared, media.schema, schemas, direction);
+  if (declared !== undefined) {
+    return forDirection(declared, media.schema, schemas, direction);
+  }
+  // A media type Blume builds itself (a hand-written endpoint's body) sets
+  // `example` to the sample it means, from a narrower schema than the body's,
+  // so one it set to `undefined` has none: sampling the whole body would send
+  // the fields that sample leaves out. A parsed spec never holds `undefined`.
+  return Object.hasOwn(media, "example")
+    ? undefined
+    : exampleValue(media.schema, schemas, direction);
 };
 
 /**

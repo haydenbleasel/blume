@@ -190,6 +190,8 @@ export const ca: UIStringsOverride = {
       "El punt final ha canviat. Torna't a connectar per fer-lo servir.",
     example: "Exemple",
     examples: "Exemples",
+    exclusiveMax: "menor que {n}",
+    exclusiveMin: "més gran que {n}",
     fields: "Camps",
     fillParameters:
       "Omple tots els paràmetres del canal abans de connectar: {names}.",
@@ -248,6 +250,7 @@ export const ca: UIStringsOverride = {
     operations: "Operacions",
     option: "Opció {n}",
     or: "o",
+    outOfRange: "{path} està fora de l'interval ({limits})",
     overview: "Visió general",
     parameters: "Paràmetres",
     pathParameters: "Paràmetres de camí",

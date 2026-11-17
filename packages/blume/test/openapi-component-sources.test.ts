@@ -90,6 +90,25 @@ describe("PanelTabs", () => {
   });
 });
 
+describe("SchemaTable", () => {
+  it("lists a union's limits once, on its row when it has one", async () => {
+    const [table, property] = await Promise.all([
+      source("SchemaTable.astro"),
+      source("SchemaProperty.astro"),
+    ]);
+    expect(table).toContain(
+      "{limits && <SchemaLimits schema={node.schema} />}"
+    );
+    expect(table).toContain(
+      '{limits && node.kind === "type" && <SchemaLimits schema={node.schema} />}'
+    );
+    expect(property).toContain("<SchemaLimits schema={resolved} />");
+    expect(property).toMatch(
+      /<SchemaTable\s+node=\{children\.node\}[^>]*limits=\{false\}/u
+    );
+  });
+});
+
 describe("ParametersTable", () => {
   it("falls back to the schema's description, as the Try it panel does", async () => {
     const table = await source("ParametersTable.astro");

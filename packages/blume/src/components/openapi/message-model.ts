@@ -10,7 +10,7 @@ import {
   payloadSchema,
   resolvedServerSecurity,
 } from "./async.ts";
-import { exampleValue, toJson, validationSchema } from "./helpers.ts";
+import { exampleValue, playgroundRules, toJson } from "./helpers.ts";
 import type { ParameterLike, SchemaLike } from "./helpers.ts";
 import type {
   MessageModel,
@@ -76,7 +76,7 @@ const messagePayload = (
   return {
     contentType: message.contentType,
     example: toJson(example) ?? "",
-    schema: validationSchema(schema, schemas),
+    schema: playgroundRules(schema, schemas, example),
   };
 };
 

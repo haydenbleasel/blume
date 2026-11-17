@@ -188,6 +188,8 @@ export const pt: UIStringsOverride = {
     endpointChanged: "O endpoint mudou. Ligue novamente para o utilizar.",
     example: "Exemplo",
     examples: "Exemplos",
+    exclusiveMax: "menor que {n}",
+    exclusiveMin: "maior que {n}",
     fields: "Campos",
     fillParameters:
       "Preencha todos os parâmetros do canal antes de ligar: {names}.",
@@ -246,6 +248,7 @@ export const pt: UIStringsOverride = {
     operations: "Operações",
     option: "Opção {n}",
     or: "ou",
+    outOfRange: "{path} está fora do intervalo ({limits})",
     overview: "Visão geral",
     parameters: "Parâmetros",
     pathParameters: "Parâmetros de caminho",

@@ -5,9 +5,9 @@ import {
   mediaExample,
   objectProperties,
   parameterDescription,
+  playgroundRules,
   resolveSchema,
   toJson,
-  validationSchema,
 } from "./helpers.ts";
 import type {
   ComponentsLike,
@@ -180,13 +180,16 @@ const jsonContentType = (
 const bodyFields = (
   schema: SchemaLike | undefined,
   schemas: Record<string, SchemaLike>,
-  example: Record<string, SpecValue>
+  example: SpecValue
 ): PlaygroundBodyField[] | undefined => {
   const resolved = resolveSchema(schemas, schema);
   if (declaredTypes(resolved.type).some((type) => type !== "object")) {
     return undefined;
   }
   const { properties, required } = objectProperties(resolved, schemas);
+  // Without an example object the fields start empty; an empty optional
+  // field isn't sent.
+  const defaults = isExampleObject(example) ? example : undefined;
   const fields: PlaygroundBodyField[] = [];
   for (const [name, property] of properties) {
     const propertySchema = resolveSchema(schemas, property);
@@ -207,7 +210,7 @@ const bodyFields = (
       name,
       required: required.has(name),
       type,
-      value: inputValue(example[name]),
+      value: inputValue(defaults?.[name]),
     });
   }
   return fields.length > 0 ? fields : undefined;
@@ -236,13 +239,10 @@ const modelBody = (
     contentType,
     example:
       raw && isString(exampleData) ? exampleData : (toJson(exampleData) ?? ""),
-    // Without an example object, typed fields would send every field empty,
-    // so the raw editor starts the body as it starts the samples: blank.
-    fields:
-      raw || !isExampleObject(exampleData)
-        ? undefined
-        : bodyFields(mediaType.schema, schemas, exampleData),
-    schema: validationSchema(mediaType.schema, schemas),
+    fields: raw
+      ? undefined
+      : bodyFields(mediaType.schema, schemas, exampleData),
+    schema: playgroundRules(mediaType.schema, schemas, exampleData),
   };
   const fieldEncoding =
     encoding === "form" ? formEncoding(mediaType.encoding) : undefined;

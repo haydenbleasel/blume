@@ -187,6 +187,8 @@ export const it: UIStringsOverride = {
     endpointChanged: "L'endpoint è cambiato. Riconnettiti per usarlo.",
     example: "Esempio",
     examples: "Esempi",
+    exclusiveMax: "minore di {n}",
+    exclusiveMin: "maggiore di {n}",
     fields: "Campi",
     fillParameters:
       "Compila tutti i parametri del canale prima di connetterti: {names}.",
@@ -245,6 +247,7 @@ export const it: UIStringsOverride = {
     operations: "Operazioni",
     option: "Opzione {n}",
     or: "oppure",
+    outOfRange: "{path} è fuori intervallo ({limits})",
     overview: "Panoramica",
     parameters: "Parametri",
     pathParameters: "Parametri di percorso",

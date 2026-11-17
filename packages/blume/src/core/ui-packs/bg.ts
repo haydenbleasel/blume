@@ -189,6 +189,8 @@ export const bg: UIStringsOverride = {
       "Крайната точка е променена. Свържете се отново, за да я използвате.",
     example: "Пример",
     examples: "Примери",
+    exclusiveMax: "по-малко от {n}",
+    exclusiveMin: "по-голямо от {n}",
     fields: "Полета",
     fillParameters:
       "Попълнете всички параметри на канала преди свързване: {names}.",
@@ -247,6 +249,7 @@ export const bg: UIStringsOverride = {
     operations: "Операции",
     option: "Вариант {n}",
     or: "или",
+    outOfRange: "{path} е извън допустимите граници ({limits})",
     overview: "Общ преглед",
     parameters: "Параметри",
     pathParameters: "Параметри в пътя",

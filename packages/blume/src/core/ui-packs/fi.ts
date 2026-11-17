@@ -187,6 +187,8 @@ export const fi: UIStringsOverride = {
     endpointChanged: "Päätepiste muuttui. Yhdistä uudelleen käyttääksesi sitä.",
     example: "Esimerkki",
     examples: "Esimerkit",
+    exclusiveMax: "pienempi kuin {n}",
+    exclusiveMin: "suurempi kuin {n}",
     fields: "Kentät",
     fillParameters:
       "Täytä kaikki kanavan parametrit ennen yhdistämistä: {names}.",
@@ -245,6 +247,7 @@ export const fi: UIStringsOverride = {
     operations: "Operaatiot",
     option: "Vaihtoehto {n}",
     or: "tai",
+    outOfRange: "Kenttä {path} on sallitun alueen ulkopuolella ({limits})",
     overview: "Yleiskatsaus",
     parameters: "Parametrit",
     pathParameters: "Polkuparametrit",

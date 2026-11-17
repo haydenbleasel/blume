@@ -189,6 +189,8 @@ export const el: UIStringsOverride = {
       "Το τελικό σημείο άλλαξε. Συνδεθείτε ξανά για να το χρησιμοποιήσετε.",
     example: "Παράδειγμα",
     examples: "Παραδείγματα",
+    exclusiveMax: "μικρότερο από {n}",
+    exclusiveMin: "μεγαλύτερο από {n}",
     fields: "Πεδία",
     fillParameters:
       "Συμπληρώστε όλες τις παραμέτρους του καναλιού πριν από τη σύνδεση: {names}.",
@@ -247,6 +249,7 @@ export const el: UIStringsOverride = {
     operations: "Λειτουργίες",
     option: "Επιλογή {n}",
     or: "ή",
+    outOfRange: "Το {path} είναι εκτός ορίων ({limits})",
     overview: "Επισκόπηση",
     parameters: "Παράμετροι",
     pathParameters: "Παράμετροι διαδρομής",

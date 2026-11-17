@@ -20,6 +20,11 @@ interface Props {
   expandAll?: boolean;
   /** Which way the data travels, which decides the fields left out. */
   direction?: SchemaDirection;
+  /**
+   * Whether the node's own limits are listed, above a union's variants or
+   * under a type. A row's disclosure says no: the row lists them already.
+   */
+  limits?: boolean;
 }
 
 const {
@@ -28,6 +33,7 @@ const {
   schemas,
   expandAll = false,
   direction,
+  limits = true,
 } = Astro.props;
 
 // The whole tree is planned once, at the top-level table, so that which named
@@ -63,7 +69,7 @@ const COMBINATORS = { "Any of": strings.anyOf, "One of": strings.oneOf };
         </div>
       )}
       {/* A union's own limits bind every variant, so they read first. */}
-      <SchemaLimits schema={node.schema} />
+      {limits && <SchemaLimits schema={node.schema} />}
       {node.groups.map((group) => (
         <>
           <div class="text-muted-foreground text-xs">{COMBINATORS[group.label]}</div>
@@ -90,7 +96,7 @@ const COMBINATORS = { "Any of": strings.anyOf, "One of": strings.oneOf };
       <code class="text-foreground">
         {node.kind === "named" ? node.name : node.label}
       </code>
-      {node.kind === "type" && <SchemaLimits schema={node.schema} />}
+      {limits && node.kind === "type" && <SchemaLimits schema={node.schema} />}
     </div>
   )
 }
