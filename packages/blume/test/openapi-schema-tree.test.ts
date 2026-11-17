@@ -215,6 +215,7 @@ describe("schemaTree", () => {
     expect(schemaTree({ type: "array" }, schemas)).toStrictEqual({
       itemsLabel: "any",
       kind: "array",
+      schema: { type: "array" },
     });
     expect(schemaTree(ref("Missing"), schemas)).toStrictEqual({
       kind: "type",

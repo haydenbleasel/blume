@@ -210,7 +210,7 @@ const bothNots = (
 /**
  * Two schemas that both apply to one value, as one schema: the `required`
  * names and `properties` of both (a property both declare merged the same
- * way), the tighter of two bounds, the values two `enum`s share, and the
+ * way, and so are the `items` of two arrays), the tighter of two bounds, the values two `enum`s share, and the
  * `allOf` members of both. A different `anyOf`, `oneOf`, or `const` keeps
  * both (see {@link replacedAssertions}), and two `not`s rule out what either
  * does: a `$ref` that rules out `"reserved"` and a sibling that rules out
@@ -236,6 +236,9 @@ export const mergeSchemas = (
       properties[name] = earlier ? mergeSchemas(earlier, property) : property;
     }
     merged.properties = properties;
+  }
+  if (isRecord(base.items) && isRecord(over.items)) {
+    merged.items = mergeSchemas(base.items, over.items);
   }
   for (const [keys, pick] of [
     [LOWER_BOUNDS, Math.max],
@@ -691,7 +694,14 @@ const declaredOn = (
   if (own.length === 0) {
     return around;
   }
-  return around.size === 0 ? new Map(own) : new Map([...around, ...own]);
+  // A name declared here and around keeps both declarations, so a `readOnly`
+  // base property stays `readOnly` where a member only adds a bound to it.
+  const merged = new Map(around);
+  for (const [name, property] of own) {
+    const earlier = merged.get(name);
+    merged.set(name, earlier ? mergeSchemas(earlier, property) : property);
+  }
+  return merged;
 };
 
 /** Whether the object declares `name` as a property that doesn't travel this way. */

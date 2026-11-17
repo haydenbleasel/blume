@@ -763,6 +763,42 @@ describe("validation alongside other schemas on the value", () => {
     ).toStrictEqual(["body.id missing", "body.serial missing"]);
   });
 
+  it("keeps a readOnly property readOnly where a member only bounds it", () => {
+    const schema: SchemaLike = {
+      allOf: [
+        { properties: { id: { readOnly: true, type: "integer" } } },
+        { properties: { id: { minimum: 0 } }, required: ["id"] },
+      ],
+      type: "object",
+    };
+    expect(
+      validateJson("{}", STRINGS, validationSchema(schema, {}))
+    ).toStrictEqual([]);
+    expect(
+      validateJson("{}", STRINGS, validationSchema(schema, {}, "response"))
+    ).toStrictEqual(["body.id missing"]);
+  });
+
+  it("checks the items of an array beside a $ref against both item schemas", () => {
+    const schemas = {
+      Codes: { items: { minLength: 2, type: "string" }, type: "array" },
+    } satisfies Record<string, SchemaLike>;
+    const codes: SchemaLike = { ...ref("Codes"), items: { maxLength: 4 } };
+    expect(resolveSchema(schemas, codes).items).toStrictEqual({
+      maxLength: 4,
+      minLength: 2,
+      type: "string",
+    });
+    const rules = validationSchema(codes, schemas);
+    expect(validateJson('["abc"]', STRINGS, rules)).toStrictEqual([]);
+    expect(validateJson('[""]', STRINGS, rules)).toStrictEqual([
+      "body[0] is out of range (min length 2)",
+    ]);
+    expect(validateJson("[123]", STRINGS, rules)).toStrictEqual([
+      "body[0] should be string, got number",
+    ]);
+  });
+
   it("keeps a schema whose anyOfs reach other models within its budget", () => {
     // Stripe's expandable fields: most properties are an id or the model.
     const schemas: Record<string, SchemaLike> = {};

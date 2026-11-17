@@ -102,6 +102,10 @@ describe("SchemaTable", () => {
     expect(table).toContain(
       '{limits && node.kind === "type" && <SchemaLimits schema={node.schema} />}'
     );
+    // An array's own limits (`minItems`) read under its "Array of" line.
+    expect(table).toMatch(
+      /\{arrayAfter\}\s*\{limits && <SchemaLimits schema=\{node\.schema\} \/>\}/u
+    );
     expect(property).toContain("<SchemaLimits schema={resolved} />");
     expect(property).toMatch(
       /<SchemaTable\s+node=\{children\.node\}[^>]*limits=\{false\}/u

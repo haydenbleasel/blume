@@ -54,6 +54,7 @@ const COMBINATORS = { "Any of": strings.anyOf, "One of": strings.oneOf };
     <div>
       <div class="mb-2 text-muted-foreground text-xs">
         {arrayBefore}<code class="text-foreground">{node.itemsLabel}</code>{arrayAfter}
+        {limits && <SchemaLimits schema={node.schema} />}
       </div>
       {node.items && (
         <Astro.self node={node.items.node} schemas={schemas} expandAll={expandAll} />

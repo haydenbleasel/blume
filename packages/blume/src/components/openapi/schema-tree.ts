@@ -52,7 +52,13 @@ export type SchemaNode =
   | { kind: "circular"; name: string }
   /** A named schema expanded elsewhere in this tree: its name only. */
   | { kind: "named"; name: string }
-  | { kind: "array"; itemsLabel: string; items?: SchemaSlot }
+  /** An array; `schema` holds the limits its table lists (`minItems`). */
+  | {
+      kind: "array";
+      itemsLabel: string;
+      items?: SchemaSlot;
+      schema: SchemaLike;
+    }
   | {
       kind: "branches";
       /** The schema's `oneOf`, then its `anyOf`: a value satisfies both. */
@@ -185,8 +191,9 @@ export const schemaTree = (
               items: table(items, ancestors),
               itemsLabel: typeLabel(items),
               kind: "array",
+              schema,
             }
-          : { itemsLabel: typeLabel({}), kind: "array" },
+          : { itemsLabel: typeLabel({}), kind: "array", schema },
       };
     }
     // A row discloses nested structure — never a model inside itself.
