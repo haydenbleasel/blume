@@ -29,6 +29,7 @@ import {
   logrocket,
   mixpanel,
   oneDollarStats,
+  openpanel,
   pirsch,
   plausible,
   segment,
@@ -36,6 +37,10 @@ import {
 import { LOGROCKET_SCRIPT_SRC } from "../src/analytics/logrocket.ts";
 import { MIXPANEL_REGION_HOSTS } from "../src/analytics/mixpanel.ts";
 import { ONE_DOLLAR_STATS_SCRIPT_SRC } from "../src/analytics/one-dollar-stats.ts";
+import {
+  OPENPANEL_DEFAULT_INIT,
+  OPENPANEL_SCRIPT_SRC,
+} from "../src/analytics/openpanel.ts";
 import { PIRSCH_SCRIPT_SRC } from "../src/analytics/pirsch.ts";
 import { PLAUSIBLE_QUEUE } from "../src/analytics/plausible.ts";
 import { analyticsConfigSchema } from "../src/analytics/schema.ts";
@@ -60,10 +65,16 @@ const all = () => [
   logrocket({ id: "org/app" }),
   mixpanel({ token: "tok" }),
   oneDollarStats(),
+  openpanel({ clientId: "client" }),
   pirsch({ code: "code" }),
   plausible({ domain: "docs.example.com" }),
   segment({ key: "wk" }),
 ];
+
+/** The global OpenPanel's queue stub defines, before the tracker lands. */
+interface OpenpanelWindow {
+  op?: ((...args: unknown[]) => void) & { q: unknown[][] };
+}
 
 /** The script tags `analyticsHead` emits for one adapter. */
 const scripts = (adapter: ReturnType<typeof all>[number]): HeadScript[] =>
@@ -95,6 +106,7 @@ describe("provider adapter factories", () => {
       "logrocket",
       "mixpanel",
       "one-dollar-stats",
+      "openpanel",
       "pirsch",
       "plausible",
       "segment",
@@ -114,17 +126,21 @@ describe("provider adapter factories", () => {
         mixpanel({ persistence: "localStorage", region: "eu", token: "t" }),
         databuddy({ clientId: "c", "track-web-vitals": "true" }),
         oneDollarStats({ hostname: "docs.example.com" }),
+        openpanel({ clientId: "c", sessionReplay: { enabled: true } }),
       ],
     });
-    expect(config.analytics).toHaveLength(23);
-    expect(config.analytics[18]?.options).toMatchObject({ serverZone: "EU" });
-    expect(config.analytics[19]?.options).toMatchObject({ spa: "auto" });
-    expect(config.analytics[20]?.options).toMatchObject({ region: "eu" });
-    expect(config.analytics[21]?.options).toMatchObject({
+    expect(config.analytics).toHaveLength(25);
+    expect(config.analytics[19]?.options).toMatchObject({ serverZone: "EU" });
+    expect(config.analytics[20]?.options).toMatchObject({ spa: "auto" });
+    expect(config.analytics[21]?.options).toMatchObject({ region: "eu" });
+    expect(config.analytics[22]?.options).toMatchObject({
       "track-web-vitals": "true",
     });
-    expect(config.analytics[22]?.options).toMatchObject({
+    expect(config.analytics[23]?.options).toMatchObject({
       hostname: "docs.example.com",
+    });
+    expect(config.analytics[24]?.options).toMatchObject({
+      sessionReplay: { enabled: true },
     });
   });
 
@@ -143,6 +159,7 @@ describe("provider adapter factories", () => {
       hightouch({ key: "" }),
       logrocket({ id: "" }),
       mixpanel({ token: "" }),
+      openpanel({ clientId: "" }),
       pirsch({ code: "" }),
       plausible({ domain: "" }),
       segment({ key: "" }),
@@ -441,6 +458,50 @@ describe("provider adapter heads", () => {
         },
         content: null,
       },
+    ]);
+  });
+
+  it("openpanel: the queue stub and init call with the snippet's defaults under passthrough, then the tracker", () => {
+    const [init, tracker] = scripts(
+      openpanel({
+        apiUrl: "https://op.example.com/api",
+        clientId: "abc",
+        trackAttributes: false,
+      })
+    );
+    expect(init?.attributes).toEqual({});
+    expect(init?.content).toStartWith("window.op=window.op||function(){");
+    expect(init?.content).toEndWith(
+      `window.op("init",${JSON.stringify({ clientId: "abc", ...OPENPANEL_DEFAULT_INIT, apiUrl: "https://op.example.com/api", trackAttributes: false })});`
+    );
+    expect(tracker).toEqual({
+      attributes: { async: true, defer: true, src: OPENPANEL_SCRIPT_SRC },
+      content: null,
+    });
+
+    const [, proxied] = scripts(
+      openpanel({ clientId: "abc", scriptUrl: "https://op.example.com/op1.js" })
+    );
+    expect(proxied?.attributes.src).toBe("https://op.example.com/op1.js");
+    expect(
+      analyticsConfigSchema.safeParse([
+        {
+          ...openpanel({ clientId: "c" }),
+          options: { clientId: "c", scriptUrl: "" },
+        },
+      ]).success
+    ).toBe(false);
+  });
+
+  it("openpanel: the stub queues init first, in the shape the tracker replays", () => {
+    const [init] = scripts(openpanel({ clientId: "abc" }));
+    const window: OpenpanelWindow = {};
+    // oxlint-disable-next-line no-new-func -- runs the emitted snippet against a stub window
+    new Function("window", init?.content ?? "")(window);
+    window.op?.("track", "feedback", { helpful: "yes" });
+    expect(window.op?.q).toEqual([
+      ["init", { clientId: "abc", ...OPENPANEL_DEFAULT_INIT }],
+      ["track", "feedback", { helpful: "yes" }],
     ]);
   });
 
