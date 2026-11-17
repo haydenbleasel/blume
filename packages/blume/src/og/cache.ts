@@ -95,12 +95,29 @@ const localFontDigest = (path: string): Promise<string> => {
 };
 
 /**
+ * A blog post's local cover by its contents, like a local font: renaming
+ * nothing but redrawing the image must still re-render the card. A file that
+ * can't be read keys as missing (the card renders without it).
+ */
+const coverDigest = async (cover: string | undefined) => {
+  if (!cover || /^(?:https?:\/\/|data:)/iu.test(cover)) {
+    return;
+  }
+  try {
+    return await digestFile(cover);
+  } catch {
+    return "missing";
+  }
+};
+
+/**
  * The cache key of a card: a digest of everything that decides its pixels —
  * the card options (title, description, brand, logo markup, palette, footer
- * text, font families), the fonts (a local file by its contents, a Google
- * family by its request), and the Blume version, since the layout and the
- * renderer it pins ship with the package. Pre-fetched `images` are left out:
- * the endpoint never passes them.
+ * text, font families, a blog post's byline), the fonts (a local file by its
+ * contents, a Google family by its request), a local cover by its contents,
+ * and the Blume version, since the layout and the renderer it pins ship with
+ * the package. Pre-fetched `images` are left out: the endpoint never passes
+ * them.
  */
 export const cardCacheKey = async (
   version: string,
@@ -113,7 +130,14 @@ export const cardCacheKey = async (
         : font
     )
   );
-  const card = { ...options, fonts: undefined, images: undefined };
+  // A local cover keys by its bytes alone, not its path on this machine, so
+  // a fresh checkout elsewhere still hits the cache.
+  const digest = await coverDigest(options.article?.cover);
+  const article =
+    digest && options.article
+      ? { ...options.article, cover: digest }
+      : options.article;
+  const card = { ...options, article, fonts: undefined, images: undefined };
   return createHash("sha256")
     .update(JSON.stringify({ card, fonts, version }))
     .digest("hex");
@@ -141,6 +165,19 @@ const storeCard = async (file: string, png: Uint8Array): Promise<void> => {
   await rename(tmp, file);
 };
 
+/** Cards rendered short of their inputs, which the cache must not keep. */
+const partial = new WeakSet<Uint8Array>();
+
+/**
+ * Mark a card rendered without some of its inputs (a cover that failed to
+ * load): it's served, but not stored, so the next build tries again rather
+ * than reading back a card a passing network error left without its cover.
+ */
+export const withoutStoring = (png: Uint8Array): Uint8Array => {
+  partial.add(png);
+  return png;
+};
+
 /** The in-flight renders of this process, so duplicate titles render once. */
 const inflight = new Map<string, Promise<Uint8Array>>();
 
@@ -153,7 +190,9 @@ const renderAndStore = async (
   try {
     const png = await render(options);
     try {
-      await storeCard(file, png);
+      if (!partial.has(png)) {
+        await storeCard(file, png);
+      }
     } catch {
       // An unwritable cache (a read-only workspace) never fails the build.
     }

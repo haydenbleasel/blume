@@ -20,7 +20,7 @@
  * `/v2` rather than `/v2/` on every host.
  */
 
-import { normalizePath } from "./base-path.ts";
+import { normalizePath, withBasePath } from "./base-path.ts";
 
 /** The name `*` captures under, which `_redirects` reads as `:splat`. */
 export const SPLAT = "splat";
@@ -559,3 +559,20 @@ export const pathsUnderPattern = (
   );
   return paths.filter((path) => sources.some((source) => source.test(path)));
 };
+
+/**
+ * Whether a configured redirect answers `route`, a served path: an exact
+ * `from` that is it, or a pattern `from` that matches it. `from` is read under
+ * `basePath`, as the check of redirects against pages reads it.
+ */
+export const redirectCovers = (
+  redirects: readonly { from: string }[],
+  basePath: string,
+  route: string
+): boolean =>
+  redirects.some((redirect) => {
+    const from = withBasePath(basePath, redirect.from);
+    return isPatternPath(redirect.from)
+      ? pathsUnderPattern(from, [route]).length > 0
+      : normalizePath(from) === route;
+  });

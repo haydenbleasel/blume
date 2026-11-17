@@ -48,6 +48,17 @@ export const ru: UIStringsOverride = {
     you: "Вы",
   },
   banner: { dismiss: "Закрыть объявление" },
+  blog: {
+    allPosts: "Все публикации",
+    description: "Новости, обновления и истории от команды.",
+    empty: "Публикаций пока нет.",
+    newer: "Более новая публикация",
+    older: "Более старая публикация",
+    readingTime: "{minutes} мин чтения",
+    tagged: "Публикации с тегом «{tag}»",
+    tags: "Теги",
+    title: "Блог",
+  },
   changelog: {
     description: "Обновления продукта и примечания к выпускам.",
     empty: "В журнале изменений пока нет записей.",

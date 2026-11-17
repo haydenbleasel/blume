@@ -207,9 +207,10 @@ const changelogMetaSchema = z.strictObject({
 
 /**
  * A post author: a bare name/handle, or an object with a name plus optional
- * avatar/URL. Blume credits the name and URL in the page's JSON-LD; the object
- * is passthrough so richer author metadata (social handles, roles) survives
- * untouched rather than have a strict scan reject it.
+ * avatar/URL. A blog post shows them in its byline, and Blume credits the name
+ * and URL in the page's JSON-LD; the object is passthrough so richer author
+ * metadata (social handles, roles) survives untouched rather than have a
+ * strict scan reject it.
  */
 const authorSchema = z.union([
   z.string(),
@@ -227,6 +228,15 @@ const authorSchema = z.union([
 // must still be parsed — Zod 4's `.default()` returns the value as-is, so a
 // `.default({})` on an object with inner defaults (or a transform) would
 // resolve to a bare `{}` instead of the fully-defaulted shape.
+
+/**
+ * A blog post's tag. YAML reads an unquoted number as one, so a number counts
+ * as its digits.
+ */
+const tagSchema = z
+  .union([z.string(), z.number()])
+  .transform((tag) => String(tag).trim())
+  .pipe(z.string().min(1));
 
 /** A `related` link: a root-relative page path or an absolute URL. */
 const relatedLinkSchema = z
@@ -256,6 +266,16 @@ const pageMetaBaseSchema = z.strictObject({
   /** Post author(s) for blog/changelog content, credited in JSON-LD. */
   authors: z.union([authorSchema, z.array(authorSchema)]).optional(),
   changelog: changelogMetaSchema.optional(),
+  /**
+   * A blog post's cover image: a path beside the post (`./cover.png`), under
+   * `public/` (`/images/cover.png`), or a URL. The object form adds alt text.
+   */
+  cover: z
+    .union([
+      z.string().min(1),
+      z.strictObject({ alt: z.string().optional(), src: z.string().min(1) }),
+    ])
+    .optional(),
   /** Publish date for feed-backed content like blog/changelog. */
   date: dateSchema.optional(),
   deprecated: z.boolean().default(false),
@@ -300,6 +320,14 @@ const pageMetaBaseSchema = z.strictObject({
   seo: seoMetaSchema.prefault({}),
   sidebar: sidebarMetaSchema.prefault({}),
   slug: z.string().optional(),
+  /**
+   * A blog post's tags: chips on the post and the index, and a page each. A
+   * single tag may be written without a list.
+   */
+  tags: z
+    .union([tagSchema, z.array(tagSchema)])
+    .transform((tags) => [tags].flat())
+    .optional(),
   title: z.string().optional(),
   // No default: an absent `type` must fall through to `content.defaultType`.
   type: z.string().optional(),
@@ -315,7 +343,11 @@ export type PageMetaInput = z.input<typeof pageMetaBaseSchema>;
  * the content collections' `entry.data` (the page's robots tag) can't
  * disagree about a page that uses the shorthand.
  */
-const foldShorthands = <Meta extends PageMeta>(meta: Meta): Meta => ({
+const foldShorthands = <
+  Meta extends Pick<PageMeta, "hidden" | "noindex" | "seo" | "sidebar">,
+>(
+  meta: Meta
+): Meta => ({
   ...meta,
   seo: { ...meta.seo, noindex: meta.seo.noindex || meta.noindex },
   sidebar: { ...meta.sidebar, hidden: meta.sidebar.hidden || meta.hidden },
@@ -336,8 +368,16 @@ const EMPTY_PAGE_META: PageMeta = pageMetaBaseSchema.parse({});
  * The scan has already dropped such a page with a `BLUME_FRONTMATTER_INVALID`
  * diagnostic — Blume continues without it unless `--strict` — so the
  * collection must not turn that dropped page into a failed content sync.
+ * `cover` and `tags` pass through as written, like custom keys: a site may
+ * have declared either in a shape of its own (see `CLAIMABLE_PAGE_META_KEYS`).
  */
 export const pageCollectionSchema = pageMetaBaseSchema
+  .extend({
+    // As written: only the scan reads Blume's own, and a site may have
+    // declared either for its own use, as custom keys pass through here.
+    cover: z.unknown().optional(),
+    tags: z.unknown().optional(),
+  })
   .loose()
   .transform(foldShorthands)
   // oxlint-disable-next-line promise/prefer-await-to-then -- zod's catch, not a promise
@@ -347,6 +387,16 @@ export const pageCollectionSchema = pageMetaBaseSchema
 export const BUILT_IN_PAGE_META_KEYS: ReadonlySet<string> = new Set<string>(
   pageMetaBaseSchema.keyof().options
 );
+
+/**
+ * Built-in keys Blume added after sites could already have declared them as
+ * custom keys: a site's own declaration takes the key over (Blume then reads
+ * none of it) instead of failing the config it was written for.
+ */
+const CLAIMABLE_PAGE_META_KEYS: ReadonlySet<string> = new Set([
+  "cover",
+  "tags",
+]);
 
 /**
  * A map of custom frontmatter keys to user-supplied validation schemas,
@@ -369,7 +419,10 @@ const customKeySchemaRecord = (where: string) =>
     .default({})
     .superRefine((value, ctx) => {
       for (const key of Object.keys(value)) {
-        if (BUILT_IN_PAGE_META_KEYS.has(key)) {
+        if (
+          BUILT_IN_PAGE_META_KEYS.has(key) &&
+          !CLAIMABLE_PAGE_META_KEYS.has(key)
+        ) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             message: `"${key}" is a built-in frontmatter field and cannot be redeclared via ${where}.`,
@@ -502,6 +555,28 @@ const footerConfigSchema = z.strictObject({
   socials: z.partialRecord(z.enum(FOOTER_SOCIALS), z.string()).default({}),
 });
 
+/** A CSS length for the sidebar column (`20rem`, `320px`). */
+const SIDEBAR_WIDTH = /^\d+(?:\.\d+)?(?:ch|em|px|rem)$/u;
+
+/**
+ * How a dated section — blog posts, changelog entries — sits in the sidebar:
+ * `groupBy` folds its entries into collapsible year (or month) groups, newest
+ * first, and `width` widens the sidebar on its pages for long titles.
+ */
+const datedSidebarSchema = (groupBy: "year" | false) =>
+  z.strictObject({
+    groupBy: z
+      .union([z.enum(["year", "month"]), z.literal(false)])
+      .default(groupBy),
+    width: z
+      .string()
+      .regex(SIDEBAR_WIDTH, {
+        message:
+          'sidebar.width takes a CSS length in ch, em, px, or rem, like "20rem".',
+      })
+      .optional(),
+  });
+
 /**
  * The generated `/changelog` index. Its title and description may be
  * per-locale maps; unset, they're the `changelog` UI strings `i18n.ui`
@@ -509,6 +584,19 @@ const footerConfigSchema = z.strictObject({
  */
 const changelogConfigSchema = z.strictObject({
   description: localizableLabelSchema.optional(),
+  /** The entries' sidebar: ungrouped unless `groupBy` asks. */
+  sidebar: datedSidebarSchema(false).prefault({}),
+  title: localizableLabelSchema.optional(),
+});
+
+/**
+ * The blog: the generated `/blog` index's title and description (per-locale
+ * maps allowed; unset, the `blog` UI strings), and how posts sit in the
+ * sidebar — grouped by year unless `groupBy` says otherwise.
+ */
+const blogConfigSchema = z.strictObject({
+  description: localizableLabelSchema.optional(),
+  sidebar: datedSidebarSchema("year").prefault({}),
   title: localizableLabelSchema.optional(),
 });
 
@@ -1650,6 +1738,8 @@ const ogConfigSchema = z.strictObject({
 });
 
 const rssConfigSchema = z.strictObject({
+  /** Each item's full page as HTML (`content:encoded`), not only its summary. */
+  content: z.boolean().default(false),
   enabled: z.boolean().default(true),
   /** Max items per feed, newest first. */
   limit: z.number().int().positive().default(50),
@@ -2263,6 +2353,7 @@ export const blumeConfigSchema = z
         })
         .optional()
         .transform((value) => normalizeBasePath(value)),
+      blog: blogConfigSchema.optional(),
       changelog: changelogConfigSchema.optional(),
       // An adapter from `blume/consent`; analytics waits for the reader.
       consent: consentConfigSchema,

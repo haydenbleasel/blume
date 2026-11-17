@@ -224,6 +224,7 @@ const BLUME_KEYS = new Set([
   "authMethod",
   "authors",
   "changelog",
+  "cover",
   "date",
   "deprecated",
   "description",
@@ -241,6 +242,7 @@ const BLUME_KEYS = new Set([
   "seo",
   "sidebar",
   "slug",
+  "tags",
   "title",
   "type",
 ]);
@@ -297,7 +299,7 @@ const PLUGIN_HINTS = {
   "section-index": "built in (folder index pages)",
   social: "built in (Open Graph images) — delete",
   "static-i18n": "manual: i18n (see the reference)",
-  tags: "tags → search.tags (the codemod moves the frontmatter); tag index pages drop",
+  tags: "tags → search.tags (the codemod moves the frontmatter); tag index pages drop, but a blog post's tags move back to tags, which get a page per tag",
   typeset: "drop",
 };
 

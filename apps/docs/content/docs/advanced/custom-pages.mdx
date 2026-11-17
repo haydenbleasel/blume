@@ -101,6 +101,18 @@ The module exposes:
       required: true,
       description: "Generated RSS feeds: { href, title }.",
     },
+    blog: {
+      type: "{ posts: BlumeBlogPost[]; tags: BlogTagCount[] }",
+      required: true,
+      description:
+        "The blog's posts, newest first, every locale and version — { route, locale, version, title, date, excerpt, readingTime, authors, tags, cover, fallback, hidden } — and the tags the generated index lists, with their counts.",
+    },
+    sidebarWidths: {
+      type: 'Partial<Record<"blog" | "changelog", string>>',
+      required: true,
+      description:
+        "The sidebar width a dated type's pages take, where `blog.sidebar.width` or `changelog.sidebar.width` sets one.",
+    },
     fontCssVars: {
       type: "FontHead[]",
       required: true,
@@ -122,7 +134,7 @@ The module exposes:
   }}
 />
 
-`routes` carries page metadata but not frontmatter like `type` or `date`. To build a list filtered by content type — a blog or changelog index — pair it with Astro's `docs` content collection, which holds the frontmatter:
+`routes` carries page metadata but not frontmatter like `type` or `date`. To build a list filtered by content type, pair it with Astro's `docs` content collection, which holds the frontmatter. The example builds a blog index by hand: blog posts are in `blog.posts` already, as the generated [blog index](/docs/advanced/blog#the-index) reads them, and a page of your own at `/blog` replaces that index:
 
 ```astro pages/blog/index.astro lineNumbers
 ---
@@ -329,6 +341,6 @@ Custom pages are ordinary Astro, so you can drop in React (or any framework) [is
     Component overrides, React islands, the registry, and eject.
   </Card>
   <Card title="Blog" href="/docs/advanced/blog" icon="book-open">
-    Author posts and build a custom blog index.
+    Author posts; Blume builds the index and tag pages.
   </Card>
 </CardGroup>

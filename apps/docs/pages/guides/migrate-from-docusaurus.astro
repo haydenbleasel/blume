@@ -92,8 +92,7 @@ import { guideById } from "../_guides/guides.ts";
   </table>
   <p>
     What doesn't carry over: swizzled components in <code>src/theme</code>,
-    React pages like your landing page, the blog's generated tag, author, and
-    archive pages, footer column titles, <code>&lt;TOCInline /&gt;</code>, and
+    React pages like your landing page, the blog's author and archive pages and its list of tags, footer column titles, <code>&lt;TOCInline /&gt;</code>, and
     redirects computed by a <code>createRedirects</code> function. If your site
     leans on those, or you translate through Crowdin, read{" "}
     <a href="/compare/docusaurus">Blume vs Docusaurus</a> first. It covers when
@@ -283,8 +282,8 @@ import { guideById } from "../_guides/guides.ts";
     <li>
       <strong>Blog.</strong> Posts should carry a <code>date</code>, and the
       old dated URLs like <code>/blog/2024/01/31/post</code> should redirect.
-      Blume doesn't generate a blog index, so check that the agent wrote a{" "}
-      <code>blog/index.mdx</code> that links your posts.
+      Blume generates the <code>/blog</code> index and a page per tag, so
+      check that posts kept their <code>tags</code>.
     </li>
     <li>
       <strong>Math.</strong> Inline math takes two dollar signs in Blume, so

@@ -3,7 +3,13 @@ import IconSprite from "./IconSprite.astro";
 import { createIconSprite } from "../icon-sprite.ts";
 import data from "blume:data";
 import { relatedLinks } from "../../core/related.ts";
-import type { RelatedEntry } from "../../core/related.ts";
+import type { RelatedEntry, RelatedLink } from "../../core/related.ts";
+import {
+  BLOG_INDEX_ROUTE,
+  adjacentPosts,
+  indexedPosts,
+  relatedPosts,
+} from "../../core/blog.ts";
 import { EN_UI } from "../../core/i18n-ui.ts";
 import type { UIStrings } from "../../core/i18n-ui.ts";
 import { resolveDateFormatOptions } from "../../core/date-format.ts";
@@ -411,13 +417,19 @@ const tocHeadings =
 // One predicate for both the outline and the page-actions divider under it,
 // so the rail cannot draw a rule under contents that were never rendered.
 const hasToc = tocHeadings.length > 0;
+// The sidebar column is `--blume-sidebar-width` wide: 17.5rem, unless a blog
+// post's or changelog entry's config asks for more room for long titles.
 let gridClass =
-  "lg:grid-cols-[17.5rem_minmax(0,1fr)] xl:grid-cols-[17.5rem_minmax(0,1fr)_17.5rem]";
+  "lg:grid-cols-[var(--blume-sidebar-width,17.5rem)_minmax(0,1fr)] xl:grid-cols-[var(--blume-sidebar-width,17.5rem)_minmax(0,1fr)_17.5rem]";
 if (!showSidebar) {
   gridClass = "";
 } else if (!showToc) {
-  gridClass = "lg:grid-cols-[17.5rem_minmax(0,1fr)]";
+  gridClass = "lg:grid-cols-[var(--blume-sidebar-width,17.5rem)_minmax(0,1fr)]";
 }
+const sidebarWidth =
+  showSidebar && (pageType === "blog" || pageType === "changelog")
+    ? data.sidebarWidths?.[pageType]
+    : undefined;
 let articleClass = "prose mx-auto max-w-content";
 if (isBare || modeLayout.width === "center") {
   articleClass = "prose mx-auto max-w-[54rem]";
@@ -475,8 +487,8 @@ const formattedLastModified = lastModifiedIso
 // This page's raw-Markdown mirror, advertised as a `text/markdown` alternate
 // in the head. Content routes always have one (see `markdownRoutePaths`, which
 // serves the same `route === "/" ? "/index.md" : "<route>.md"` mapping as the
-// PageActions menu); the generated changelog index — the only "bare" page — is
-// not a content route and has none.
+// PageActions menu); the generated changelog and blog pages — the "bare"
+// ones — aren't content routes, and advertise none.
 const markdownMirror = isBare
   ? null
   : withMountedBase(page.route === "/" ? "/index.md" : `${page.route}.md`);
@@ -522,14 +534,50 @@ const crumbs = findBreadcrumbs(sidebar, page.route);
 // group asks for a directory. Looked up in the full tree: a tab's own page
 // is not in its scoped sidebar.
 const directoryGroup = directoryGroupForRoute(navigation.sidebar, page.route);
+// A blog post links the posts before and after it by date, not by sidebar
+// order, and when its front matter names no `related` pages it suggests the
+// posts that share its tags.
+const blogPosts = pageType === "blog" ? (data.blog?.posts ?? []) : [];
+const blogPost = blogPosts.find((post) => post.route === page.route);
+const isBlogPost = blogPost !== undefined;
+// The index exists while it has posts to list; a hidden post's, or another
+// locale's or version's, may be the only one.
+const hasBlogIndex =
+  indexedPosts(blogPosts, data.config.i18n?.defaultLocale ?? null).length > 0;
 // The page's `related` links, resolved to served routes in this locale.
-const relatedItems = relatedLinks(related, {
-  basePath: data.config.basePath,
-  i18n: data.config.i18n,
-  locale,
-  routes: data.routes,
-});
-const { prev, next } = getPagination(flattenPages(sidebar), page.route);
+const relatedItems: RelatedLink[] =
+  isBlogPost && related === undefined
+    ? relatedPosts(blogPosts, page.route).map((post) => ({
+        description: post.excerpt ?? undefined,
+        external: false,
+        href: post.route,
+        title: post.title,
+      }))
+    : relatedLinks(related, {
+        basePath: data.config.basePath,
+        i18n: data.config.i18n,
+        locale,
+        routes: data.routes,
+      });
+// A dated post pages by date; an undated one as the sidebar orders it.
+const adjacent = isBlogPost ? adjacentPosts(blogPosts, page.route) : null;
+const { prev, next } = adjacent
+  ? {
+      next: adjacent.older && {
+        label: adjacent.older.title,
+        route: adjacent.older.route,
+      },
+      prev: adjacent.newer && {
+        label: adjacent.newer.title,
+        route: adjacent.newer.route,
+      },
+    }
+  : getPagination(flattenPages(sidebar), page.route);
+// Newest first, so the post before this one on the index is the newer one.
+const blogStrings = { ...EN_UI.blog, ...strings.blog };
+const paginationStrings = adjacent
+  ? { ...strings.page, next: blogStrings.older, previous: blogStrings.newer }
+  : strings.page;
 
 // Structured data is skipped when disabled or for pages we ask crawlers not to
 // index. Escape `<` so a title/description containing `</script>` can't break
@@ -546,6 +594,7 @@ const structuredData =
       identity: data.config.identity,
       jsonLd: data.config.jsonLd,
       image: ogImage,
+      keywords: blogPost?.tags.map((tag) => tag.label),
       locale,
       modified: lastModified,
       pageType,
@@ -743,6 +792,7 @@ const localeRedirect = localeTargets
     <div
       class:list={["mx-auto grid grid-cols-1 items-start", gridClass]}
       data-blume-doc-grid
+      style={sidebarWidth ? `--blume-sidebar-width: ${sidebarWidth}` : undefined}
     >
       <aside
         aria-label={navStrings.primary}
@@ -970,7 +1020,18 @@ const localeRedirect = localeTargets
                 />
               )}
               {pagination && (
-                <PaginationSlot next={next} prev={prev} strings={strings.page} />
+                <PaginationSlot next={next} prev={prev} strings={paginationStrings} />
+              )}
+              {isBlogPost && hasBlogIndex && (
+                <p class="mx-auto mt-6 max-w-content text-sm">
+                  <a
+                    class="inline-flex items-center gap-1.5 text-muted-foreground transition-colors hover:text-foreground"
+                    href={withMountedBase(BLOG_INDEX_ROUTE)}
+                  >
+                    <Icon class="rtl:-scale-x-100" name="arrow-left" size={14} />
+                    {blogStrings.allPosts}
+                  </a>
+                </p>
               )}
             </div>
           )

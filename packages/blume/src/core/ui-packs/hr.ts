@@ -48,6 +48,17 @@ export const hr: UIStringsOverride = {
     you: "Vi",
   },
   banner: { dismiss: "Zatvori obavijest" },
+  blog: {
+    allPosts: "Sve objave",
+    description: "Novosti, ažuriranja i priče iz tima.",
+    empty: "Još nema objava.",
+    newer: "Novija objava",
+    older: "Starija objava",
+    readingTime: "{minutes} min čitanja",
+    tagged: "Objave s oznakom „{tag}”",
+    tags: "Oznake",
+    title: "Blog",
+  },
   changelog: {
     description: "Ažuriranja proizvoda i napomene o izdanjima.",
     empty: "U popisu promjena još nema unosa.",

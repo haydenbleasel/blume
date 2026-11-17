@@ -11,6 +11,7 @@ import {
   validateSidebarItems,
 } from "./nav-diagnostics.ts";
 import { buildNavigation, isPageRef, pagesByRef } from "./navigation.ts";
+import type { DatedGroups } from "./navigation.ts";
 import type {
   FolderMeta,
   LocalizableLabel,
@@ -37,6 +38,10 @@ interface BuildContentGraphOptions {
   brandHref?: string;
   /** Routes served outside the content tree that tabs may link to directly. */
   extraRoutes?: ReadonlySet<string>;
+  /** How dated entries (blog posts, changelog entries) group in the sidebar. */
+  datedGroups?: DatedGroups;
+  /** The time zone the sidebar reads dated entries' periods in. */
+  timeZone?: string;
   folderMeta: Map<string, FolderMeta>;
   sharedFolderMeta?: Map<string, FolderMeta>;
   navigation: ResolvedConfig["navigation"];
@@ -286,6 +291,7 @@ const buildLocaleNavigation = (
     actions: actions.map(localizeHref),
     basePath,
     cta: cta ? localizeHref(cta) : null,
+    datedGroups: options.datedGroups,
     diagnostics,
     display: options.navigation.sidebar.display,
     extraRoutes: options.extraRoutes,
@@ -295,6 +301,7 @@ const buildLocaleNavigation = (
     // The localized tree root ("/" for the hidden default, "/fr" otherwise;
     // "/fr/v1.0" inside a snapshot): the tab pointing here spans the whole
     // tree and must not be treated as a tab section.
+    locale: code,
     localizedRoot: localizeRoute(versionizeRoute("/", version), code, i18n),
     metaPrefix: [version, localeDir].filter(Boolean).join("/"),
     refByLogical: true,
@@ -317,6 +324,7 @@ const buildLocaleNavigation = (
     // snapshot's versionized `localizedRoot` no longer is.
     tabRoot: localizeRoute("/", code, i18n),
     tabs,
+    timeZone: options.timeZone,
   });
   // `serves` checked the localized brand link against based routes, and
   // unlike tab and header links it isn't rebased later, so a localized one
@@ -422,6 +430,7 @@ const buildVersionNavigation = (
     "": buildNavigation(versionPages, {
       ...resolveHeaderLinks(options.navigation, ""),
       basePath: options.basePath ?? "",
+      datedGroups: options.datedGroups,
       diagnostics,
       display: options.navigation.sidebar.display,
       extraRoutes: options.extraRoutes,
@@ -436,6 +445,7 @@ const buildVersionNavigation = (
       // A configured explicit sidebar describes the current docs; a snapshot's
       // structure comes from the snapshot itself.
       tabs: resolveTabLabels(options.navigation.tabs, ""),
+      timeZone: options.timeZone,
     }),
   };
 };
@@ -472,6 +482,7 @@ export const buildContentGraph = (
       // entry on a single-locale site.
       ...resolveHeaderLinks(options.navigation, ""),
       basePath: options.basePath ?? "",
+      datedGroups: options.datedGroups,
       diagnostics,
       display: options.navigation.sidebar.display,
       extraRoutes: options.extraRoutes,
@@ -482,6 +493,7 @@ export const buildContentGraph = (
       // No locale to prefer: a per-locale label map resolves to its first
       // entry on a single-locale site.
       tabs: resolveTabLabels(options.navigation.tabs, ""),
+      timeZone: options.timeZone,
     });
     if (options.bannerHref !== undefined) {
       navigation = {

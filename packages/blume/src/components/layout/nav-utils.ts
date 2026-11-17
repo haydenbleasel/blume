@@ -78,7 +78,12 @@ export const findBreadcrumbs = (nodes: NavNode[], route: string): Crumb[] => {
         if (item.route === route) {
           return [...trail, crumb];
         }
-        const found = search(item.children, [...trail, crumb]);
+        // A year (or month) the sidebar folds dated entries into is no
+        // section of the site: the trail reads through it.
+        const found = search(
+          item.children,
+          item.period ? trail : [...trail, crumb]
+        );
         if (found) {
           return found;
         }
@@ -326,12 +331,21 @@ export interface DirectoryEntry {
 }
 
 /**
+ * A group's children, with the year (or month) groups the sidebar folds dated
+ * entries into opened up in place: they're no sections of their own.
+ */
+const unfoldPeriods = (nodes: NavNode[]): NavNode[] =>
+  nodes.flatMap((node) =>
+    node.kind === "group" && node.period ? node.children : [node]
+  );
+
+/**
  * What a group's page lists: the group's pages and subgroups, in sidebar
  * order, without the page itself or external links. A subgroup is described
  * by its own page, and one with no page to link to is left out.
  */
 export const directoryEntries = (group: NavGroup): DirectoryEntry[] =>
-  group.children.flatMap((child): DirectoryEntry[] => {
+  unfoldPeriods(group.children).flatMap((child): DirectoryEntry[] => {
     if (child.kind === "page") {
       return child.pageId && child.route !== group.route
         ? [
