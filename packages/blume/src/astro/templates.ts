@@ -121,6 +121,14 @@ interface AstroAdapterRender {
   option: string;
 }
 
+const usesQuickTunnel = (tunnel: true | undefined, ejected: boolean): boolean =>
+  tunnel === true && !ejected;
+
+const renderTunnelViteServerOption = (
+  tunnel: true | undefined,
+  ejected: boolean
+): string => (usesQuickTunnel(tunnel, ejected) ? "allowedHosts: true," : "");
+
 const renderAstroAdapter = (
   deployment: ResolvedConfig["deployment"],
   context: ProjectContext,
@@ -631,6 +639,8 @@ export const astroConfigTemplate = (options: {
   contentRoot?: string;
   /** Bridge used to load configured integrations without serializing them. */
   integrationBridge?: IntegrationBridgeOptions;
+  /** Allow the Quick Tunnel hostname in the dev server. */
+  tunnel?: true;
 }): string => {
   const { context, config, needsReact, pages, themePath } = options;
 
@@ -1007,6 +1017,7 @@ ${userConfigSetup}export default defineConfig({
       },
     },
     server: {
+      ${renderTunnelViteServerOption(options.tunnel, ejected)}
       fs: {
         allow: ${JSON.stringify(fsAllow)},
       },

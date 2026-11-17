@@ -40,6 +40,7 @@ blume <command> [options]
 - `blume init --eject` — scaffold, then eject to a standalone Astro project (with `--no-install`, falls back to guiding you through `blume eject` once dependencies are installed).
 - `blume dev --host --port <n> --open`
 - `blume dev --content-dir <dir>` — scan a different content folder without editing `blume.config.ts`.
+- `blume dev --tunnel` — start `cloudflared` against the local server and expose it through a temporary Cloudflare Quick Tunnel, regardless of the configured deployment adapter. Install `cloudflared` and make sure it is available on your `PATH`. Treat the public URL as sensitive: anyone who has it can access your local dev site.
 - `blume dev --debug` — verbose Astro/Vite logging for troubleshooting.
 - `blume dev --preview` / `blume build --preview` — include drafts and unpublished CMS content.
 - `blume build --no-strict` — build despite diagnostic errors. By default `blume build` fails (exit 1) on any error diagnostic, because pages that fail frontmatter validation, and `.mdx` pages that don't [parse](/docs/content#markdown-and-mdx), are dropped from the output; with `--no-strict` the build succeeds and reports how many pages are missing. A failure only the build itself finds, such as a page that throws while it renders, still fails it. `blume dev --strict` opts dev into the same fail-fast behavior.

@@ -2021,7 +2021,8 @@ export const clientFeaturesFor = async (
  * Only files whose content changed are rewritten so Vite HMR stays fast.
  */
 export const generateRuntime = async (
-  project: BlumeProject
+  project: BlumeProject,
+  generationOptions: { tunnel?: true } = {}
 ): Promise<GenerateResult> => {
   const { context, config } = project;
   assertFontFilesExist(project);
@@ -2210,6 +2211,7 @@ export const generateRuntime = async (
           reactCompiler,
           searchClientPath,
           themePath,
+          tunnel: generationOptions.tunnel,
         })
       ),
       write(
