@@ -60,7 +60,7 @@ Eine nummerierte vertikale Abfolge für geordnete Anleitungen – Installationen
 
 ## Tabs
 
-Wechsle an Ort und Stelle zwischen gleichwertigen Inhalten – Sprachvarianten, betriebssystemspezifischen Befehlen oder alternativen Vorgehensweisen – ohne alles untereinander auf der Seite zu stapeln. Jeder `Tab` nimmt einen `title` entgegen.
+Wechsle an Ort und Stelle zwischen gleichwertigen Inhalten – Sprachvarianten, betriebssystemspezifischen Befehlen oder alternativen Vorgehensweisen – ohne alles untereinander auf der Seite zu stapeln. Jeder `Tab` nimmt einen `title` und eine optionale `id` entgegen.
 
 <Tabs>
   <Tab title="macOS">Nutze Homebrew, um die Toolchain zu installieren.</Tab>
@@ -78,7 +78,7 @@ Füge `inline` hinzu, um randlos zu rendern – eine Tab-Leiste auf einer Linie 
 
 Gruppen mit gleichnamigen Tabs wechseln gemeinsam – wähle in einer „macOS“, und jede Gruppe mit einem macOS-Tab zieht nach. Füge `syncKey` hinzu, um diese Synchronisierung einzugrenzen: Nur Gruppen mit demselben Schlüssel wechseln gemeinsam, sodass unabhängige Gruppen, die zufällig einen Tab-Titel teilen, eigenständig bleiben – oder `sync={false}`, um eine Gruppe ganz davon auszunehmen.
 
-Der aktive Tab wird in den URL-Hash geschrieben, sodass ein Link direkt mit ihm öffnet; übergib `hash={false}`, um die URL unverändert zu lassen. `defaultTabIndex` wählt den Tab, der zuerst geöffnet wird (nullbasiert, Standard `0`), wenn weder ein Link noch eine synchronisierte Auswahl einen bestimmt. `dropdown` ersetzt die Tab-Leiste durch ein Auswahlmenü (nur im umrandeten Layout), `borderBottom={false}` entfernt die Linie unter der Leiste, und jeder `Tab` nimmt ein `icon` entgegen, das vor seinem Titel angezeigt wird.
+Der aktive Tab wird in den URL-Hash geschrieben – als seine `id` oder andernfalls als sein in einen Slug umgewandelter Titel (`#windows`) –, sodass ein Link direkt mit ihm öffnet; übergib `hash={false}`, um die URL unverändert zu lassen. `defaultTabIndex` wählt den Tab, der zuerst geöffnet wird (nullbasiert, Standard `0`), wenn weder ein Link noch eine synchronisierte Auswahl einen bestimmt. `dropdown` ersetzt die Tab-Leiste durch ein Auswahlmenü (nur im umrandeten Layout), `borderBottom={false}` entfernt die Linie unter der Leiste, und jeder `Tab` nimmt ein `icon` entgegen, das vor seinem Titel angezeigt wird.
 
 <Tabs inline param="install">
   <Tab title="macOS">Nutze Homebrew, um die Toolchain zu installieren.</Tab>
@@ -244,7 +244,9 @@ Veranschauliche ein Projekt- oder Ordnerlayout. Umschließe eine gewöhnliche Ma
 
 ## Accordion
 
-Staple zusammengehörige Aufklappbereiche in einem einzigen umrandeten Container mit Trennlinien dazwischen – FAQs, optionale Schritte oder lange Beispiele. Jedes Kind ist ein `AccordionItem` (`title`, optional `icon`, `description`, `defaultOpen`). Der `title` rendert Inline-Markdown, sodass Code-Spans, Hervorhebungen und Links darin so erscheinen wie in einem Satz; rohes HTML darin wird als Text angezeigt. Für einen einzelnen eigenständigen Aufklappbereich verwende [Expandable](#expandable).
+Staple zusammengehörige Aufklappbereiche in einem einzigen umrandeten Container mit Trennlinien dazwischen – FAQs, optionale Schritte oder lange Beispiele. Jedes Kind ist ein `AccordionItem` (`title`, optional `id`, `icon`, `description`, `defaultOpen`). Der `title` rendert Inline-Markdown, sodass Code-Spans, Hervorhebungen und Links darin so erscheinen wie in einem Satz; rohes HTML darin wird als Text angezeigt. Für einen einzelnen eigenständigen Aufklappbereich verwende [Expandable](#expandable).
+
+Ein Link auf einen Eintrag öffnet ihn. Sein Anker ist seine `id` oder andernfalls sein in einen Slug umgewandelter Titel (unten `#does-it-support-mdx`), und einer, der sich auf der Seite wiederholt, erhält nach dem ersten `-2`, `-3`.
 
 <Accordion>
   <AccordionItem title="Does it support MDX?">
@@ -268,7 +270,7 @@ Staple zusammengehörige Aufklappbereiche in einem einzigen umrandeten Container
 
 ## Expandable
 
-Ein leichtgewichtiger Inline-Aufklappbereich für verschachtelte Details – etwa die Unterattribute eines Feldes oder eine optionale Randbemerkung. `title` beschriftet den Umschalter (Standard „Show more“) und rendert wie bei einem Accordion-Eintrag Inline-Markdown; setze `defaultOpen`, damit er aufgeklappt startet.
+Ein leichtgewichtiger Inline-Aufklappbereich für verschachtelte Details – etwa die Unterattribute eines Feldes oder eine optionale Randbemerkung. `title` beschriftet den Umschalter (Standard „Show more“) und rendert wie bei einem Accordion-Eintrag Inline-Markdown; setze `defaultOpen`, damit er aufgeklappt startet. Ein Link auf seinen in einen Slug umgewandelten Titel (`#show-advanced-options`) öffnet ihn, wie bei einem Accordion-Eintrag.
 
 <Expandable title="Show advanced options">
   Diese Einstellungen sind optional und müssen selten geändert werden.

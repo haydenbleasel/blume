@@ -121,7 +121,9 @@ As tabelas de schema seguem o caminho que os dados percorrem, assim como os exem
 
 Um corpo ou uma resposta cujo mapa `examples` nomeia dois ou mais exemplos mostra cada um deles, identificado pelo seu `summary` ou, quando não tem um, pela sua chave. Uma resposta ganha uma aba por exemplo depois do status (`200 · A cat`), o payload de um webhook ganha uma por exemplo depois do media type, e o corpo de uma requisição ganha um bloco **Examples** abaixo do schema. Os exemplos de código e o Try it partem do primeiro.
 
-Uma propriedade escrita como um `$ref` com palavras-chave ao lado, algo que o OpenAPI 3.1 permite, usa essas palavras-chave no lugar das do schema referenciado. A linha dela mostra a própria `description`, e os exemplos usam o próprio `example` ou `default` dela.
+Uma propriedade escrita como um `$ref` com palavras-chave ao lado, algo que o OpenAPI 3.1 permite, usa essas palavras-chave no lugar das do schema referenciado. A linha dela mostra a própria `description`, e os exemplos usam o próprio `example` ou `default` dela. Um `required` ao lado dele se soma aos nomes que o schema referenciado exige.
+
+Um exemplo gerado é verificado contra o schema dele, incluindo `oneOf`, `anyOf`, `not`, `const` e limites, então um exemplo nunca envia os dois lados de um `oneOf`. Ele não é verificado contra um `pattern` ou um `format`, nem contra os comprimentos ao lado de um `format`, para os quais o gerador de exemplos escreve um valor fixo. Um `oneOf` com um `discriminator` só precisa de uma variante correspondente, assim como um `oneOf` cujas variantes se sobrepõem de modo que nenhum exemplo corresponde a apenas uma, como um `Cat` e um `Dog` que são ambos um `Pet`. Um `example` ou `default` que viola o próprio schema fica de fora dos exemplos, e os que estão ao lado dele continuam. Quando nenhum exemplo passa na verificação, a página não mostra nenhum exemplo, e os exemplos de código e o Try it começam sem corpo. Os exemplos escritos no `example` ou no `examples` de um media type aparecem do jeito que foram escritos.
 
 ### Seus próprios exemplos [#your-own-samples]
 
