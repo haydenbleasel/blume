@@ -134,6 +134,10 @@ const sortedKeys = (_key: string, member: JsonValue): JsonValue =>
       )
     : member;
 
+/** A value as JSON with its object keys sorted (see {@link sortedKeys}). */
+export const canonicalJson = (value: JsonValue): string =>
+  JSON.stringify(value, sortedKeys);
+
 /** The allowed values `value` isn't among (its `enum`, else its `const`), as JSON. */
 const disallowed = (
   value: JsonValue,
@@ -142,7 +146,7 @@ const disallowed = (
   if (schema.enum === undefined && schema.const === undefined) {
     return undefined;
   }
-  const text = JSON.stringify(value, sortedKeys);
+  const text = canonicalJson(value);
   if (
     schema.enum !== undefined &&
     !schema.enum.some((member) => JSON.stringify(member, sortedKeys) === text)

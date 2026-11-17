@@ -2,7 +2,7 @@ import { sample } from "openapi-sampler";
 
 import type { ValidationSchema } from "./request.ts";
 import type { ReferenceStrings } from "./strings.ts";
-import { BOUND_LABELS, matchesSchema } from "./validate-json.ts";
+import { BOUND_LABELS, canonicalJson, matchesSchema } from "./validate-json.ts";
 import type { JsonValue } from "./validate-json.ts";
 
 /**
@@ -252,8 +252,12 @@ export const mergeSchemas = (
     }
   }
   if (Array.isArray(base.enum) && Array.isArray(over.enum)) {
-    const allowed = new Set(over.enum.map(jsonLiteral));
-    merged.enum = base.enum.filter((value) => allowed.has(jsonLiteral(value)));
+    // Objects match whatever order their keys come in, as the validator
+    // compares them.
+    // SAFETY: an `enum` lists the JSON values a spec parsed to.
+    const text = (value: SpecValue) => canonicalJson(value as JsonValue);
+    const allowed = new Set(over.enum.map(text));
+    merged.enum = base.enum.filter((value) => allowed.has(text(value)));
   }
   const allOf = [
     ...listOf(base.allOf),

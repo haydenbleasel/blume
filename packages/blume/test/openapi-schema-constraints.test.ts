@@ -791,6 +791,17 @@ describe("validation alongside other schemas on the value", () => {
     });
     const rules = validationSchema(codes, schemas);
     expect(validateJson('["abc"]', STRINGS, rules)).toStrictEqual([]);
+    // Object enum members match whatever order their keys come in.
+    const [same, other]: SchemaLike[] = JSON.parse(
+      '[{"enum": [{"b": 2, "a": 1}]}, {"enum": [{"b": 3, "a": 1}]}]'
+    );
+    const pair: SchemaLike = { enum: [{ a: 1, b: 2 }] };
+    expect(mergeSchemas({ items: pair }, { items: same }).items).toStrictEqual(
+      pair
+    );
+    expect(
+      mergeSchemas({ items: pair }, { items: other }).items?.enum
+    ).toStrictEqual([]);
     expect(validateJson('[""]', STRINGS, rules)).toStrictEqual([
       "body[0] is out of range (min length 2)",
     ]);
