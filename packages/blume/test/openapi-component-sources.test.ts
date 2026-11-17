@@ -90,6 +90,29 @@ describe("PanelTabs", () => {
   });
 });
 
+describe("SchemaTable", () => {
+  it("lists a union's limits once, on its row when it has one", async () => {
+    const [table, property] = await Promise.all([
+      source("SchemaTable.astro"),
+      source("SchemaProperty.astro"),
+    ]);
+    expect(table).toContain(
+      "{limits && <SchemaLimits schema={node.schema} />}"
+    );
+    expect(table).toContain(
+      '{limits && node.kind === "type" && <SchemaLimits schema={node.schema} />}'
+    );
+    // An array's own limits (`minItems`) read under its "Array of" line.
+    expect(table).toMatch(
+      /\{arrayAfter\}\s*\{limits && <SchemaLimits schema=\{node\.schema\} \/>\}/u
+    );
+    expect(property).toContain("<SchemaLimits schema={resolved} />");
+    expect(property).toMatch(
+      /<SchemaTable\s+node=\{children\.node\}[^>]*limits=\{false\}/u
+    );
+  });
+});
+
 describe("ParametersTable", () => {
   it("falls back to the schema's description, as the Try it panel does", async () => {
     const table = await source("ParametersTable.astro");

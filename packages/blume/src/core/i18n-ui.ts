@@ -248,8 +248,8 @@ const uiStringsObject = z.object({
     .object({
       // Before a parameter's or property's enum values.
       allowed: z.string().default("Allowed:"),
-      // Before the variants of an `anyOf` schema.
-      anyOf: z.string().default("Any of:"),
+      // Before the variants of an `anyOf` schema: a value matches one or more.
+      anyOf: z.string().default("At least one of:"),
       apiKey: z.string().default("API key"),
       // A GraphQL field's arguments: the section heading, then the inline
       // label on a field row.
@@ -330,6 +330,10 @@ const uiStringsObject = z.object({
         .default("The endpoint changed. Connect again to use it."),
       example: z.string().default("Example"),
       examples: z.string().default("Examples"),
+      // A schema row's exclusive bounds, beside `min` and `max`: the value
+      // must be less than, or greater than, `{n}`.
+      exclusiveMax: z.string().default("less than {n}"),
+      exclusiveMin: z.string().default("greater than {n}"),
       fields: z.string().default("Fields"),
       fillParameters: z
         .string()
@@ -388,6 +392,9 @@ const uiStringsObject = z.object({
         .default("No authorization needed on {servers}."),
       noExamplePayload: z.string().default("No example payload."),
       noExampleResponse: z.string().default("No example response."),
+      // A schema row's `not`, beside its other limits; `{value}` is what it
+      // rules out (`"reserved"`).
+      not: z.string().default("not {value}"),
       // A Try it body or event payload that fails its schema (also
       // `requiredMissing` and `wrongType`); `{path}` is the value's location
       // (`body.name`).
@@ -400,8 +407,8 @@ const uiStringsObject = z.object({
       oauth2Token: z.string().default("OAuth2 access token"),
       // A credential that only some servers ask for; `{servers}` lists them.
       onServers: z.string().default("on {servers}"),
-      // Before the variants of a `oneOf` schema.
-      oneOf: z.string().default("One of:"),
+      // Before the variants of a `oneOf` schema: a value matches exactly one.
+      oneOf: z.string().default("Exactly one of:"),
       openIdConnectToken: z.string().default("OpenID Connect token"),
       // A GraphQL operation's own code panel.
       operation: z.string().default("Operation"),
@@ -412,6 +419,9 @@ const uiStringsObject = z.object({
       option: z.string().default("Option {n}"),
       // Between alternative ways to authorize.
       or: z.string().default("or"),
+      // A Try it body or event payload value outside its schema's bounds;
+      // `{limits}` lists the bounds it breaks, worded like `min` and `max`.
+      outOfRange: z.string().default("{path} is out of range ({limits})"),
       // The sidebar label of a reference's overview page.
       overview: z.string().default("Overview"),
       parameters: z.string().default("Parameters"),
@@ -432,6 +442,10 @@ const uiStringsObject = z.object({
       response: z.string().default("Response"),
       responses: z.string().default("Responses"),
       returns: z.string().default("Returns"),
+      // A Try it body or event payload that matches none of its `anyOf`
+      // variants, not exactly one of its `oneOf` variants, or its `not`
+      // (bounds have `outOfRange`).
+      schemaMismatch: z.string().default("{path} doesn't match its schema"),
       scopes: z.string().default("Scopes:"),
       send: z.string().default("Send"),
       sending: z.string().default("Sending…"),

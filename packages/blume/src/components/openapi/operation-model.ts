@@ -5,6 +5,7 @@ import {
   mediaExample,
   objectProperties,
   parameterDescription,
+  playgroundRules,
   resolveSchema,
   toJson,
 } from "./helpers.ts";
@@ -14,12 +15,7 @@ import type {
   SchemaLike,
   SpecValue,
 } from "./helpers.ts";
-import {
-  declaredTypes,
-  inputValue,
-  scalarType,
-  validationSchema,
-} from "./playground-schema.ts";
+import { declaredTypes, inputValue, scalarType } from "./playground-schema.ts";
 import { bodyEncoding } from "./request.ts";
 import type {
   ParamSerialization,
@@ -191,6 +187,8 @@ const bodyFields = (
     return undefined;
   }
   const { properties, required } = objectProperties(resolved, schemas);
+  // Without an example object the fields start empty; an empty optional
+  // field isn't sent.
   const defaults = isExampleObject(example) ? example : undefined;
   const fields: PlaygroundBodyField[] = [];
   for (const [name, property] of properties) {
@@ -244,7 +242,7 @@ const modelBody = (
     fields: raw
       ? undefined
       : bodyFields(mediaType.schema, schemas, exampleData),
-    schema: validationSchema(mediaType.schema, schemas),
+    schema: playgroundRules(mediaType.schema, schemas, exampleData),
   };
   const fieldEncoding =
     encoding === "form" ? formEncoding(mediaType.encoding) : undefined;

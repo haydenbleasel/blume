@@ -190,6 +190,8 @@ export const ca: UIStringsOverride = {
       "El punt final ha canviat. Torna't a connectar per fer-lo servir.",
     example: "Exemple",
     examples: "Exemples",
+    exclusiveMax: "menor que {n}",
+    exclusiveMin: "més gran que {n}",
     fields: "Camps",
     fillParameters:
       "Omple tots els paràmetres del canal abans de connectar: {names}.",
@@ -233,6 +235,7 @@ export const ca: UIStringsOverride = {
     noAuthorizationOn: "No cal autorització a {servers}.",
     noExamplePayload: "No hi ha cap càrrega útil d'exemple.",
     noExampleResponse: "No hi ha cap resposta d'exemple.",
+    not: "no {value}",
     notAllowed: "{path} ha de ser un d'aquests valors: {values}",
     notConnected: "No connectat.",
     notConnectedStream:
@@ -247,6 +250,7 @@ export const ca: UIStringsOverride = {
     operations: "Operacions",
     option: "Opció {n}",
     or: "o",
+    outOfRange: "{path} està fora de l'interval ({limits})",
     overview: "Visió general",
     parameters: "Paràmetres",
     pathParameters: "Paràmetres de camí",
@@ -263,6 +267,7 @@ export const ca: UIStringsOverride = {
     response: "Resposta",
     responses: "Respostes",
     returns: "Retorna",
+    schemaMismatch: "{path} no coincideix amb el seu esquema",
     scopes: "Àmbits:",
     send: "Envia",
     sending: "S'està enviant…",

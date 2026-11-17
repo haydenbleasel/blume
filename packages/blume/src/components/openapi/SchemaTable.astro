@@ -7,6 +7,7 @@ import {
   type SchemaNode,
   schemaTree,
 } from "./schema-tree.ts";
+import SchemaLimits from "./SchemaLimits.astro";
 import SchemaProperty from "./SchemaProperty.astro";
 import { aroundPlaceholder, referenceStrings } from "./strings.ts";
 
@@ -19,6 +20,11 @@ interface Props {
   expandAll?: boolean;
   /** Which way the data travels, which decides the fields left out. */
   direction?: SchemaDirection;
+  /**
+   * Whether the node's own limits are listed, above a union's variants or
+   * under a type. A row's disclosure says no: the row lists them already.
+   */
+  limits?: boolean;
 }
 
 const {
@@ -27,6 +33,7 @@ const {
   schemas,
   expandAll = false,
   direction,
+  limits = true,
 } = Astro.props;
 
 // The whole tree is planned once, at the top-level table, so that which named
@@ -47,6 +54,7 @@ const COMBINATORS = { "Any of": strings.anyOf, "One of": strings.oneOf };
     <div>
       <div class="mb-2 text-muted-foreground text-xs">
         {arrayBefore}<code class="text-foreground">{node.itemsLabel}</code>{arrayAfter}
+        {limits && <SchemaLimits schema={node.schema} />}
       </div>
       {node.items && (
         <Astro.self node={node.items.node} schemas={schemas} expandAll={expandAll} />
@@ -61,15 +69,21 @@ const COMBINATORS = { "Any of": strings.anyOf, "One of": strings.oneOf };
           ))}
         </div>
       )}
-      <div class="text-muted-foreground text-xs">{COMBINATORS[node.label]}</div>
-      {node.branches.map((branch, index) => (
-        <div class="rounded-blume border border-border p-3">
-          <div class="mb-2 font-medium text-foreground text-xs">
-            {branch.label ||
-              strings.option.replaceAll("{n}", () => String(index + 1))}
-          </div>
-          <Astro.self node={branch.slot.node} schemas={schemas} expandAll={expandAll} />
-        </div>
+      {/* A union's own limits bind every variant, so they read first. */}
+      {limits && <SchemaLimits schema={node.schema} />}
+      {node.groups.map((group) => (
+        <>
+          <div class="text-muted-foreground text-xs">{COMBINATORS[group.label]}</div>
+          {group.branches.map((branch, index) => (
+            <div class="rounded-blume border border-border p-3">
+              <div class="mb-2 font-medium text-foreground text-xs">
+                {branch.label ||
+                  strings.option.replaceAll("{n}", () => String(index + 1))}
+              </div>
+              <Astro.self node={branch.slot.node} schemas={schemas} expandAll={expandAll} />
+            </div>
+          ))}
+        </>
       ))}
     </div>
   ) : node.kind === "properties" ? (
@@ -83,6 +97,7 @@ const COMBINATORS = { "Any of": strings.anyOf, "One of": strings.oneOf };
       <code class="text-foreground">
         {node.kind === "named" ? node.name : node.label}
       </code>
+      {limits && node.kind === "type" && <SchemaLimits schema={node.schema} />}
     </div>
   )
 }

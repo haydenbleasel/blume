@@ -190,6 +190,8 @@ export const fr: UIStringsOverride = {
       "Le point de terminaison a changé. Reconnectez-vous pour l'utiliser.",
     example: "Exemple",
     examples: "Exemples",
+    exclusiveMax: "inférieur à {n}",
+    exclusiveMin: "supérieur à {n}",
     fields: "Champs",
     fillParameters:
       "Renseignez tous les paramètres du canal avant de vous connecter : {names}.",
@@ -233,6 +235,7 @@ export const fr: UIStringsOverride = {
     noAuthorizationOn: "Aucune autorisation requise sur {servers}.",
     noExamplePayload: "Aucun exemple de charge utile.",
     noExampleResponse: "Aucun exemple de réponse.",
+    not: "pas {value}",
     notAllowed: "{path} doit être l'une des valeurs suivantes : {values}",
     notConnected: "Non connecté.",
     notConnectedStream:
@@ -247,6 +250,7 @@ export const fr: UIStringsOverride = {
     operations: "Opérations",
     option: "Option {n}",
     or: "ou",
+    outOfRange: "{path} est hors limites ({limits})",
     overview: "Vue d'ensemble",
     parameters: "Paramètres",
     pathParameters: "Paramètres de chemin",
@@ -263,6 +267,7 @@ export const fr: UIStringsOverride = {
     response: "Réponse",
     responses: "Réponses",
     returns: "Renvoie",
+    schemaMismatch: "{path} ne correspond pas à son schéma",
     scopes: "Portées :",
     send: "Envoyer",
     sending: "Envoi…",
