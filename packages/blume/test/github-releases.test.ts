@@ -82,7 +82,7 @@ const asFetch = (handler: FetchHandler): typeof fetch =>
 /** The frontmatter shape githubReleasesSource stages for a release entry. */
 interface ReleaseMeta {
   changelog?: { category?: string };
-  seo?: { description?: string };
+  seo?: { description?: string; noindex?: boolean };
 }
 
 // SAFETY: every entry passed here comes straight from githubReleasesSource,
@@ -111,6 +111,21 @@ const releasesFetch = (pages: Record<number, Release[]>): ReleasesFetch => {
 const failingFetch = asFetch(() =>
   Promise.resolve(new Response("", { status: 404 }))
 );
+
+/** Whether the config schema accepts `noindex` on a `githubReleases()` source. */
+const noindexParses = (noindex: boolean | { [key: string]: number }) =>
+  blumeConfigSchema.safeParse({
+    content: {
+      sources: [
+        githubReleases({
+          // SAFETY: deliberately unvalidated input, to exercise the schema.
+          noindex: noindex as boolean,
+          owner: "acme",
+          repo: "sdk",
+        }),
+      ],
+    },
+  }).success;
 
 describe("githubReleasesSource", () => {
   it("watch polls fresh past the dev cache and fires on a new release", async () => {
@@ -299,6 +314,50 @@ describe("githubReleasesSource", () => {
     // No lone surrogate anywhere: the string must round-trip through UTF-8.
     expect(description).toBe(Buffer.from(description, "utf-8").toString());
     expect(description).not.toContain("💥");
+  });
+
+  it("noindexes the releases the noindex option names", async () => {
+    // Four words of prose: the heading and the commit hash don't count.
+    const short = "### Patch Changes\n\n- 5437f81: Attempt the fix again";
+    const long = "- Added widgets that resize themselves to fit the window";
+    const releases = [
+      makeRelease({ body: short, id: 1, tag_name: "v1.0.0" }),
+      makeRelease({ body: long, id: 2, tag_name: "v2.0.0" }),
+      makeRelease({ body: "", id: 3, tag_name: "v3.0.0" }),
+    ];
+    const load = async (
+      noindex?: boolean | { minWords: number }
+    ): Promise<ReleaseMeta[]> => {
+      const { fetchImpl } = releasesFetch({ 1: releases });
+      const source = githubReleasesSource(
+        { fetchImpl, name: "changelog", noindex, owner: "acme", repo: "sdk" },
+        ctxFor(await tempDir())
+      );
+      const { entries } = await source.load();
+      return entries.map((entry) => metaOf(entry));
+    };
+    const [shortMeta, longMeta, emptyMeta] = await load({ minWords: 5 });
+    expect(shortMeta?.seo).toEqual({
+      description: "Attempt the fix again",
+      noindex: true,
+    });
+    expect(longMeta?.seo?.noindex).toBeUndefined();
+    // Notes with no prose at all are under any minimum.
+    expect(emptyMeta?.seo).toEqual({ noindex: true });
+    // `true` noindexes every release, `false` and no option none.
+    const all = await load(true);
+    expect(all.every((meta) => meta.seo?.noindex)).toBe(true);
+    const off = await load(false);
+    expect(off.some((meta) => meta.seo?.noindex)).toBe(false);
+    const unset = await load();
+    expect(unset.some((meta) => meta.seo?.noindex)).toBe(false);
+  });
+
+  it("accepts the noindex option on the adapter and rejects a bad one", () => {
+    expect(noindexParses(true)).toBe(true);
+    expect(noindexParses({ minWords: 60 })).toBe(true);
+    expect(noindexParses({ minWords: 0 })).toBe(false);
+    expect(noindexParses({ extra: 1, minWords: 60 })).toBe(false);
   });
 
   it("keeps a short body as-is and omits seo for an empty one", async () => {

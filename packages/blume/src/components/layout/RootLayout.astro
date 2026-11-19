@@ -43,6 +43,8 @@ import {
   OG_IMAGE_WIDTH,
 } from "../../og/dimensions.ts";
 import { buildStructuredData, toIso } from "../../seo/jsonld.ts";
+import { ogTypeFor } from "../../seo/page-kind.ts";
+import type { FaqEntry } from "../../markdown/faq.ts";
 import type { AuthorInput } from "../../seo/jsonld.ts";
 import { normalizeXHandle } from "../../seo/x-handle.ts";
 import { withBase, withMountedBase } from "../islands/base-path.ts";
@@ -199,6 +201,11 @@ interface Props {
   published?: string | Date | null;
   /** The page's front matter `authors`, credited in its JSON-LD. */
   authors?: AuthorInput | AuthorInput[];
+  /**
+   * The page's questions and answers (front matter `seo.faq`, read off the
+   * page by `markdown/faq.ts`), emitted as a `FAQPage` JSON-LD node.
+   */
+  faq?: FaqEntry[];
   lastModified?: string | null;
   noindex?: boolean;
   structuredDataEnabled?: boolean;
@@ -316,6 +323,7 @@ const {
   pageMode,
   published,
   authors,
+  faq,
   lastModified,
   noindex,
   structuredDataEnabled,
@@ -444,8 +452,7 @@ const description = page.description ?? site.description;
 // Blog posts and changelog entries are dated writing, so they take `og:type:
 // article` — the same split JSON-LD makes when it picks an article @type. Docs
 // pages (and the changelog index, which has no `type`) stay `website`.
-const ogType =
-  pageType === "blog" || pageType === "changelog" ? "article" : "website";
+const ogType = ogTypeFor(pageType);
 // The last-modified date as ISO 8601, parsed once for every surface that
 // carries it; undefined when absent or unparseable.
 const lastModifiedIso = toIso(lastModified);
@@ -542,6 +549,7 @@ const structuredData =
       base: import.meta.env.BASE_URL,
       breadcrumbs: crumbs,
       description,
+      faq,
       homeRoute: navigation.root,
       identity: data.config.identity,
       jsonLd: data.config.jsonLd,

@@ -5,6 +5,7 @@ import { toString as mdastToString } from "mdast-util-to-string";
 import { gfm } from "micromark-extension-gfm";
 import stringWidth from "string-width";
 
+import type { GithubReleasesNoindex } from "../../sources/github-releases.ts";
 import matter from "../frontmatter.ts";
 import { PUBLIC_API_URL } from "../github.ts";
 import { neutralizeUnsafeLinks } from "../safe-links.ts";
@@ -35,6 +36,8 @@ export interface GithubReleasesSourceOptions {
   /** Cap the number of releases materialized, newest-first. Default 100. */
   limit?: number;
   name: string;
+  /** Which release pages are `noindex` (see `githubReleases`). */
+  noindex?: GithubReleasesNoindex;
   /** Repository owner (user or org). */
   owner: string;
   /** Opt-in dev polling interval (seconds); omit to freeze for the session. */
@@ -90,28 +93,36 @@ const TRAILING_FRAGMENT = /[\s,;:.—–-]+$/u;
 const NON_PROSE = new Set(["code", "heading", "html", "thematicBreak"]);
 
 /**
- * Derive a meta description from release notes: GitHub-flavored markdown
- * parsed to mdast and reduced to the plain text of its prose blocks —
- * section headings ("### Patch Changes"), code fences, and changesets'
- * commit-hash bullet prefixes dropped; link/emphasis text and inline code
- * content kept — then cut at a word boundary to fit the search snippet cap.
- * Undefined when the notes have no prose at all.
+ * The plain text of release notes' prose: GitHub-flavored markdown parsed to
+ * mdast and reduced to the text of its prose blocks — section headings ("###
+ * Patch Changes"), code fences, and changesets' commit-hash bullet prefixes
+ * dropped; link/emphasis text and inline code content kept.
  */
-const releaseDescription = (body: string): string | undefined => {
+const releaseProse = (body: string): string => {
   const tree = fromMarkdown(body.replaceAll(CHANGESET_HASH, "$<mark>"), {
     extensions: [gfm()],
     mdastExtensions: [gfmFromMarkdown()],
   });
-  const text = tree.children
-    .filter((node) => !NON_PROSE.has(node.type))
-    // Images vanish (their alt is not prose) and raw HTML/JSX tags drop,
-    // matching what a reader of the rendered notes would see as text.
-    .map((node) =>
-      mdastToString(node, { includeHtml: false, includeImageAlt: false })
-    )
-    .join(" ")
-    .replaceAll(WHITESPACE, " ")
-    .trim();
+  return (
+    tree.children
+      .filter((node) => !NON_PROSE.has(node.type))
+      // Images vanish (their alt is not prose) and raw HTML/JSX tags drop,
+      // matching what a reader of the rendered notes would see as text.
+      .map((node) =>
+        mdastToString(node, { includeHtml: false, includeImageAlt: false })
+      )
+      .join(" ")
+      .replaceAll(WHITESPACE, " ")
+      .trim()
+  );
+};
+
+/**
+ * Derive a meta description from release notes' prose (see
+ * {@link releaseProse}), cut at a word boundary to fit the search snippet
+ * cap. Undefined when the notes have no prose at all.
+ */
+const releaseDescription = (text: string): string | undefined => {
   if (!text) {
     return undefined;
   }
@@ -128,6 +139,21 @@ const releaseDescription = (body: string): string | undefined => {
       : slice
   ).replace(TRAILING_FRAGMENT, "");
   return `${head}…`;
+};
+
+/**
+ * Whether a release's page is `noindex` under the source's `noindex` option:
+ * every one for `true`, and for `{ minWords }` one whose prose has fewer
+ * words than that.
+ */
+const releaseNoindex = (
+  prose: string,
+  noindex: GithubReleasesNoindex | undefined
+): boolean => {
+  if (noindex === true || noindex === false || noindex === undefined) {
+    return noindex === true;
+  }
+  return prose.split(" ").filter(Boolean).length < noindex.minWords;
 };
 
 /** Every heading in a tree, in document order (lists and quotes included). */
@@ -279,7 +305,7 @@ const githubHeaders = (): Headers => {
 interface ChangelogFrontmatter {
   changelog: { category: string; version: string };
   date: string;
-  seo?: { description: string };
+  seo?: { description?: string; noindex?: boolean };
   title?: string;
   type?: string;
 }
@@ -301,7 +327,10 @@ const releaseCategory = (release: GithubRelease): string => {
  * generated `/changelog` timeline and RSS feed, and a summary derived from the
  * notes becomes the release page's meta description.
  */
-const releaseToEntry = (release: GithubRelease, site?: string): SourceEntry => {
+const releaseToEntry = (
+  release: GithubRelease,
+  options: Pick<GithubReleasesSourceOptions, "noindex" | "site">
+): SourceEntry => {
   const version = release.tag_name.replace(LEADING_V, "");
   const title = release.name?.trim() || release.tag_name;
   const date = release.published_at ?? release.created_at;
@@ -315,21 +344,31 @@ const releaseToEntry = (release: GithubRelease, site?: string): SourceEntry => {
       neutralizeUnsafeLinks(
         (release.body ?? "").replaceAll("\r\n", "\n")
       ).trim(),
-      site
+      options.site
     )
   );
   // A summary in `seo.description` gives each release page a unique meta
   // description (instead of the site-wide fallback) without also rendering the
   // visible lede paragraph a top-level `description` would add.
-  const description = releaseDescription(body);
+  const prose = releaseProse(body);
+  const description = releaseDescription(prose);
+  // A release the `noindex` option catches (see `releaseNoindex`) keeps its
+  // page, its place on the timeline, and its feed item, but leaves the index.
+  const noindex = releaseNoindex(prose, options.noindex);
   // Assignment order matters: js-yaml serializes keys in insertion order, so
   // `seo` lands between `date` and `title` exactly as it always has.
   const data: ChangelogFrontmatter = {
     changelog: { category, version },
     date,
   };
-  if (description) {
-    data.seo = { description };
+  if (description || noindex) {
+    data.seo = {};
+    if (description) {
+      data.seo.description = description;
+    }
+    if (noindex) {
+      data.seo.noindex = true;
+    }
   }
   data.title = title;
   data.type = "changelog";
@@ -423,9 +462,7 @@ export const githubReleasesSource = (
         cache,
         async () => {
           const releases = await fetchReleases();
-          return releases.map((release) =>
-            releaseToEntry(release, options.site)
-          );
+          return releases.map((release) => releaseToEntry(release, options));
         },
         refresh
       );

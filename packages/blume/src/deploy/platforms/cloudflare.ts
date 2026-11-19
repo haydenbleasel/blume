@@ -4,6 +4,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { basename, dirname, join, relative, resolve } from "pathe";
 
 import { pageJsonPath } from "../../ai/api/paths.ts";
+import { builtMirrorRoutes } from "../../ai/built-pages.ts";
 import { buildHomeLinkHeader } from "../../ai/link-headers.ts";
 import {
   agentMarkdown,
@@ -84,21 +85,26 @@ export const emitCloudflareNegotiation = async (
     warnNegotiationSkipped(log);
     return;
   }
-  const routePaths = markdownRoutePaths(project);
+  // The adapter writes the prerendered files under the deployment base
+  // (`dist/client/<base>/`), where the wrapper fetches them from.
+  const staticDir = join(
+    clientDir(context),
+    normalizeBasePath(config.deployment.options.base)
+  );
+  // The content routes, plus the custom pages the build wrote a Markdown
+  // copy of (see `ai/built-pages.ts`).
+  const routePaths = [
+    ...markdownRoutePaths(project),
+    ...builtMirrorRoutes(project, staticDir),
+  ];
   // The homepage mirror is served from the static layer, so its
   // `x-markdown-tokens` estimate rides the wrapper Worker, mirroring the
   // Vercel routing config.
   const rawMarkdown = await buildRawMarkdown(project);
   const home = rawMarkdown["/"];
-  // The 404 twins the wrapper may substitute for the HTML shell; only wired
-  // when the build actually emitted them (a project that owns `/404` gets
-  // neither), like the Vercel routing config. The adapter writes the
-  // prerendered files under the deployment base (`dist/client/<base>/`),
-  // where the wrapper fetches them from.
-  const staticDir = join(
-    clientDir(context),
-    normalizeBasePath(config.deployment.options.base)
-  );
+  // The 404 twins the wrapper may substitute for the HTML shell are only
+  // wired when the build actually emitted them (a project that owns `/404`
+  // gets neither), like the Vercel routing config.
   const injected = injectWorkerNegotiation(
     await readFile(wranglerPath, "utf-8"),
     {

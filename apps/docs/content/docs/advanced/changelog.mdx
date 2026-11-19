@@ -62,6 +62,8 @@ Once you have at least one `type: changelog` entry, Blume generates a **`/change
 - The date follows the configured [`dateFormat`](/docs/configuration#date-format), minus the year the row's group already shows.
 - Drafts and `sidebar.hidden` entries are skipped.
 
+The page is dated by its newest entry that search engines may index (a [`noindex`](/docs/discoverability/metadata#per-page-overrides) release still shows on the timeline but doesn't count): a "Last updated" line at the foot of the page, its JSON-LD `dateModified`, and its `<lastmod>` in the [sitemap](/docs/discoverability/sitemap-and-robots#sitemap).
+
 The page is headed **Changelog** (in English), with a one-line description below. Set your own with `changelog` in your config; they also become the page's `<title>`, meta description, and OG card, and the top of its Markdown mirror at `/changelog.md`:
 
 ```ts blume.config.ts

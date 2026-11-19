@@ -1,6 +1,7 @@
 // html-escaper's five-entity table is XML-safe (`'` → the numeric `&#39;`).
 import { escape as escapeXml } from "html-escaper";
 
+import type { BuiltPage } from "../ai/built-pages.ts";
 import {
   customStaticRoutes,
   discoverPagesSync,
@@ -172,7 +173,8 @@ export const hreflangAlternates = (
 /**
  * Build the sitemap files from the route manifest plus the routes the manifest
  * can't see: custom `.astro` pages (most importantly a custom landing `/`) and
- * the generated `/changelog` index. Returns null when the sitemap is disabled
+ * the generated `/changelog` index, each dated and filtered by what the build
+ * read back from its HTML (`builtPages`). Returns null when the sitemap is disabled
  * or no `site` is configured (absolute URLs are required for a valid sitemap).
  * Drafts, hidden, and `noindex` pages are excluded, and so is a page whose
  * `seo.canonical` points elsewhere.
@@ -183,7 +185,8 @@ export const hreflangAlternates = (
  * already points at.
  */
 export const buildSitemapFiles = (
-  project: BlumeProject
+  project: BlumeProject,
+  builtPages: readonly BuiltPage[] = []
 ): SitemapFile[] | null => {
   const { site } = project.config.deployment.options;
   if (!(site && project.config.seo.sitemap)) {
@@ -259,8 +262,15 @@ export const buildSitemapFiles = (
   if (hasGeneratedChangelog(project, userPages)) {
     extraRoutes.push("/changelog");
   }
+  // What the build read back from those pages' HTML (see
+  // `ai/built-pages.ts`): a `noindex` one stays out, and a dated one carries
+  // its date.
+  const built = new Map(builtPages.map((page) => [page.route, page]));
   for (const route of extraRoutes) {
-    pushUrl(mountBasePath(deployBase, route));
+    const page = built.get(route);
+    if (!page?.noindex) {
+      pushUrl(mountBasePath(deployBase, route), page?.lastModified);
+    }
   }
   urls.sort();
 

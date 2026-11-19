@@ -20,6 +20,7 @@ export default defineConfig({
         // prereleases: false,  // include prereleases (default off)
         // drafts: false,       // include drafts (needs a write token)
         // limit: 100,          // cap releases, newest-first
+        // noindex: { minWords: 60 }, // keep short releases out of search
         // baseUrl: "https://github.acme.com/api/v3", // GitHub Enterprise Server
       }),
     ],
@@ -35,6 +36,10 @@ changelog: {
   description: "Every release of the Acme SDK, from GitHub.",
 },
 ```
+
+### Short releases
+
+A repo that releases often has many release pages that say little, a version bump or a one-line fix, and a search engine that indexes them all reads the site as mostly thin pages. Set `noindex` to keep them out of the index: `{ minWords: 60 }` marks a release `noindex` when its notes have fewer than 60 words of prose (headings, code, and changesets' leading commit hashes don't count), and `true` marks every release. A noindexed release keeps its page, its place on the `/changelog` timeline, and its RSS item, but leaves the [sitemap](/docs/discoverability/sitemap-and-robots#sitemap), [`llms.txt`](/docs/discoverability/llms-txt), and [structured data](/docs/discoverability/structured-data), as any [`noindex`](/docs/discoverability/metadata#per-page-overrides) page does.
 
 A private repo authenticates with the `GITHUB_TOKEN` environment variable — the same token the other GitHub features use, never inlined into your config; the adapter declares it, so a build without it warns. For a repository on GitHub Enterprise Server, set `baseUrl` to its REST API (`https://<host>/api/v3`); `GITHUB_TOKEN` is sent there, so it must be a token for that server. Like [every remote source](/docs/content/sources#caching-and-offline-builds) it's cached under `.blume/cache/<source>/` and served offline if the API is unreachable. Because a changelog is supplementary, a fetch failure with no cache (say a CI build without a token) degrades to an empty changelog with a warning rather than failing the build — set `GITHUB_TOKEN` in your CI and deploy environments to populate it.
 

@@ -501,7 +501,7 @@ describe("negotiation worker — responses", () => {
     const worker = await loadWorker(workerText());
     const { calls, env } = makeEnv({ assetsStatus: 404 });
     const response = await worker.fetch(
-      new Request("https://site.test/docs/quickstart/", {
+      new Request("https://site.test/docs/quickstart", {
         headers: { accept: "text/markdown" },
       }),
       env,
@@ -541,7 +541,7 @@ describe("negotiation worker — responses", () => {
     const worker = await loadWorker(workerText({ assetsBinding: "FILES" }));
     const { calls, env } = makeEnv();
     const response = await worker.fetch(
-      new Request("https://site.test/docs/quickstart/", {
+      new Request("https://site.test/docs/quickstart", {
         headers: { accept: "text/markdown" },
       }),
       env,
@@ -549,6 +549,57 @@ describe("negotiation worker — responses", () => {
     );
     expect(calls.server.length).toBe(1);
     expect(response.headers.get("vary")).toBe("Accept");
+  });
+});
+
+describe("negotiation worker — canonical URLs", () => {
+  it("redirects a content page's slashed URL to its own, keeping the query", async () => {
+    const worker = await loadWorker(workerText({ base: "/site/" }));
+    const { calls, env } = makeEnv();
+    const response = await worker.fetch(
+      new Request("https://site.test/site/docs/quickstart/?tab=npm"),
+      env,
+      {}
+    );
+    expect(response.status).toBe(301);
+    expect(response.headers.get("location")).toBe(
+      "/site/docs/quickstart?tab=npm"
+    );
+    expect(response.headers.get("x-powered-by")).toBe("Blume");
+    expect(calls.server).toStrictEqual([]);
+    // The bare base and a path that is no content route are left alone.
+    for (const path of ["/site/", "/site/not-a-route/"]) {
+      // oxlint-disable-next-line no-await-in-loop -- sequential vectors
+      const passed = await worker.fetch(
+        new Request(`https://site.test${path}`),
+        env,
+        {}
+      );
+      expect(passed.status).toBe(200);
+    }
+  });
+
+  it("keeps the noindex of a Markdown copy off the page's own URL", async () => {
+    const worker = await loadWorker(workerText());
+    const { env } = makeEnv();
+    env.ASSETS.fetch = (): Promise<Response> =>
+      Promise.resolve(
+        new Response("# markdown", {
+          headers: {
+            "content-type": "text/markdown",
+            "x-robots-tag": "noindex",
+          },
+        })
+      );
+    const response = await worker.fetch(
+      new Request("https://site.test/docs/quickstart", {
+        headers: { accept: "text/markdown" },
+      }),
+      env,
+      {}
+    );
+    expect(await response.text()).toBe("# markdown");
+    expect(response.headers.get("x-robots-tag")).toBeNull();
   });
 });
 

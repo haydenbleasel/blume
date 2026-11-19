@@ -36,7 +36,8 @@ import {
   OG_IMAGE_TYPE,
   OG_IMAGE_WIDTH,
 } from "../../og/dimensions.ts";
-import { buildStructuredData } from "../../seo/jsonld.ts";
+import { buildStructuredData, toIso } from "../../seo/jsonld.ts";
+import { customMirrorName, ogTypeFor } from "../../seo/page-kind.ts";
 import { normalizeXHandle } from "../../seo/x-handle.ts";
 import Icon from "../Icon.astro";
 import { stripBase, withBase, withMountedBase } from "../islands/base-path.ts";
@@ -139,6 +140,31 @@ interface Props {
    */
   lastModified?: string | Date | null;
   /**
+   * When the page was first published, emitted as the JSON-LD
+   * `datePublished` and, on an article, `article:published_time`.
+   */
+  published?: string | Date | null;
+  /**
+   * The page's content type, as a content page's front matter `type` names
+   * it. `"blog"` and `"changelog"` make it an article: `og:type: article`
+   * with `article:published_time`/`article:modified_time`, and a
+   * `BlogPosting`/`TechArticle` JSON-LD node.
+   */
+  pageType?: string;
+  /**
+   * The schema.org `@type` of the page's JSON-LD node (`"WebPage"`,
+   * `"CollectionPage"`, …), in place of the one `pageType` picks — a landing
+   * or index page isn't an article.
+   */
+  structuredDataType?: string;
+  /**
+   * The agent surfaces, as a content page's front matter `ai` sets them.
+   * `exclude: true` keeps the page out of its Markdown copy, `llms.txt`, and
+   * `llms-full.txt`: the page's `<main>` is marked web-only, which is what
+   * the build reads back (see `ai/built-pages.ts`).
+   */
+  ai?: { exclude?: boolean };
+  /**
    * Which agent-discovery resources exist, advertised as `describedby` head
    * links plus the AI Catalog/ARD pair — the same `DiscoveryLinks` partial
    * RootLayout renders. A custom page gets this from the `blume:data` snapshot
@@ -193,6 +219,10 @@ const {
   canonical,
   structuredDataEnabled,
   lastModified,
+  published,
+  pageType,
+  structuredDataType,
+  ai,
   discovery = data.config.discovery,
   x,
   noindex,
@@ -235,12 +265,26 @@ const route =
   stripBase(import.meta.env.BASE_URL ?? "/", Astro.url.pathname);
 const activeTab = currentTabForRoute(navigation.tabs, route, navigation.root);
 
-// A custom page has no raw-Markdown mirror — except the homepage: `/index.md`
-// always exists (see `markdownRoutePaths`; a landing page gets the synthesized
-// llms.txt index), and the homepage HTTP `Link` header already advertises it,
-// so the head is its HTML counterpart on hosts that can't set that header.
-// Advertising a mirror for any other custom route would 404.
-const markdownMirror = route === "/" ? withMountedBase("/index.md") : null;
+// The page's Markdown copy, advertised as a `text/markdown` alternate. The
+// homepage's `/index.md` always exists (see `markdownRoutePaths`; a landing
+// page gets the synthesized llms.txt index). Any other static page the build
+// reads back gets a copy at `<route>.md`, converted from the `<main>` it
+// renders (see `ai/built-pages.ts`) — the same pages `customMirrorName` names.
+const aiExcluded = ai?.exclude === true;
+const mirrorName = customMirrorName({
+  dynamic: Astro.routePattern.includes("["),
+  excluded: aiExcluded,
+  noindex: noindex === true,
+  route,
+});
+const markdownMirror = mirrorName
+  ? withMountedBase(`${encodeURI(mirrorName)}.md`)
+  : null;
+// Dated writing (a blog post, a changelog entry) is an article, with its
+// timestamps; anything else is a website, as RootLayout decides.
+const ogType = ogTypeFor(pageType);
+const articlePublished = ogType === "article" ? toIso(published) : undefined;
+const articleModified = ogType === "article" ? toIso(lastModified) : undefined;
 
 // Derive canonical + og:image from the site URL the same way the catch-all does
 // for content pages, so a custom page gets both for free. The matching OG card
@@ -312,7 +356,10 @@ const structuredData =
       image: resolvedOgImage,
       locale,
       modified: lastModified,
+      pageType,
+      published,
       route,
+      schemaType: structuredDataType,
       siteName: site.title,
       siteUrl: siteUrl ?? null,
       title: pageTitle,
@@ -379,11 +426,21 @@ const localeRedirect = localeTargets
     )}
     {noindex && <meta content="noindex" name="robots" />}
     {description && <meta content={description} name="description" />}
-    <meta content="website" property="og:type" />
+    <meta content={ogType} property="og:type" />
     <meta content={site.title} property="og:site_name" />
     <meta content={pageTitle} property="og:title" />
     {description && <meta content={description} property="og:description" />}
     {resolvedCanonical && <meta content={resolvedCanonical} property="og:url" />}
+    {
+      articlePublished && (
+        <meta content={articlePublished} property="article:published_time" />
+      )
+    }
+    {
+      articleModified && (
+        <meta content={articleModified} property="article:modified_time" />
+      )
+    }
     {
       resolvedOgImage && (
         <>
@@ -440,6 +497,9 @@ const localeRedirect = localeTargets
         />
       )
     }
+    {/* The page's own head tags: a feed's `alternate` link, its own JSON-LD,
+        a preload. */}
+    <slot name="head" />
     {
       bannerKey && (
         <script data-key={bannerKey} is:inline set:html={BANNER_INIT_SCRIPT} />
@@ -479,7 +539,10 @@ const localeRedirect = localeTargets
       switcherStrings={strings.languageSwitcher}
       transparent={transparentHeader}
     />
-    <main id="blume-content"><slot /></main>
+    <main
+      data-blume-visibility={aiExcluded ? "web" : undefined}
+      id="blume-content"
+    ><slot /></main>
     {
       Astro.slots.has("footer") ? (
         <slot name="footer" />
