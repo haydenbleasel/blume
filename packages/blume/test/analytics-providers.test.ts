@@ -1,6 +1,11 @@
 import { describe, expect, it } from "bun:test";
 
 import {
+  NOTRA_SCRIPT_PLUS_RELEASE,
+  NOTRA_SCRIPT_RELEASE,
+} from "@usenotra/sdk/script";
+
+import {
   AMPLITUDE_DEFAULT_INIT,
   AMPLITUDE_SCRIPT_ORIGIN,
 } from "../src/analytics/amplitude.ts";
@@ -28,6 +33,7 @@ import {
   hotjar,
   logrocket,
   mixpanel,
+  notra,
   oneDollarStats,
   pirsch,
   plausible,
@@ -59,6 +65,7 @@ const all = () => [
   hotjar({ id: 1234 }),
   logrocket({ id: "org/app" }),
   mixpanel({ token: "tok" }),
+  notra({ webKey: "nwk.abc" }),
   oneDollarStats(),
   pirsch({ code: "code" }),
   plausible({ domain: "docs.example.com" }),
@@ -94,6 +101,7 @@ describe("provider adapter factories", () => {
       "hotjar",
       "logrocket",
       "mixpanel",
+      "notra",
       "one-dollar-stats",
       "pirsch",
       "plausible",
@@ -116,14 +124,14 @@ describe("provider adapter factories", () => {
         oneDollarStats({ hostname: "docs.example.com" }),
       ],
     });
-    expect(config.analytics).toHaveLength(23);
-    expect(config.analytics[18]?.options).toMatchObject({ serverZone: "EU" });
-    expect(config.analytics[19]?.options).toMatchObject({ spa: "auto" });
-    expect(config.analytics[20]?.options).toMatchObject({ region: "eu" });
-    expect(config.analytics[21]?.options).toMatchObject({
+    expect(config.analytics).toHaveLength(24);
+    expect(config.analytics[19]?.options).toMatchObject({ serverZone: "EU" });
+    expect(config.analytics[20]?.options).toMatchObject({ spa: "auto" });
+    expect(config.analytics[21]?.options).toMatchObject({ region: "eu" });
+    expect(config.analytics[22]?.options).toMatchObject({
       "track-web-vitals": "true",
     });
-    expect(config.analytics[22]?.options).toMatchObject({
+    expect(config.analytics[23]?.options).toMatchObject({
       hostname: "docs.example.com",
     });
   });
@@ -143,6 +151,7 @@ describe("provider adapter factories", () => {
       hightouch({ key: "" }),
       logrocket({ id: "" }),
       mixpanel({ token: "" }),
+      notra({ webKey: "" }),
       pirsch({ code: "" }),
       plausible({ domain: "" }),
       segment({ key: "" }),
@@ -483,6 +492,51 @@ describe("provider adapter heads", () => {
         content: null,
       },
     ]);
+  });
+
+  it("notra: the SDK's pinned deferred tag with its integrity hash, data-key, and beacon", () => {
+    expect(scripts(notra({ webKey: "nwk.abc" }))).toEqual([
+      {
+        attributes: {
+          crossorigin: "anonymous",
+          "data-api": "https://ingest.usenotra.com/api/collect",
+          "data-key": "nwk.abc",
+          defer: true,
+          integrity: NOTRA_SCRIPT_RELEASE.integrity,
+          src: `https://static.usenotra.com/${NOTRA_SCRIPT_RELEASE.file}`,
+        },
+        content: null,
+      },
+    ]);
+  });
+
+  it("notra: the errors build, hash routes, and a self-hosted script", () => {
+    expect(
+      scripts(notra({ errors: true, hash: true, webKey: "nwk.abc" }))[0]
+        ?.attributes
+    ).toMatchObject({
+      "data-hash": true,
+      integrity: NOTRA_SCRIPT_PLUS_RELEASE.integrity,
+      src: `https://static.usenotra.com/${NOTRA_SCRIPT_PLUS_RELEASE.file}`,
+    });
+    expect(
+      scripts(notra({ src: "/notra.js", webKey: "nwk.abc" }))[0]?.attributes
+    ).toEqual({ "data-key": "nwk.abc", defer: true, src: "/notra.js" });
+  });
+
+  it("notra: reject a key that isn't a public web key, and an unknown option", () => {
+    const message = analyticsConfigSchema.safeParse([
+      notra({ webKey: "secret" }),
+    ]).error?.issues[0]?.message;
+    expect(message).toContain('starts with "nwk."');
+    expect(
+      analyticsConfigSchema.safeParse([
+        {
+          ...notra({ webKey: "nwk.abc" }),
+          options: { key: "nwk.abc", webKey: "nwk.abc" },
+        },
+      ]).success
+    ).toBe(false);
   });
 
   it("pirsch: the deferred tag with its id, data-code, and passthrough data attributes", () => {

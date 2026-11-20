@@ -50,6 +50,7 @@ Every identifier below — a project key, a measurement ID, a site token — is 
 | `hotjar()` | [Hotjar](#hotjar) | `id` |
 | `logrocket()` | [LogRocket](#logrocket) | `id` |
 | `mixpanel()` | [Mixpanel](#mixpanel) | `token` |
+| `notra()` | [Notra](#notra) | `webKey` |
 | `oneDollarStats()` | [OneDollarStats](#onedollarstats) | — |
 | `pirsch()` | [Pirsch](#pirsch) | `code` |
 | `plausible()` | [Plausible](#plausible) | `domain` |
@@ -208,6 +209,21 @@ analytics: [
 ```
 
 `clientId` becomes `data-client-id`. Any other option becomes its own `data-` attribute on the tag, so name it the way the attribute reads, in kebab-case (`track-web-vitals`, `track-errors`, `track-outgoing-links`, `api-url`, …). Databuddy ignores a camelCase name like `trackWebVitals`. Values are strings: `"true"` or `"false"` for a switch, and a JSON array for `skip-patterns` and `mask-patterns`. Databuddy reads any other list value as empty.
+
+## Notra
+
+Copy your project's **public web key** (`nwk.…`, from **Settings → Tracking** in [Notra](https://usenotra.com)) and pass it to `notra()`.
+
+```ts blume.config.ts lineNumbers
+analytics: [notra({ webKey: "nwk.xxxxxxxxxxxxxxxx" })],
+```
+
+Blume writes the tag with [`@usenotra/sdk`](https://www.npmjs.com/package/@usenotra/sdk), so it loads the notra.js build that SDK release pins, with its Subresource Integrity hash. The browser refuses to run the script if a single byte changes, and you never set the hash yourself. notra.js counts visitors without cookies and follows client-side navigation on its own.
+
+- `errors: true` loads `notra.plus.js`, which also reports JavaScript errors.
+- `hash: true` counts `#hash` route changes as page views.
+- `endpoint` is the origin of a self-hosted ingest or proxy that serves the script at `/api/notra.js` and takes page views at `/api/collect`. `api` overrides the beacon endpoint alone.
+- `src` loads a script URL of your own, and `integrity` sets its hash. `pinned: false` loads the unpinned `notra.js` instead of the pinned build.
 
 ## OneDollarStats
 
@@ -430,6 +446,14 @@ A root-relative `src` points at a file in `public/` (`src: "/js/redirects.js"` f
 | `mixpanel()` | `token` | — | Mixpanel project token. Required. |
 | `mixpanel()` | `region` | `us` | Data residency region: `us`, `eu`, or `in`. |
 | `mixpanel()` | anything else | `track_pageview: "url-with-path-and-query-string"` | Merged into the `mixpanel.init` options verbatim. |
+| `notra()` | `webKey` | — | Notra public web key (`nwk.…`). Required. |
+| `notra()` | `errors` | `false` | Load `notra.plus.js`, which also reports JavaScript errors. |
+| `notra()` | `hash` | `false` | Count `#hash` route changes as page views (`data-hash`). |
+| `notra()` | `endpoint` | `https://static.usenotra.com` | Origin of a self-hosted ingest or proxy serving `/api/notra.js`. |
+| `notra()` | `api` | `https://ingest.usenotra.com/api/collect` | Beacon endpoint (`data-api`). |
+| `notra()` | `src` | — | Full script URL, for self-hosting. Overrides `endpoint`, `errors`, and `pinned`. |
+| `notra()` | `integrity` | the pinned build's hash | Subresource Integrity value (`sha384-…`). |
+| `notra()` | `pinned` | `true` | Load the build `@usenotra/sdk` pins, with its integrity hash. |
 | `oneDollarStats()` | `hostname` | — | Bare host name every event is reported under, on every host. |
 | `oneDollarStats()` | anything else | — | Rendered as a `data-` attribute on the tag (`"hash-routing": "false"` is left off). |
 | `pirsch()` | `code` | — | Pirsch identification code. Required. |
@@ -451,4 +475,4 @@ A root-relative `src` points at a file in `public/` (`src: "/js/redirects.js"` f
 
 ## Custom events
 
-Blume's page feedback (`feedback`, and `feedback_comment` when [written feedback](/docs/configuration#written-feedback) is on), [search](/docs/configuration/search#search-analytics) (`search`, `search_select`), [assistant](/docs/configuration/assistant#analytics) (`ask`, `ask_answer`, `ask_error`), and [narration](/docs/configuration/narration#analytics) player (`narration_play`, `narration_complete`) send custom events through every configured adapter that has a client API — PostHog, Mixpanel, Heap, Segment, Hightouch, Amplitude, LogRocket, Adobe, Google Analytics, Google Tag Manager (as a `{ event }` push on `window.dataLayer`), Plausible, Databuddy, Fathom, OneDollarStats (with each property value as a string), Pirsch, Clarity, Hotjar, and Vercel. Fathom, Clarity, and Hotjar take an event's name alone, so they count each event without its properties. Cloudflare and Clearbit have no event API, and Clics has no global one for Blume to call. Every event also fires as a `blume:track` CustomEvent on `window` with `{ event, props }` in `detail`, so a `script()` adapter can forward it anywhere else. The assistant never sends a question's text to a provider, and search sends its queries as typed unless you set [`search.analytics.queries`](/docs/configuration/search#search-analytics) to `false`, which sends each query's length instead; either way the text still reaches the `blume:track` event, for a listener you write to forward. For deploying your built site, see [Deployment](/docs/deployment).
+Blume's page feedback (`feedback`, and `feedback_comment` when [written feedback](/docs/configuration#written-feedback) is on), [search](/docs/configuration/search#search-analytics) (`search`, `search_select`), [assistant](/docs/configuration/assistant#analytics) (`ask`, `ask_answer`, `ask_error`), and [narration](/docs/configuration/narration#analytics) player (`narration_play`, `narration_complete`) send custom events through every configured adapter that has a client API — PostHog, Mixpanel, Heap, Segment, Hightouch, Amplitude, LogRocket, Adobe, Google Analytics, Google Tag Manager (as a `{ event }` push on `window.dataLayer`), Plausible, Databuddy, Fathom, OneDollarStats (with each property value as a string), Pirsch, Clarity, Hotjar, and Vercel. Fathom, Clarity, and Hotjar take an event's name alone, so they count each event without its properties. Cloudflare, Clearbit, and Notra have no event API, and Clics has no global one for Blume to call. Every event also fires as a `blume:track` CustomEvent on `window` with `{ event, props }` in `detail`, so a `script()` adapter can forward it anywhere else. The assistant never sends a question's text to a provider, and search sends its queries as typed unless you set [`search.analytics.queries`](/docs/configuration/search#search-analytics) to `false`, which sends each query's length instead; either way the text still reaches the `blume:track` event, for a listener you write to forward. For deploying your built site, see [Deployment](/docs/deployment).
