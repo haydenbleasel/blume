@@ -27,6 +27,16 @@ The [S3 and CloudFront guide](/guides/s3-cloudfront-documentation-site) has a Cl
 
 On Cloudflare Workers, which serves a static build as static assets, set `"html_handling": "drop-trailing-slash"` under `assets` in your Wrangler config. Blume writes each page as `<route>/index.html` and links to it without a trailing slash, and Cloudflare's default (`auto-trailing-slash`) answers `/quickstart` with a `307` to `/quickstart/`. A [`cloudflare()` server build](#server-rendering) routes every page through its Worker, which serves `/quickstart` under either setting, so there it only matters when the build warns `Could not wire Accept: text/markdown negotiation` and the static layer serves the pages itself.
 
+To publish from your terminal without a host account or a Git connection, [deed.page](https://deed.page) takes `dist/` as one tarball. Set `deployment.site` to `https://<slug>.deed.page`, then build and upload:
+
+```bash
+blume build
+tar -C dist -czf site.tar.gz .
+curl -T site.tar.gz "https://deed.page/v1/sites?slug=<slug>"
+```
+
+The JSON response has the site's `url` and a `token` it shows only once; send it as `Authorization: Bearer <token>` to publish a new version to the same slug. deed.page answers `/quickstart` with a `308` to `/quickstart/`, where it serves the `index.html` Blume wrote. It doesn't read `_headers`: pages, Markdown copies, and `llms.txt` still get `charset=utf-8`, but the `X-Powered-By` and homepage `Link` headers aren't sent, and `.well-known/api-catalog` goes out as `application/octet-stream`. One upload is capped at 4 MB, and Free-plan sites show a small deed.page badge; the [deed.page docs](https://deed.page/docs) cover larger sites.
+
 A static build includes:
 
 - every docs and custom page as static HTML
