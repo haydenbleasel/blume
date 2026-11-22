@@ -140,6 +140,13 @@ const OBSIDIAN_NATIVE_KEYS = new Set([
 ]);
 
 /**
+ * Built-in keys a vault commonly uses for something else: card views and
+ * plugins read `cover` as a note's own image (often a wikilink or a list), so
+ * a note passes it on only when the source keeps it (`frontmatterKeys`).
+ */
+const KEPT_ONLY_KEYS = new Set(["cover"]);
+
+/**
  * A note's route input: its locale- and version-stripped path, slugged. Vault
  * filenames are prose (`Getting Started.md`) and the route mapper does not
  * slug, so this does — through {@link slugifyPath}, which keeps a non-Latin
@@ -756,7 +763,8 @@ const noteToEntry = (
     Object.entries(note.data).filter(
       ([key]) =>
         !OBSIDIAN_NATIVE_KEYS.has(key) &&
-        (BUILT_IN_PAGE_META_KEYS.has(key) || keep.has(key))
+        (keep.has(key) ||
+          (BUILT_IN_PAGE_META_KEYS.has(key) && !KEPT_ONLY_KEYS.has(key)))
     )
   );
   const merged = title === undefined ? data : { ...data, title };

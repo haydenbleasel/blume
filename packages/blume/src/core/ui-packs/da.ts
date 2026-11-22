@@ -47,6 +47,17 @@ export const da: UIStringsOverride = {
     you: "Du",
   },
   banner: { dismiss: "Luk meddelelsen" },
+  blog: {
+    allPosts: "Alle indlæg",
+    description: "Nyheder, opdateringer og historier fra teamet.",
+    empty: "Ingen indlæg endnu.",
+    newer: "Nyere indlæg",
+    older: "Ældre indlæg",
+    readingTime: "{minutes} min. læsning",
+    tagged: "Indlæg tagget “{tag}”",
+    tags: "Tags",
+    title: "Blog",
+  },
   changelog: {
     description: "Produktopdateringer og udgivelsesnoter.",
     empty: "Ingen poster i ændringsloggen endnu.",

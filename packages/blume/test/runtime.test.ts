@@ -6,6 +6,7 @@ import { getBlumeCollection } from "../src/runtime/index.ts";
 const route = (over: Partial<BlumeRoute>): BlumeRoute => ({
   alternates: [],
   collection: "docs",
+  contentType: "doc",
   description: null,
   draft: false,
   editUrl: null,

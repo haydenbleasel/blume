@@ -48,6 +48,17 @@ export const ro: UIStringsOverride = {
     you: "Tu",
   },
   banner: { dismiss: "Închide anunțul" },
+  blog: {
+    allPosts: "Toate articolele",
+    description: "Noutăți, actualizări și povești de la echipă.",
+    empty: "Încă nu există articole.",
+    newer: "Articol mai nou",
+    older: "Articol mai vechi",
+    readingTime: "{minutes} min de citit",
+    tagged: "Articole cu eticheta „{tag}”",
+    tags: "Etichete",
+    title: "Blog",
+  },
   changelog: {
     description: "Actualizări ale produsului și note de lansare.",
     empty: "Încă nu există intrări în jurnalul de modificări.",

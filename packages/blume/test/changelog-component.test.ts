@@ -8,12 +8,13 @@ import { dirname, join } from "pathe";
 import { changelogComponentSerializers } from "../src/ai/changelog-components.ts";
 import { buildChangelogIndexMarkdown } from "../src/ai/changelog-markdown.ts";
 import { downlevelComponents } from "../src/ai/component-markdown.ts";
+import { entryDateFormats } from "../src/components/content/entry-dates.ts";
 import {
-  compareChangelogDates,
-  groupChangelogYears,
-  parseChangelogDate,
+  compareEntryDates,
+  groupEntryYears,
+  parseEntryDate,
   uniqueAnchorIds,
-} from "../src/core/changelog-list.ts";
+} from "../src/core/dated-list.ts";
 import type { BlumeProject } from "../src/core/project-graph.ts";
 import { scanProject } from "../src/core/project-graph.ts";
 
@@ -52,36 +53,40 @@ const release = (title: string, date: string, category?: string): string =>
     category ? `changelog:\n  category: ${category}\n` : ""
   }---\n\nBody.\n`;
 
-const componentSource = async (): Promise<string> =>
-  await readFile(
+const componentSource = async (): Promise<string> => {
+  const source = await readFile(
     fileURLToPath(
       new URL("../src/components/content/Changelog.astro", import.meta.url)
     ),
     "utf-8"
   );
+  // A Windows checkout's line endings are CRLF.
+  return source.replaceAll("\r\n", "\n");
+};
 
 describe("changelog list policy", () => {
   it("sorts newest first and leaves undated entries last", () => {
     const dates = [
-      parseChangelogDate("2026-01-15"),
+      parseEntryDate("2026-01-15"),
       null,
-      parseChangelogDate("2026-07-01"),
+      parseEntryDate("1969-07-20"),
+      null,
+      parseEntryDate("2026-07-01"),
     ];
+    // An entry dated before 1970 is still dated: undated ones go after it.
     expect(
       [...dates]
-        .toSorted(compareChangelogDates)
+        .toSorted(compareEntryDates)
         .map((date) => date?.toISOString().slice(0, 10) ?? "undated")
-    ).toEqual(["2026-07-01", "2026-01-15", "undated"]);
+    ).toEqual(["2026-07-01", "2026-01-15", "1969-07-20", "undated", "undated"]);
   });
 
   it("reads a Date as well as a string, and refuses a malformed one", () => {
-    expect(parseChangelogDate(new Date("2026-03-04"))?.getUTCFullYear()).toBe(
-      2026
-    );
-    expect(parseChangelogDate("2026-03-04")?.getUTCFullYear()).toBe(2026);
+    expect(parseEntryDate(new Date("2026-03-04"))?.getUTCFullYear()).toBe(2026);
+    expect(parseEntryDate("2026-03-04")?.getUTCFullYear()).toBe(2026);
     // A malformed date costs the row its stamp, never the build.
-    expect(parseChangelogDate("not a date")).toBeNull();
-    expect(parseChangelogDate(null)).toBeNull();
+    expect(parseEntryDate("not a date")).toBeNull();
+    expect(parseEntryDate(null)).toBeNull();
   });
 
   it("groups consecutive rows of the same year, undated in their own group", () => {
@@ -92,7 +97,7 @@ describe("changelog list policy", () => {
       { year: null },
     ];
     expect(
-      groupChangelogYears(rows, (row) => row.year).map((group) => [
+      groupEntryYears(rows, (row) => row.year).map((group) => [
         group.year,
         group.items.length,
       ])
@@ -152,9 +157,8 @@ describe("Changelog component", () => {
       'const readerLocale = i18n ? (Astro.currentLocale ?? i18n.defaultLocale) : "en";'
     );
     expect(source).toContain(
-      "new Intl.DateTimeFormat(readerLocale, rowDateFormat)"
+      "entryDateFormats(\n  data.config.dateFormat,\n  readerLocale\n)"
     );
-    expect(source).toContain("new Intl.DateTimeFormat(readerLocale, {");
   });
 
   it("selects the same releases the Markdown mirror does", async () => {
@@ -177,19 +181,53 @@ describe("Changelog component", () => {
     expect(mirror).toContain("!page.fallback");
   });
 
-  it("drops the year a row's group already shows, keeping the style's month wording", async () => {
-    const source = await componentSource();
-    // Moved here from the template's tests with the markup. `medium` is the
-    // one preset that abbreviates the month, so a `long` or `full` site keeps
-    // reading "October 5"; a component format just loses its `year` key.
-    expect(source).toContain(
-      "const { dateStyle, year: _year, ...dateComponents } = dateFormatOptions;"
+  it("drops the year a row's group already shows, keeping the style's month wording", () => {
+    // `medium` is the one preset that abbreviates the month, so a `long` or
+    // `full` site keeps reading "October 5"; a component format just loses
+    // its `year` key. The year heading follows the configured time zone.
+    const date = new Date("2026-10-05T12:00:00Z");
+    expect(entryDateFormats({ dateStyle: "long" }, "en").row(date)).toBe(
+      "October 5"
     );
-    expect(source).toContain(
-      'month: dateStyle === "medium" ? "short" : "long",'
+    expect(entryDateFormats({ dateStyle: "full" }, "en").row(date)).toBe(
+      "October 5"
     );
-    expect(source).toContain("timeZone: dateFormatOptions.timeZone,");
-    expect(source).toContain('year: "numeric",');
+    expect(entryDateFormats({ dateStyle: "medium" }, "en").row(date)).toBe(
+      "Oct 5"
+    );
+    expect(
+      entryDateFormats(
+        { day: "2-digit", month: "2-digit", year: "numeric" },
+        "en"
+      ).row(date)
+    ).toBe("10/05");
+    expect(entryDateFormats(undefined, "en").full(date)).toBe(
+      "October 5, 2026"
+    );
+    const newYear = new Date("2026-12-31T23:30:00Z");
+    expect(entryDateFormats(undefined, "en").year(newYear)).toBe("2026");
+    expect(
+      entryDateFormats(
+        { dateStyle: "long", timeZone: "Pacific/Auckland" },
+        "en"
+      ).year(newYear)
+    ).toBe("2027");
+    // A row's `datetime` names the day its label does.
+    expect(entryDateFormats(undefined, "en").iso(newYear)).toBe("2026-12-31");
+    // A locale code `Intl` can't read formats in English rather than throw.
+    expect(entryDateFormats(undefined, "pt_BR").full(date)).toBe(
+      "October 5, 2026"
+    );
+    // A year before 1000 keeps ISO's four digits.
+    expect(
+      entryDateFormats(undefined, "en").iso(new Date("0999-05-01T00:00:00Z"))
+    ).toBe("0999-05-01");
+    expect(
+      entryDateFormats(
+        { dateStyle: "long", timeZone: "Pacific/Auckland" },
+        "en"
+      ).iso(newYear)
+    ).toBe("2027-01-01");
   });
 
   it("requires a current-docs route on every site, not only localized ones", async () => {
@@ -211,11 +249,13 @@ describe("Changelog component", () => {
     expect(source).toContain(
       "const route = routeByEntry.get(entryKey(entry.collection, entry.id));"
     );
-    expect(source).toContain("href: route ? withMountedBase(route) : null,");
+    expect(source).toContain(
+      "href: route ? withMountedBase(route.path) : null,"
+    );
     // A regex, so the anchor's own `${…}` isn't read as interpolation here.
     expect(source).toMatch(/href=\{item\.href \?\? `#\$\{item\.id\}`\}/u);
     expect(source).toContain(
-      "routeByEntry.set(entryKey(route.collection, route.entryId), route.path);"
+      "routeByEntry.set(entryKey(route.collection, route.entryId), route);"
     );
     // Keyed by collection too: both collections id an entry by its file path,
     // so a file on disk and a staged release can share an id while rendering
@@ -286,6 +326,28 @@ describe("Changelog serializer", () => {
     expect(generated).toContain(authored);
     expect(generated).toContain("# Changelog");
     expect(authored).not.toContain("# Changelog");
+  });
+
+  it("dates the mirror in the configured time zone, as the page does", async () => {
+    const project = await scanFixture({
+      "blume.config.ts":
+        'export default { title: "Acme", dateFormat: { dateStyle: "long", timeZone: "Pacific/Auckland" } };',
+      "docs/changelog/v0.md": release("v0.0.1", "0999-06-01"),
+      "docs/changelog/v1.md": release("v1.0.0", "2026-12-31T23:30:00Z"),
+      "docs/changelog/v9.md": release("v9.0.0", "+010000-01-01T00:00:00Z"),
+      "docs/index.md": "---\ntitle: Home\n---\n\nHome.\n",
+    });
+    expect(buildChangelogIndexMarkdown(project)).toContain(
+      "## 2027\n\n- [v1.0.0](/changelog/v1) — 2027-01-01"
+    );
+    // A year before 1000 heads its entries as in 2.2.3, unpadded, and one
+    // after 9999 whole.
+    expect(buildChangelogIndexMarkdown(project)).toContain(
+      "## 999\n\n- [v0.0.1](/changelog/v0) — 0999-06-01"
+    );
+    expect(buildChangelogIndexMarkdown(project)).toContain(
+      "## 10000\n\n- [v9.0.0](/changelog/v9) — 10000-01-01"
+    );
   });
 
   it("drops the tag on a site with no releases rather than leaving it as written", async () => {

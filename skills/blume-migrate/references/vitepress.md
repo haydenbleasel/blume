@@ -199,6 +199,10 @@ The old URL list is `<old build>/**/*.html` (or the live `sitemap.xml`). Blume s
 - Repoint `docs:dev`/`docs:build`/`docs:preview` to `blume dev`/`build`/`preview`. Grep the repo for `.vitepress/dist` and `vitepress build`: CI and deploy configs (Pages workflows, publish scripts, `netlify.toml`) must now publish `dist/` and install the docs package's deps. `.gitignore`: `.vitepress/cache`, `.vitepress/dist` → `.blume`, `dist`.
 - A `404.md` → delete (Blume ships a 404; `pages/404.astro` replaces it).
 
+## Blog
+
+VitePress has no blog of its own: a site's posts are pages that a `createContentLoader("posts/*.md")` data loader reads and a custom Vue component lists. Make them `type: blog` pages (see SKILL.md "Blogs"): keep `title` and `date`, and map the theme's own fields by meaning (`author` → `authors`, an image → `cover`, `tags`). Delete the data loader and the listing page's component, keeping any introduction in `blog/index.mdx` with `<Blog />`, and redirect the old listing page to `/blog` when its route isn't `/blog` already (a redirect from a page's route takes the page over).
+
 ## Dropped — report these
 
 `titleTemplate`, the footer `message` (and any link inside `copyright`), per-page `outline`/`aside`, one-sided `prev`/`next`, page-level toggles (`editLink`, `footer`, `navbar`, `pageClass`), `head` entries beyond meta tags and analytics, build hooks, Vite and custom markdown-it plugins, unsupported social links, line-number offsets and the site-wide switch, snippet regions and include ranges (now split files), copied out-of-root snippets, data-driven and unregistered theme components (and any content they hid), `VPTeamMembers`, data loaders and dynamic routes, hero styling, the DocSearch index (with its credentials), old-site anchors that were already broken (and any left unpinned under `--only-linked`), version-dropdown links, and `::: note`/`important`/`caution` text that 1.x showed literally.

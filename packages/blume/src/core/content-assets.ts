@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { dirname, extname, relative } from "pathe";
 
 import { normalizeBasePath } from "./base-path.ts";
+import { authorEntries, coverEntry } from "./blog.ts";
 import { resolveRelativeFile, resolveRelativeImage } from "./relative-files.ts";
 import { hashText } from "./sources/cache.ts";
 import {
@@ -75,6 +76,45 @@ export const contentAssetUrl = (param: string, deployBase?: string): string =>
 const RELATIVE_DESTINATION = /\][(:][ \t]*(?![/#\s])/u;
 const RELATIVE_ELEMENT_URL = /(?:href|src)=["'](?![/#])/u;
 
+// A block-style front matter line whose value may be one of those images,
+// quoted or not, with or without a comment after it.
+const FRONT_MATTER_IMAGE_LINE =
+  /^(?<key>[ \t]*(?:-[ \t]+)?(?:avatar|cover|image|src):[ \t]*)(?<quote>["']?)(?<value>[^\s"'#][^"'\r\n]*?)\k<quote>(?<tail>(?:[ \t]+#[^\r\n]*)?[ \t]*\r?)$/u;
+
+/**
+ * The front matter's `images` (see {@link frontMatterImages}), where they
+ * name a file beside the page, pointed at their served URLs as the body's
+ * images are: an agent reading the page by URL can't resolve `./cover.png`.
+ * Only a cover, avatar, or image line holding one of them is touched.
+ */
+const rewriteFrontMatterImages = (
+  source: string,
+  images: readonly string[],
+  toUrl: (target: string) => string | null
+): string => {
+  const lines = source.split("\n");
+  const end = lines.findIndex(
+    (line, index) => index > 0 && line.trimEnd() === "---"
+  );
+  const values = new Set(images);
+  if (lines[0]?.trimEnd() !== "---" || end === -1 || values.size === 0) {
+    return source;
+  }
+  return lines
+    .map((line, index) => {
+      const groups =
+        index < end ? FRONT_MATTER_IMAGE_LINE.exec(line)?.groups : undefined;
+      const url =
+        groups?.value !== undefined && values.has(groups.value)
+          ? toUrl(groups.value)
+          : null;
+      return url === null || groups === undefined
+        ? line
+        : `${groups.key}${groups.quote}${url}${groups.quote}${groups.tail}`;
+    })
+    .join("\n");
+};
+
 /**
  * Rewrite a page's relative image references, and its links and element
  * URLs naming other files beside it, to their served
@@ -90,6 +130,8 @@ export const rewriteRelativeAssets = (options: {
   projectRoot: string;
   deployBase?: string;
   format: "md" | "mdx" | null;
+  /** The images the page's front matter names, for an agent's copy of it. */
+  frontMatterImages?: readonly string[];
   register?: (param: string, absPath: string) => void;
 }): string => {
   const { source, sourcePath, projectRoot, deployBase, format, register } =
@@ -111,7 +153,11 @@ export const rewriteRelativeAssets = (options: {
 
   // Inline code is skipped too: a `` `![x](./y.png)` `` span is syntax being
   // shown, not an image.
-  const withImages = rewriteImageEmbeds(source, toUrl, format);
+  const withImages = rewriteImageEmbeds(
+    rewriteFrontMatterImages(source, options.frontMatterImages ?? [], toUrl),
+    toUrl,
+    format
+  );
   // A `<Card img>` is an image embed too: its file is served and its value
   // pointed there, which the HTML render reads back (see
   // `markdown/content-assets.ts`), as are links and element URLs naming any
@@ -127,6 +173,33 @@ export const rewriteRelativeAssets = (options: {
         format
       )
     : withLinks;
+};
+
+/**
+ * An image a page names in front matter beside it (a blog post's `cover`, an
+ * author's `avatar`: `./cover.png`), served from `/blume-assets/content/…`
+ * like the body's own images: its URL as the page emits it, and its file.
+ * Null when no such image is on disk.
+ */
+export const resolvePostImage = (
+  target: string,
+  options: { deployBase?: string; projectRoot: string; sourcePath: string }
+): { file: string; param: string; src: string } | null => {
+  const file = resolveRelativeImage(dirname(options.sourcePath), target);
+  if (file === null) {
+    return null;
+  }
+  const param = contentAssetParam(options.projectRoot, file);
+  return { file, param, src: contentAssetUrl(param, options.deployBase) };
+};
+
+/** The images a page's front matter names: its cover and its authors' avatars. */
+export const frontMatterImages = (page: PageRecord): string[] => {
+  const cover = coverEntry(page.meta.cover);
+  const avatars = authorEntries(page.meta.authors).flatMap((author) =>
+    author.avatar ? [author.avatar] : []
+  );
+  return cover ? [cover.src, ...avatars] : avatars;
 };
 
 /**
@@ -171,5 +244,21 @@ export const collectContentAssets = async (project: {
       });
     })
   );
+  // Front matter images beside a page are served the same way.
+  for (const page of project.graph.pages) {
+    const { sourcePath } = page;
+    if (!sourcePath) {
+      continue;
+    }
+    for (const image of frontMatterImages(page)) {
+      const served = resolvePostImage(image, {
+        projectRoot: project.context.root,
+        sourcePath,
+      });
+      if (served) {
+        files[served.param] = served.file;
+      }
+    }
+  }
   return files;
 };

@@ -1,6 +1,8 @@
 import { extname } from "pathe";
 
 import { stripBasePath, withBasePath } from "./base-path.ts";
+import { isoDateFormat } from "./date-format.ts";
+import { entryDate } from "./dated-list.ts";
 import { orderingPrefix, stripOrderingPrefix } from "./ordering-prefix.ts";
 import type {
   DirectoryMode,
@@ -218,7 +220,26 @@ interface MutablePage {
   orderIsAuthored: boolean;
   /** Whether `order` is the node's position in its folder meta `pages` list. */
   ranked?: boolean;
+  /**
+   * A dated entry's type and publish time (a blog post or changelog entry
+   * with a date), which can fold it into a year or month group.
+   */
+  dated?: { time: number; title: string; type: DatedType };
+  /** Whether the label may wrap to a second line (any dated type's entry). */
+  wrap?: boolean;
 }
+
+/** The content types whose entries are dated and listed newest first. */
+type DatedType = "blog" | "changelog";
+
+const isDatedType = (type: string): type is DatedType =>
+  type === "blog" || type === "changelog";
+
+/**
+ * How each dated type's entries group in the sidebar (`blog.sidebar.groupBy`,
+ * `changelog.sidebar.groupBy`); a type left out lists its entries ungrouped.
+ */
+export type DatedGroups = Partial<Record<DatedType, "month" | "year">>;
 
 interface MutableGroup {
   kind: "group";
@@ -242,6 +263,8 @@ interface MutableGroup {
   order: number;
   /** Whether `order` is the node's position in its folder meta `pages` list. */
   ranked?: boolean;
+  /** Set on a group of dated entries rather than a folder. */
+  period?: "month" | "year";
   children: MutableNode[];
   index: Map<string, MutableGroup>;
 }
@@ -287,7 +310,12 @@ interface PageOrder {
   order: number;
   /** Whether the order came from the author (frontmatter or a rank prefix). */
   orderIsAuthored: boolean;
+  /** The publish time a dated entry's order came from. */
+  time?: number;
 }
+
+/** The furthest a `Date` reaches from the epoch, in milliseconds. */
+const MAX_TIME = 8.64e15;
 
 const pageOrder = (page: PageRecord, filename: string): PageOrder => {
   if (page.meta.sidebar.order !== undefined) {
@@ -296,16 +324,19 @@ const pageOrder = (page: PageRecord, filename: string): PageOrder => {
   if (isIndexStem(stemOf(filename))) {
     return { order: Number.NEGATIVE_INFINITY, orderIsAuthored: false };
   }
-  // Changelog entries read newest-first, matching the generated timeline. Sort
-  // on the negated publish timestamp so a later date yields a smaller order
-  // under the ascending comparator; undated entries fall back to filename order.
-  // The date is derived, not an authoring choice, so same-day entries aren't a
-  // duplicate-order mistake.
-  if (page.contentType === "changelog") {
-    const iso = page.meta.date ?? page.meta.changelog?.date;
+  // Changelog entries and blog posts read newest-first, matching their
+  // generated indexes. Sort on the negated publish timestamp so a later date
+  // yields a smaller order under the ascending comparator; undated entries
+  // fall back to filename order. The date is derived, not an authoring
+  // choice, so same-day entries aren't a duplicate-order mistake.
+  const dated = isDatedType(page.contentType);
+  if (dated) {
+    const iso = entryDate(page);
     const time = iso ? Date.parse(iso) : Number.NaN;
     if (!Number.isNaN(time)) {
-      return { order: -time, orderIsAuthored: false };
+      // Below every filename order too, an entry dated before 1970 included,
+      // as the indexes list each dated entry ahead of every undated one.
+      return { order: -time - MAX_TIME - 1, orderIsAuthored: false, time };
     }
   }
   // An undated changelog entry's numeric filename prefix is usually a date
@@ -619,11 +650,22 @@ const duplicateOrderDiagnostics = (nodes: MutableNode[]): Diagnostic[] => {
   return diagnostics;
 };
 
+/** A dated blog post's title, which orders it among same-day posts. */
+const blogTitle = (node: MutableNode): string | undefined =>
+  node.kind === "page" && node.dated?.type === "blog"
+    ? node.dated.title
+    : undefined;
+
 const sortNodes = (nodes: MutableNode[], diagnostics: Diagnostic[]): void => {
   diagnostics.push(...duplicateOrderDiagnostics(nodes));
   nodes.sort((a, b) => {
     if (a.order !== b.order) {
       return a.order - b.order;
+    }
+    // Same-day blog posts tie on their titles, as on the blog's index.
+    const titles = [blogTitle(a), blogTitle(b)];
+    if (titles[0] !== undefined && titles[1] !== undefined) {
+      return titles[0].localeCompare(titles[1], "en");
     }
     return a.label.localeCompare(b.label);
   });
@@ -692,6 +734,164 @@ const hoistTabSections = (
   }
 };
 
+/** How a period group's label writes its year, or its month and year. */
+const PERIOD_FORMATS = {
+  month: { month: "long", year: "numeric" },
+  year: { year: "numeric" },
+} satisfies Record<"month" | "year", Intl.DateTimeFormatOptions>;
+
+/** A dated entry's period label, from its publish time. */
+type PeriodLabel = (time: number, period: "month" | "year") => string;
+
+/**
+ * Period labels in the tree's language and the site's `dateFormat` time zone,
+ * as the indexes write their year headings. A locale code `Intl` can't read
+ * (`pt_BR`) labels in English rather than failing the scan.
+ */
+const periodLabels = (
+  locale: string | undefined,
+  timeZone: string
+): PeriodLabel => {
+  const formats = new Map<"month" | "year", Intl.DateTimeFormat>();
+  return (time, period) => {
+    let format = formats.get(period);
+    if (!format) {
+      const options = { ...PERIOD_FORMATS[period], timeZone };
+      try {
+        format = new Intl.DateTimeFormat(locale ?? "en", options);
+      } catch {
+        format = new Intl.DateTimeFormat("en", options);
+      }
+      formats.set(period, format);
+    }
+    return format.format(time);
+  };
+};
+
+/** A period's name as its words alone: lowercase, single-spaced. */
+const periodWords = (name: string): string =>
+  name
+    .toLowerCase()
+    .replaceAll(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
+
+/** How a dated entry's period is named: the sidebar's labels and the day. */
+interface PeriodNaming {
+  day: (date: Date) => string;
+  plain: PeriodLabel;
+  shown: PeriodLabel;
+}
+
+/**
+ * The names a folder can give an entry's period: its label in the tree's
+ * language (`2025年`) or plainly (`2025`, `March 2025`); by month also
+ * `2025-03`, and `03` or `3` only inside the year's own folder (`2025/03/`),
+ * where a bare number can't be a series' `3/`.
+ */
+const periodNames = (
+  time: number,
+  period: "month" | "year",
+  labels: PeriodNaming,
+  enclosing: ReadonlySet<string>
+): string[] => {
+  const names = [labels.shown(time, period), labels.plain(time, period)];
+  if (period === "month") {
+    const month = labels.day(new Date(time)).slice(0, -3);
+    names.push(month);
+    if (enclosing.has(month.slice(0, -3))) {
+      names.push(month.slice(-2), String(Number(month.slice(-2))));
+    }
+  }
+  return names;
+};
+
+/**
+ * What a folder is called: its label (a `meta.ts` title, else its name
+ * humanized) and its own name, so `2024/` titled `Archive 2024` is the year.
+ */
+const folderWords = (group: MutableGroup): string[] => [
+  periodWords(group.label),
+  periodWords(group.key),
+];
+
+/**
+ * Fold each level's dated entries into collapsible year (or month) groups,
+ * newest first, where their type asks for it: a blog with a hundred posts
+ * reads as a handful of years, the open post's year expanded. The groups take
+ * the place of the first entry they hold; an entry the author ordered by hand
+ * (`sidebar.order`, or a folder meta `pages` list) stays where it was put, and
+ * an undated one stays loose. A folder that already is the period (a blog kept
+ * in `2025/` folders) isn't folded again. Runs after sorting and hoisting, so
+ * each group's entries are already newest first and the groups land where the
+ * entries sat.
+ */
+const groupDatedPages = (
+  nodes: MutableNode[],
+  groups: DatedGroups,
+  labels: PeriodNaming,
+  enclosing: ReadonlySet<string> = new Set()
+): void => {
+  const folds = new Map<
+    MutableNode,
+    { label: string; period: "month" | "year" }
+  >();
+  // A period a folder around the entry (`2025/03/`) or beside it (`2026/`
+  // beside loose 2026 posts) already is gets no group of its own: the entry
+  // stays where it is. A folder's label is humanized (`2025-03` reads
+  // `2025 03`, `mars 2025` `Mars 2025`), so only its words count.
+  const folders = new Set([
+    ...enclosing,
+    ...nodes.flatMap((node) =>
+      node.kind === "group" ? folderWords(node) : []
+    ),
+  ]);
+  for (const node of nodes) {
+    if (node.kind === "group") {
+      groupDatedPages(
+        node.children,
+        groups,
+        labels,
+        new Set([...enclosing, ...folderWords(node)])
+      );
+      continue;
+    }
+    const period = node.dated ? groups[node.dated.type] : undefined;
+    if (!(node.dated && period) || node.ranked) {
+      continue;
+    }
+    const names = periodNames(node.dated.time, period, labels, enclosing);
+    if (!names.some((name) => folders.has(periodWords(name)))) {
+      folds.set(node, { label: labels.shown(node.dated.time, period), period });
+    }
+  }
+  if (folds.size === 0) {
+    return;
+  }
+  const first = nodes.findIndex((node) => folds.has(node));
+  // One group per label, in the order its newest entry comes: a folder of
+  // blog posts by year and changelog entries by month can interleave them.
+  const byLabel = new Map<string, MutableGroup>();
+  for (const [node, fold] of folds) {
+    let group = byLabel.get(fold.label);
+    if (!group) {
+      group = createGroup(`(${fold.label})`, "", fold.label, 0);
+      group.display = "group";
+      group.period = fold.period;
+      byLabel.set(fold.label, group);
+    }
+    group.children.push(node);
+  }
+  const folded = [...byLabel.values()];
+  const rest = nodes.filter((node) => !folds.has(node));
+  nodes.splice(
+    0,
+    nodes.length,
+    ...rest.slice(0, first),
+    ...folded,
+    ...rest.slice(first)
+  );
+};
+
 /**
  * A group's directory mode: its own, else the nearest one set above it (see
  * `directory` in `schema.ts`).
@@ -702,7 +902,7 @@ const toNavNode = (
   inheritedDirectory?: DirectoryMode
 ): NavNode => {
   if (node.kind === "page") {
-    return {
+    const page: Extract<NavNode, { kind: "page" }> = {
       badge: node.badge,
       deprecated: node.deprecated || undefined,
       description: node.description,
@@ -712,9 +912,14 @@ const toNavNode = (
       pageId: node.pageId,
       route: node.route,
     };
+    // A dated entry's title is often a sentence: two lines, not one cut.
+    if (node.wrap) {
+      page.wrap = true;
+    }
+    return page;
   }
   const directory = node.directory ?? inheritedDirectory;
-  return {
+  const group: Extract<NavNode, { kind: "group" }> = {
     children: node.children.map((child) =>
       toNavNode(child, display, directory)
     ),
@@ -727,6 +932,27 @@ const toNavNode = (
     path: node.routePath,
     route: node.route,
   };
+  if (node.period) {
+    group.period = node.period;
+  }
+  return group;
+};
+
+/**
+ * A dated type's entry (blog post, changelog entry) wraps its label, and one
+ * with a publish time can fold into a period group.
+ */
+const datedFields = (
+  page: PageRecord,
+  time: number | undefined
+): Pick<MutablePage, "dated" | "wrap"> => {
+  const type = page.contentType;
+  if (!isDatedType(type)) {
+    return {};
+  }
+  return time === undefined
+    ? { wrap: true }
+    : { dated: { time, title: page.title, type }, wrap: true };
 };
 
 /** Build the sidebar tree from the file system and folder meta. */
@@ -738,8 +964,9 @@ const buildFileSystemSidebar = (
   sharedMetaPrefix: string,
   display: SidebarDisplay,
   tabPaths: Set<string>,
-  diagnostics: Diagnostic[] = [],
-  fallbackMetaPrefix?: string
+  diagnostics: Diagnostic[],
+  fallbackMetaPrefix: string | undefined,
+  dates: { groups: DatedGroups; locale?: string; timeZone?: string }
 ): NavNode[] => {
   const root = createGroup("", "", "", 0);
   // Folder path -> `sidebar.display` from that folder's index page frontmatter.
@@ -849,9 +1076,10 @@ const buildFileSystemSidebar = (
       }
     }
 
-    const { order, orderIsAuthored } = pageOrder(page, filename);
+    const { order, orderIsAuthored, time } = pageOrder(page, filename);
     parent.children.push({
       badge: page.meta.sidebar.badge,
+      ...datedFields(page, time),
       deprecated: page.meta.deprecated || undefined,
       description: page.description,
       file: page.sourcePath,
@@ -879,6 +1107,14 @@ const buildFileSystemSidebar = (
   sortNodes(root.children, diagnostics);
   hoistPages(root.children, display, true);
   hoistTabSections(root.children, tabPaths, display);
+  // After hoisting, which lifts loose pages above groups: the period groups
+  // then take the dated entries' place, ahead of any undated one.
+  const timeZone = dates.timeZone ?? "UTC";
+  groupDatedPages(root.children, dates.groups, {
+    day: isoDateFormat(timeZone),
+    plain: periodLabels("en", timeZone),
+    shown: periodLabels(dates.locale, timeZone),
+  });
   return root.children.map((child) =>
     toNavNode(child, display, root.directory)
   );
@@ -1300,6 +1536,12 @@ export const buildNavigation = (
      * of falling back to its section's first page.
      */
     extraRoutes?: ReadonlySet<string>;
+    /** How dated entries (blog posts, changelog entries) group, by type. */
+    datedGroups?: DatedGroups;
+    /** The tree's locale, which names its month groups. */
+    locale?: string;
+    /** The time zone dated entries' periods are read in; UTC by default. */
+    timeZone?: string;
   }
 ): Navigation => {
   const basePath = options.basePath ?? "";
@@ -1374,7 +1616,12 @@ export const buildNavigation = (
       tabs.flatMap((tab) => (isRootTab(tab, rootTabPath) ? [] : [tab.path]))
     ),
     diagnostics,
-    options.fallbackMetaPrefix
+    options.fallbackMetaPrefix,
+    {
+      groups: options.datedGroups ?? {},
+      locale: options.locale,
+      timeZone: options.timeZone,
+    }
   );
   return {
     actions,

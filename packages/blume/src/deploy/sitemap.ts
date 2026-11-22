@@ -5,6 +5,8 @@ import type { BuiltPage } from "../ai/built-pages.ts";
 import {
   customStaticRoutes,
   discoverPagesSync,
+  generatedBlogTagRoutes,
+  hasGeneratedBlog,
   hasGeneratedChangelog,
 } from "../astro/pages.ts";
 import {
@@ -250,9 +252,9 @@ export const buildSitemapFiles = (
       alternateTags(page.route)
     );
   }
-  // Custom `.astro` pages and the generated changelog index mount outside
-  // `basePath` (they're injected at their pattern — see `blumeIntegration`), so
-  // only the deployment base layers onto their URLs.
+  // Custom `.astro` pages and the generated changelog and blog pages mount
+  // outside `basePath` (they're injected at their pattern — see
+  // `blumeIntegration`), so only the deployment base layers onto their URLs.
   const userPages = project.context.pagesRoot
     ? discoverPagesSync(project.context.pagesRoot)
     : [];
@@ -262,6 +264,10 @@ export const buildSitemapFiles = (
   if (hasGeneratedChangelog(project, userPages)) {
     extraRoutes.push("/changelog");
   }
+  if (hasGeneratedBlog(project, userPages)) {
+    extraRoutes.push("/blog");
+  }
+  extraRoutes.push(...generatedBlogTagRoutes(project, userPages));
   // What the build read back from those pages' HTML (see
   // `ai/built-pages.ts`): a `noindex` one stays out, and a dated one carries
   // its date.

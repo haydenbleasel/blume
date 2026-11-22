@@ -102,6 +102,10 @@ A `loader({ i18n })` setup (locale-suffixed files or locale dirs) → Blume `i18
 
 Repoint scripts (`dev`→`blume dev`, `build`→`blume build`, `start`→`blume preview`), remove the `fumadocs-*`/`@fumadocs/*` deps and the host framework's deps (`next`, `react-router`, `@tanstack/*`…), add `blume`. Safe to delete after harvesting (see above for what to read first): `source.config.*`, `lib/source.ts`, `lib/shared.ts`, `lib/layout.shared.tsx` (or `app/layout.config.tsx`), `components/mdx.tsx` / `mdx-components.tsx`, the app/route dir, and host-framework config (`next.config.*`, `next-env.d.ts`, the `next` tsconfig plugin — or the React Router/TanStack equivalents).
 
+## Blog
+
+Fumadocs has no blog of its own: a site's blog is a `fumadocs-mdx` collection (`defineCollections({ type: "doc", dir: "content/blog" })` in `source.config.ts`) shown by its own `app/blog/` pages. Move the posts into `blog/` under Blume's content root, as `type: blog` pages (see SKILL.md "Blogs"): keep `title`, `description`, and `date`, and map the collection schema's extra fields by meaning (`author` → `authors`, an image → `cover`, `tags`). Then delete the `app/blog/` pages: Blume generates `/blog`, the tag pages, and the post layout.
+
 ## Dropped — report these
 
 Folder `description` and `collapsible: false`; reversed rest (`z...a`) ordering; the extract (`...folder`) flatten semantics; deep-folder sidebar links; frontmatter `full` (approximated as `mode: wide`); header settings from `lib/layout.shared.tsx` with no Blume home; `<DynamicCodeBlock>`/`<InlineTOC>`; custom Shiki transformers; any icon with no Lucide equivalent after casing conversion.

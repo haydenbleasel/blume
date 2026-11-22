@@ -46,6 +46,17 @@ export const th: UIStringsOverride = {
     you: "คุณ",
   },
   banner: { dismiss: "ปิดประกาศ" },
+  blog: {
+    allPosts: "โพสต์ทั้งหมด",
+    description: "ข่าวสาร อัปเดต และเรื่องราวจากทีม",
+    empty: "ยังไม่มีโพสต์",
+    newer: "โพสต์ที่ใหม่กว่า",
+    older: "โพสต์ที่เก่ากว่า",
+    readingTime: "อ่าน {minutes} นาที",
+    tagged: "โพสต์ที่มีแท็ก “{tag}”",
+    tags: "แท็ก",
+    title: "บล็อก",
+  },
   changelog: {
     description: "อัปเดตผลิตภัณฑ์และบันทึกประจำรุ่น",
     empty: "ยังไม่มีรายการในบันทึกการเปลี่ยนแปลง",
