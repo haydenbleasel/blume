@@ -9,9 +9,13 @@ export const PACKAGE_MANAGERS = [
   "bun",
   "nub",
   "aube",
+  "vlt",
 ] as const;
 
 export type PackageManager = (typeof PACKAGE_MANAGERS)[number];
+
+/** The managers package-manager-detector has an agent table for. */
+type TableManager = Exclude<PackageManager, "vlt">;
 
 /**
  * The agent each tab renders. The yarn tab is pinned to Berry (yarn 2+ — the
@@ -19,7 +23,7 @@ export type PackageManager = (typeof PACKAGE_MANAGERS)[number];
  * `--immutable` next to Classic-only `yarn global add`, so no single yarn
  * version could run every rendered command. Berry removed `global`
  * (yarnpkg/berry#821), so global installs on the yarn tab honestly render
- * npm's form, matching `ni`'s table.
+ * npm's form, matching `ni`'s table. vlt has no table; see `buildVltCommand`.
  */
 const AGENT_FOR = {
   aube: "aube",
@@ -28,7 +32,7 @@ const AGENT_FOR = {
   nub: "nub",
   pnpm: "pnpm",
   yarn: "yarn@berry",
-} satisfies Record<PackageManager, Agent>;
+} satisfies Record<TableManager, Agent>;
 
 /** Words that mark the input as an explicit command rather than a bare list. */
 const MANAGER_PREFIXES = new Set([
@@ -40,14 +44,17 @@ const MANAGER_PREFIXES = new Set([
   "nub",
   "nubx",
   "pnpm",
+  "vlt",
+  "vlx",
   "yarn",
 ]);
 
 /** Standalone runner binaries that spell `<manager> exec` as one word. */
-const EXEC_BINARIES = new Set(["bunx", "npx", "nubx"]);
+const EXEC_BINARIES = new Set(["bunx", "npx", "nubx", "vlx"]);
 
 const WHITESPACE = /\s+/u;
 const WHITESPACE_RUN = /\s+/gu;
+const NPM_BINARY = /^npm(?= )/u;
 const GLOBAL_FLAGS = new Set(["-g", "--global"]);
 
 type Operation =
@@ -118,9 +125,10 @@ const normalizeFlags = (args: string[]): string[] =>
   });
 
 /**
- * Drop the `--` that ends the input manager's own options. Only npm needs one
- * before arguments meant for an initializer or script; pnpm and Yarn pass a
- * literal `--` through to them, so it's re-inserted per manager on render.
+ * Drop the `--` that ends the input manager's own options. Only npm and vlt
+ * need one before arguments meant for an initializer, script or `vlx` binary;
+ * pnpm and Yarn pass a literal `--` through to them, so it's re-inserted per
+ * manager on render.
  */
 const dropSeparator = (args: string[]): string[] => {
   const index = args.indexOf("--");
@@ -128,11 +136,12 @@ const dropSeparator = (args: string[]): string[] => {
 };
 
 /**
- * npm reads flags after a `create` initializer as its own config, so they need
- * a `--` in front (`npm create vite my-app -- --template react-ts`). Every
- * other manager forwards them as written.
+ * npm reads flags after a `create` initializer as its own config, and vlt does
+ * the same there and after a `vlx` binary, so they need a `--` in front
+ * (`npm create vite my-app -- --template react-ts`,
+ * `vlx prettier . -- --write`). Every other manager forwards them as written.
  */
-const npmCreateArgs = (args: string[]): string[] => {
+const insertSeparator = (args: string[]): string[] => {
   const initializer = args.findIndex((arg) => !arg.startsWith("-"));
   const flag = args.findIndex(
     (arg, index) => index > initializer && arg.startsWith("-")
@@ -157,7 +166,10 @@ const parseIntent = (input: string): Intent => {
     return { args: normalizeFlags(tokens), operation: "add" };
   }
   if (EXEC_BINARIES.has(first)) {
-    return { args: rest, operation: "exec" };
+    return {
+      args: first === "vlx" ? dropSeparator(rest) : rest,
+      operation: "exec",
+    };
   }
 
   const [verb, ...verbArgs] = rest;
@@ -190,6 +202,10 @@ const parseIntent = (input: string): Intent => {
   if (operation === "create" || operation === "run") {
     return { args: dropSeparator(verbArgs), operation };
   }
+  // Like vlx, `vlt exec` takes a `--` before the binary's flags.
+  if (first === "vlt" && operation === "exec") {
+    return { args: dropSeparator(verbArgs), operation };
+  }
   return { args: normalizeFlags(verbArgs), operation };
 };
 
@@ -207,12 +223,12 @@ const COMMAND_FOR = {
  * Render one manager's command for the given intent, via
  * package-manager-detector's maintained agent tables (the engine behind `ni`).
  */
-const buildCommand = (manager: PackageManager, intent: Intent): string => {
+const buildCommand = (manager: TableManager, intent: Intent): string => {
   // The tables carry no `create`; every manager spells the verb the same way,
   // and only npm needs a `--` before the initializer's flags. (The tables'
   // `run` already inserts npm's `--` itself.)
   if (intent.operation === "create") {
-    const args = manager === "npm" ? npmCreateArgs(intent.args) : intent.args;
+    const args = manager === "npm" ? insertSeparator(intent.args) : intent.args;
     return `${manager} create ${args.join(" ")}`;
   }
   // A `-g`/`--global` flag selects the dedicated global command (the tables
@@ -246,6 +262,25 @@ const buildCommand = (manager: PackageManager, intent: Intent): string => {
   return words.join(" ");
 };
 
+/**
+ * package-manager-detector has no vlt agent, but vlt spells these operations
+ * as npm does, so its tab is npm's command under vlt's name. `vlx` needs a
+ * `--` before the binary's flags, and `vlt create` requires an initializer,
+ * so a bare `npm init` becomes `vlt init`.
+ */
+const buildVltCommand = (intent: Intent): string => {
+  if (intent.operation === "exec") {
+    return `vlx ${insertSeparator(dropSeparator(intent.args)).join(" ")}`;
+  }
+  if (
+    intent.operation === "create" &&
+    intent.args.every((arg) => arg.startsWith("-"))
+  ) {
+    return `vlt init ${intent.args.join(" ")}`;
+  }
+  return buildCommand("npm", intent).replace(NPM_BINARY, "vlt");
+};
+
 const normalizeCommand = (command: string): string =>
   command.replaceAll(WHITESPACE_RUN, " ").trim();
 
@@ -262,6 +297,7 @@ export const toPackageCommands = (input: string) => {
     npm: normalizeCommand(buildCommand("npm", intent)),
     nub: normalizeCommand(buildCommand("nub", intent)),
     pnpm: normalizeCommand(buildCommand("pnpm", intent)),
+    vlt: normalizeCommand(buildVltCommand(intent)),
     yarn: normalizeCommand(buildCommand("yarn", intent)),
   } satisfies Record<PackageManager, string>;
 };
