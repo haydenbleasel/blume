@@ -73,6 +73,58 @@ describe("ranking in the Orama index", () => {
   it("finds a page by its keywords", async () => {
     expect(await routes(DOCS, "gizmo")).toStrictEqual(["/charlie"]);
   });
+
+  it("ranks a whole title phrase before scattered body matches before limiting hits", async () => {
+    const db = await buildOramaIndex([
+      {
+        content: "memory coding agents, for scopes",
+        description: "",
+        route: "/reference",
+        title: "Memory operations for admins",
+      },
+      {
+        content: Array.from({ length: 80 }, (_, i) => `example${i}`).join(" "),
+        description: "A guide to decisions",
+        route: "/guide",
+        title: "Memory for coding agents across sessions",
+      },
+    ]);
+
+    expect(
+      await queryOramaIndex(db, "memory for coding agents", 1)
+    ).toMatchObject([{ route: "/guide" }]);
+  });
+
+  it("applies the same phrase ranking when combining locale results", async () => {
+    const db = await buildOramaIndex(
+      [
+        {
+          boost: 5,
+          content: "Memoire, configuration, agent",
+          description: "",
+          locale: "en",
+          route: "/reference",
+          title: "Mémoire agents for admins",
+        },
+        {
+          content: "Setup and usage",
+          description: "",
+          keywords: ["Mémoire agent"],
+          locale: "ja",
+          route: "/ja/guide",
+          title: "設定ガイド",
+        },
+      ],
+      "en"
+    );
+
+    expect(await queryOramaIndex(db, "memoire agent", 1)).toMatchObject([
+      { route: "/ja/guide" },
+    ]);
+    expect(
+      await queryOramaIndex(db, "memoire agent", 1, { locale: "en" })
+    ).toMatchObject([{ route: "/reference" }]);
+  });
 });
 
 describe(pagefindRanking, () => {

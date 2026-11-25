@@ -71,11 +71,56 @@ const BOOST = { description: 2, keywords: 3, title: 3 };
 const boostedDatabases = new WeakSet<AnyOrama>();
 
 /** A search match as Orama's sort function sees it: id, score, document. */
-type RankedMatch = [unknown, number, OramaDoc];
+type RankedMatch = [number, number, OramaDoc];
 
-/** Rank matches by relevance times the page's `search.boost`. */
-const byBoostedScore = (a: RankedMatch, b: RankedMatch): number =>
-  b[1] * (b[2].boost ?? 1) - a[1] * (a[2].boost ?? 1);
+/** Fold spelling and punctuation while keeping word order and boundaries. */
+const normalizePhrase = (value: string): string =>
+  foldLatinTerm(stripSoftHyphens(value).normalize("NFC").toLowerCase())
+    .replaceAll(/[^\p{L}\p{M}\p{N}]+/gu, " ")
+    .trim();
+
+/** Check each candidate's title and individual aliases once per query. */
+const phraseMatcher = (
+  term: string
+): ((doc: OramaDoc) => boolean) | undefined => {
+  const phrase = normalizePhrase(term);
+  if (!phrase.includes(" ")) {
+    return;
+  }
+  const needle = ` ${phrase} `;
+  const contains = (value: string): boolean =>
+    ` ${normalizePhrase(value)} `.includes(needle);
+  const matches = new WeakMap<OramaDoc, boolean>();
+  return (doc) => {
+    const cached = matches.get(doc);
+    if (cached !== undefined) {
+      return cached;
+    }
+    const match =
+      contains(doc.title) || (doc.keywords?.some(contains) ?? false);
+    matches.set(doc, match);
+    return match;
+  };
+};
+
+/** Use the same ranking before each locale's limit and when merging locales. */
+const searchRanking = (term: string, hasBoosts: boolean) => {
+  const matchesPhrase = phraseMatcher(term);
+  const compareRank = (
+    a: OramaDoc,
+    aScore: number,
+    b: OramaDoc,
+    bScore: number
+  ): number =>
+    Number(matchesPhrase?.(b) ?? false) - Number(matchesPhrase?.(a) ?? false) ||
+    bScore * (b.boost ?? 1) - aScore * (a.boost ?? 1);
+  const sortBy =
+    matchesPhrase || hasBoosts
+      ? (a: RankedMatch, b: RankedMatch): number =>
+          compareRank(a[2], a[1], b[2], b[1]) || (hasBoosts ? 0 : a[0] - b[0])
+      : undefined;
+  return { compareRank, sortBy };
+};
 
 /**
  * The script {@link latinTokenizer} indexes. {@link LATIN_SEPARATOR} splits on
@@ -470,10 +515,6 @@ const rankedHits = async (
   return found.hits;
 };
 
-/** A hit's rank across searches: its relevance times the page's boost. */
-const boostedScore = (hit: Hit): number =>
-  hit.score * (hit.document.boost ?? 1);
-
 /**
  * Query the index, returning the matching documents (highest-ranked first).
  * `filters` narrows results by exact `where` matches on the enum fields:
@@ -483,7 +524,7 @@ const boostedScore = (hit: Hit): number =>
  * On an index whose translations have tokenizers of their own, a query scoped
  * to a locale is tokenized with that locale's tokenizer. An unscoped query
  * searches each locale's pages with its own tokenizer, and the Latin-script
- * pages with {@link latinTokenizer}, then merges the matches by score: every
+ * pages with {@link latinTokenizer}, then merges the ranked matches: every
  * search runs over the one index, so their scores share its term statistics.
  */
 export const queryOramaIndex = async (
@@ -507,14 +548,14 @@ export const queryOramaIndex = async (
   if (facetTerms.length > 0) {
     where.facetTerms = { containsAll: facetTerms };
   }
-  // Boosts multiply every match's score before the limit applies (Orama
-  // sorts the whole match set with a sort function), so a boosted page can
-  // rise past matches outside the first page.
+  // Sort before Orama limits each result list. A whole phrase in the title
+  // or an alias ranks first, then relevance and the page's boost break ties.
+  const { compareRank, sortBy } = searchRanking(term, boostedDatabases.has(db));
   const unfiltered = {
     boost: BOOST,
     limit,
     properties: ["title", "keywords", "description", "content"],
-    ...(boostedDatabases.has(db) && { sortBy: byBoostedScore }),
+    sortBy,
     term,
   };
   const params =
@@ -556,7 +597,7 @@ export const queryOramaIndex = async (
   const found = await Promise.all(searches);
   return found
     .flat()
-    .toSorted((a, b) => boostedScore(b) - boostedScore(a))
+    .toSorted((a, b) => compareRank(a.document, a.score, b.document, b.score))
     .slice(0, limit)
     .map((hit) => hit.document);
 };

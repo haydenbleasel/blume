@@ -108,7 +108,8 @@ Keep boosts to a few pages readers most often need, such as a quickstart or an o
 
 How much a boost moves a page depends on the adapter:
 
-- **Orama** (the default) and **FlexSearch** multiply every match by its page's boost before sorting, so a boost of 3 counts exactly three times. The [MCP server](/docs/discoverability/mcp) and the [assistant](/docs/configuration/assistant)'s search rank the same way.
+- **Orama** (the default) ranks complete query phrases in a page's title or one of its keywords first. Within each group, it ranks by relevance multiplied by the page's boost. The docs API, the [MCP server](/docs/discoverability/mcp) and the [assistant](/docs/configuration/assistant) share this ranking.
+- **FlexSearch** multiplies every match by its page's boost before sorting.
 - **Pagefind** weighs a boosted page's text more heavily. It damps repeated matches, so the lift is smaller than the multiplier: a boost of 5 ranks the page higher, but closer to twice as high. Pagefind counts a boost over 10 as 10.
 - **Algolia** sorts by boost among results that match about equally well, so a boost settles close calls without lifting a weaker match over a strong one. The sync adds `desc(boost)` to the index's custom ranking, after any ranking you set.
 - **Typesense** sorts by relevance, then by boost among results with the same relevance score, so a boost settles ties without lifting a weaker match over a strong one.
