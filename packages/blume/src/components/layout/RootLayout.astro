@@ -498,9 +498,9 @@ const mcpMenu = mcp?.clients
   ? mcpMenuEntries(mcp.clients, locale, data.config.i18n?.defaultLocale)
   : undefined;
 
-// Scope the sidebar (and the breadcrumbs/pagination derived from it) to the
-// active tab's section, so a multi-section site drills each tab into its own
-// pages. Without tabs — or on a route under none — this is the full sidebar.
+// Scope the sidebar and pagination to the active tab's section so each tab
+// shows its own pages. Without tabs, or on a route under none, this is the
+// full sidebar.
 // `navigation.root` keeps the root-tab check in the tabs' localized/based
 // path space (`/en`, `/docs`), so a locale or base prefix doesn't misread the
 // root tab as a section tab; in an archived version tree the root is
@@ -524,7 +524,8 @@ const activeTab = currentTabForRoute(
   page.route,
   navigation.root
 );
-const crumbs = findBreadcrumbs(sidebar, page.route);
+// The full tree retains the tab's landing page as a breadcrumb ancestor.
+const crumbs = findBreadcrumbs(navigation.sidebar, page.route);
 // A group's own page lists the group's pages below its content when the
 // group asks for a directory. Looked up in the full tree: a tab's own page
 // is not in its scoped sidebar.

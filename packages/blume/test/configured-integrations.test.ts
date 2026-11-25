@@ -403,9 +403,13 @@ const runCli = async (
   args: string[],
   timeout = 120_000
 ): Promise<{ exitCode: number; output: string }> => {
+  const env: NodeJS.ProcessEnv = { ...process.env, NO_COLOR: "1" };
+  // Component tests set BASE_URL for direct imports. Fixture builds use
+  // the deployment base in their own config.
+  delete env.BASE_URL;
   const proc = Bun.spawn(["bun", CLI, ...args], {
     cwd: root,
-    env: { ...process.env, NO_COLOR: "1" },
+    env,
     stderr: "pipe",
     stdout: "pipe",
   });
@@ -551,6 +555,40 @@ it("passes invalid integration elements through to Astro validation", async () =
   expect(built.output).toMatch(/integrations?/iu);
   expect(built.output).not.toContain("BLUME_CONFIG_INVALID");
   // Budget for a killed-and-retried 90s build attempt.
+}, 240_000);
+
+it("renders the tab landing page in built breadcrumbs", async () => {
+  const root = await writeProject({
+    "blume.config.ts": `
+import { node } from "blume/deploy";
+
+export default {
+  deployment: node({ base: "/docs", site: "https://docs.example.com" }),
+  navigation: { tabs: [{ label: "Guides", path: "/guides" }] },
+  ${offlineFontsSource},
+};
+`,
+    "docs/guides/index.md": "# Guides\n",
+    "docs/guides/setup.md": "# Setup\n",
+    "docs/index.md": "# Home\n",
+  });
+
+  const built = await runIsolatedBuild(root);
+  expect(built.exitCode, built.output).toBe(0);
+  const html = await readFile(
+    join(root, ".blume-verify/dist/client/guides/setup/index.html"),
+    "utf-8"
+  );
+  const breadcrumb =
+    html.match(/<nav aria-label="Breadcrumb"[^>]*>[\s\S]*?<\/nav>/u)?.[0] ?? "";
+  expect(breadcrumb).toContain('href="/docs/guides"');
+  expect(html).toContain('"@type":"BreadcrumbList"');
+  expect(html).toContain(
+    '"item":"https://docs.example.com/docs/guides","name":"Guides","position":1'
+  );
+  expect(html).toContain(
+    '"item":"https://docs.example.com/docs/guides/setup","name":"Setup","position":2'
+  );
 }, 240_000);
 
 it("renders agents.mcp.clients in the built Connect to MCP menu", async () => {
