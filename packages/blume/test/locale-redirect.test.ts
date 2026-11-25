@@ -1,10 +1,12 @@
 import { afterEach, describe, expect, it } from "bun:test";
 
 import {
-  browserLanguageTargets,
-  LOCALE_REDIRECT_SCRIPT,
   LOCALE_STORAGE_KEY,
   rememberLocaleChoice,
+} from "../src/components/layout/locale-choice.ts";
+import {
+  browserLanguageTargets,
+  LOCALE_REDIRECT_SCRIPT,
 } from "../src/components/layout/locale-redirect.ts";
 import type { BlumeDataI18n } from "../src/core/data.ts";
 
