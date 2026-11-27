@@ -108,7 +108,8 @@ Keep boosts to a few pages readers most often need, such as a quickstart or an o
 
 How much a boost moves a page depends on the adapter:
 
-- **Orama** (the default) and **FlexSearch** multiply every match by its page's boost before sorting, so a boost of 3 counts exactly three times. The [MCP server](/docs/discoverability/mcp) and the [assistant](/docs/configuration/assistant)'s search rank the same way.
+- **Orama** (the default) multiplies every match by its page's boost before sorting, so a boost of 3 counts exactly three times. A query of two or more words first ranks the pages that [hold it as a phrase](#phrase-matches). The [JSON docs API](/docs/discoverability/json-api), the [MCP server](/docs/discoverability/mcp) and the [assistant](/docs/configuration/assistant) rank the same way.
+- **FlexSearch** multiplies every match by its page's boost before sorting, so a boost of 3 counts exactly three times.
 - **Pagefind** weighs a boosted page's text more heavily. It damps repeated matches, so the lift is smaller than the multiplier: a boost of 5 ranks the page higher, but closer to twice as high. Pagefind counts a boost over 10 as 10.
 - **Algolia** sorts by boost among results that match about equally well, so a boost settles close calls without lifting a weaker match over a strong one. The sync adds `desc(boost)` to the index's custom ranking, after any ranking you set.
 - **Typesense** sorts by relevance, then by boost among results with the same relevance score, so a boost settles ties without lifting a weaker match over a strong one.
@@ -116,6 +117,12 @@ How much a boost moves a page depends on the adapter:
 - **Mixedbread** searches your own store, which Blume doesn't upload to, so boosts and keywords don't reach it.
 
 Keywords are searched on every adapter except Mixedbread.
+
+### Phrase matches
+
+With Orama, a query of two or more words ranks a page first when its title or one of its keywords holds the query as a phrase. Searching `coding agents` puts a page titled "Memory for coding agents" above one that uses both words apart. Case, accents and punctuation don't matter, and the last word counts from its first letters, so the order holds while a reader is still typing. A one-word query ranks by relevance and boost alone.
+
+A boost orders the pages within each group and never moves a page from one group to the other. A legacy guide whose title holds the query ranks above a boosted page that only uses its words apart. To put another page first, add the phrase to that page's `search.keywords`, and the two boosts decide between them.
 
 ## Search analytics
 

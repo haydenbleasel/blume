@@ -8,6 +8,7 @@ import {
   localizeHref,
   routeSetFor,
 } from "../../core/locale-links.ts";
+import { deployBase } from "../islands/base-path.ts";
 
 /**
  * Keep a translated page's content links inside the reader's locale. Content
@@ -30,7 +31,7 @@ const html =
     ? localizeContentLinks(await Astro.slots.render("default"), (href) =>
         localizeHref(href, {
           basePath: data.config.basePath,
-          deployBase: normalizeBasePath(import.meta.env.BASE_URL),
+          deployBase: normalizeBasePath(deployBase()),
           i18n,
           locale,
           routes: routeSetFor(data.routes),

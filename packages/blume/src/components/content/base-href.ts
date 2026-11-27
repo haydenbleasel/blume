@@ -5,6 +5,7 @@ import {
   withAuthoredBasePath,
 } from "../../core/base-path.ts";
 import { routeSetFor, servesRoute } from "../../core/locale-links.ts";
+import { deployBase } from "../islands/base-path.ts";
 
 /**
  * Rebase a component-emitted `href` the way `markdown/base-links.ts` rebases
@@ -18,7 +19,7 @@ import { routeSetFor, servesRoute } from "../../core/locale-links.ts";
  */
 export const contentHref = (href: string): string =>
   withAuthoredBasePath(
-    normalizeBasePath(import.meta.env.BASE_URL),
+    normalizeBasePath(deployBase()),
     data.config.basePath,
     href,
     (route) => servesRoute(routeSetFor(data.routes), route)

@@ -11,7 +11,7 @@ import { resolveIcon } from "../theme/icons.ts";
  */
 export const resolvePopularIconMarkup = (
   icon?: string,
-  /** `deployment.base` / `import.meta.env.BASE_URL` for root-relative image paths. */
+  /** The deployment base (`deployBase()`) for root-relative image paths. */
   base = "/"
 ): string | undefined => {
   if (!icon) {

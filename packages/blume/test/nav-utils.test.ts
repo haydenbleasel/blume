@@ -5,12 +5,14 @@ import {
   currentTabForRoute,
   directoryEntries,
   directoryGroupForRoute,
+  findBreadcrumbs,
   groupStartsOpen,
   isGroupRowCurrent,
   navGroupIds,
   sidebarForRoute,
+  withTabCrumb,
 } from "../src/components/layout/nav-utils.ts";
-import type { NavGroup } from "../src/components/layout/nav-utils.ts";
+import type { Crumb, NavGroup } from "../src/components/layout/nav-utils.ts";
 import type { NavNode, NavTab } from "../src/core/types.ts";
 
 const page = (label: string, route: string): NavNode => ({
@@ -413,6 +415,195 @@ describe("sidebarForRoute", () => {
     const scoped = sidebarForRoute(TREE, TABS, "/adapters/s3");
     expect(scoped).toBe(childrenOf(TREE[0]));
     expect(ids.size).toBe(2);
+  });
+});
+
+/** A section whose folder has an index page, so its group is a link. */
+const section = (
+  label: string,
+  path: string,
+  children: NavNode[]
+): NavNode => ({
+  children,
+  display: "flat",
+  kind: "group",
+  label,
+  path,
+  route: path,
+});
+
+/** The trail the layout builds: looked up beside the page, then led. */
+const trail = (
+  tree: NavNode[],
+  tabs: NavTab[],
+  route: string,
+  root = "/"
+): Crumb[] =>
+  withTabCrumb(
+    findBreadcrumbs(sidebarForRoute(tree, tabs, route, root), route),
+    currentTabForRoute(tabs, route, root),
+    root
+  );
+
+// A Guides tab over a folder with an index page, beside the home page.
+const GUIDES: NavNode[] = [
+  page("Home", "/"),
+  section("Guides", "/guides", [
+    page("Overview", "/guides"),
+    page("Setup", "/guides/setup"),
+    group("Deploying", "/guides/deploying", [
+      page("Vercel", "/guides/deploying/vercel"),
+    ]),
+  ]),
+];
+const GUIDES_TAB: NavTab = { label: "Guides", path: "/guides" };
+
+describe("withTabCrumb", () => {
+  it("leads a tab page's trail with the tab's landing page", () => {
+    // The scoped sidebar is the section's children, so on its own the trail
+    // for a page at the top of a tab is the page alone.
+    expect(trail(GUIDES, [GUIDES_TAB], "/guides/setup")).toStrictEqual([
+      { label: "Guides", route: "/guides" },
+      { label: "Setup", route: "/guides/setup" },
+    ]);
+    // Groups inside the section stay between the tab and the page.
+    expect(
+      trail(GUIDES, [GUIDES_TAB], "/guides/deploying/vercel")
+    ).toStrictEqual([
+      { label: "Guides", route: "/guides" },
+      { label: "Deploying" },
+      { label: "Vercel", route: "/guides/deploying/vercel" },
+    ]);
+  });
+
+  it("names the crumb after the tab, not the section's sidebar group", () => {
+    // The group's folder-derived label never renders under its tab, so the
+    // tab's label (resolved per locale) is the section's only name.
+    const tree: NavNode[] = [
+      section("Docs", "/de/docs", [
+        page("Schnellstart", "/de/docs/quickstart"),
+      ]),
+    ];
+    const tabs: NavTab[] = [
+      { label: "Start", path: "/de" },
+      { label: "Doku", path: "/de/docs" },
+    ];
+    expect(trail(tree, tabs, "/de/docs/quickstart", "/de")).toStrictEqual([
+      { label: "Doku", route: "/de/docs" },
+      { label: "Schnellstart", route: "/de/docs/quickstart" },
+    ]);
+  });
+
+  it("keeps the trail inside the tab when another group lists the page first", () => {
+    // An explicit sidebar may list one page in two groups. The trail follows
+    // the section the page renders beside, not the tree's first match.
+    const tree: NavNode[] = [
+      group("Start here", "/start", [page("Quickstart", "/api/quickstart")]),
+      section("API", "/api", [
+        page("Quickstart", "/api/quickstart"),
+        page("Auth", "/api/auth"),
+      ]),
+    ];
+    const tabs: NavTab[] = [{ label: "API Reference", path: "/api" }];
+    expect(findBreadcrumbs(tree, "/api/quickstart")[0]?.label).toBe(
+      "Start here"
+    );
+    expect(trail(tree, tabs, "/api/quickstart")).toStrictEqual([
+      { label: "API Reference", route: "/api" },
+      { label: "Quickstart", route: "/api/quickstart" },
+    ]);
+  });
+
+  it("links a tab that lands outside the content tree", () => {
+    // The generated changelog index is no content page, so the entries' group
+    // has no route of its own; the tab is what knows where it lands.
+    const tree: NavNode[] = [
+      group("Changelog", "/changelog", [page("1.2.0", "/changelog/1-2-0")]),
+    ];
+    expect(
+      trail(
+        tree,
+        [{ label: "Changelog", path: "/changelog" }],
+        "/changelog/1-2-0"
+      )
+    ).toStrictEqual([
+      { label: "Changelog", route: "/changelog" },
+      { label: "1.2.0", route: "/changelog/1-2-0" },
+    ]);
+    // Under a `basePath` the index keeps its own path, which the tab carries
+    // as its `href`.
+    const based: NavNode[] = [
+      group("Changelog", "/docs/changelog", [
+        page("1.2.0", "/docs/changelog/1-2-0"),
+      ]),
+    ];
+    const tabs: NavTab[] = [
+      { href: "/changelog", label: "Changelog", path: "/docs/changelog" },
+    ];
+    expect(
+      trail(based, tabs, "/docs/changelog/1-2-0", "/docs")[0]
+    ).toStrictEqual({ label: "Changelog", route: "/changelog" });
+  });
+
+  it("adds no crumb for a section with no landing page", () => {
+    // Without an index page the tab links to the section's first page, which
+    // is a page in the section rather than a parent of the others.
+    const tree: NavNode[] = [
+      group("Guides", "/guides", [
+        page("Intro", "/guides/intro"),
+        page("Setup", "/guides/setup"),
+      ]),
+    ];
+    const tabs: NavTab[] = [
+      { href: "/guides/intro", label: "Guides", path: "/guides" },
+    ];
+    expect(trail(tree, tabs, "/guides/setup")).toStrictEqual([
+      { label: "Setup", route: "/guides/setup" },
+    ]);
+    expect(trail(tree, tabs, "/guides/intro")).toStrictEqual([
+      { label: "Intro", route: "/guides/intro" },
+    ]);
+  });
+
+  it("adds no crumb for an external tab target", () => {
+    const tabs: NavTab[] = [
+      { ...GUIDES_TAB, href: "https://guides.example.com" },
+    ];
+    expect(trail(GUIDES, tabs, "/guides/setup")).toStrictEqual([
+      { label: "Setup", route: "/guides/setup" },
+    ]);
+  });
+
+  it("leaves the landing page's own trail alone", () => {
+    expect(trail(GUIDES, [GUIDES_TAB], "/guides")).toStrictEqual([
+      { label: "Overview", route: "/guides" },
+    ]);
+  });
+
+  it("leaves a page outside the sidebar without a trail", () => {
+    expect(trail(GUIDES, [GUIDES_TAB], "/guides/hidden")).toStrictEqual([]);
+  });
+
+  it("adds no crumb outside a section tab", () => {
+    const tabs: NavTab[] = [{ label: "Docs", path: "/" }, GUIDES_TAB];
+    // The root tab spans the whole tree rather than owning a section.
+    expect(trail(GUIDES, tabs, "/")).toStrictEqual([
+      { label: "Home", route: "/" },
+    ]);
+    // No tabs at all: the full tree's trail, group included.
+    expect(trail(GUIDES, [], "/guides/setup")).toStrictEqual([
+      { label: "Guides", route: "/guides" },
+      { label: "Setup", route: "/guides/setup" },
+    ]);
+    // An archived version tree marks no tab current, and its sidebar is not
+    // scoped, so the snapshot's own group already leads the trail.
+    const archived: NavNode[] = [
+      section("Guides", "/v1.0/guides", [page("Setup", "/v1.0/guides/setup")]),
+    ];
+    expect(trail(archived, tabs, "/v1.0/guides/setup", "/v1.0")).toStrictEqual([
+      { label: "Guides", route: "/v1.0/guides" },
+      { label: "Setup", route: "/v1.0/guides/setup" },
+    ]);
   });
 });
 

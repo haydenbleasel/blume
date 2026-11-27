@@ -93,7 +93,7 @@ export const localizeLinkPath = (
 };
 
 export interface LocalizeHrefOptions extends LocalizeLinkOptions {
-  /** `deployment.base` (Astro's `BASE_URL`), layered over `basePath` in hrefs. */
+  /** `deployment.base` (`deployBase()`), layered over `basePath` in hrefs. */
   deployBase: string;
 }
 

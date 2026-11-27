@@ -160,7 +160,7 @@ const plain = (html: string): string => {
 };
 
 export interface WebMcpToolOptions {
-  /** The deployment base (`import.meta.env.BASE_URL`). */
+  /** The deployment base (`deployBase()`). */
   base: string;
   /** Injectable for tests; defaults to the page's `fetch`. */
   fetchFn?: typeof fetch;
