@@ -6,7 +6,7 @@ import type { AstroConfig, AstroIntegration } from "astro";
 import { join, relative, resolve } from "pathe";
 
 import { loadEnvFiles } from "../cli/env.ts";
-import { normalizeBasePath } from "../core/base-path.ts";
+import { DEPLOY_BASE_DEFINE, normalizeBasePath } from "../core/base-path.ts";
 import type { CustomPageRoute } from "../core/custom-pages.ts";
 import { enrichDiagnostic } from "../core/diagnostics.ts";
 import { POWERED_BY_HEADERS } from "../core/powered-by.ts";
@@ -536,10 +536,20 @@ export const blumeIntegration = (
       },
       "astro:config:setup": ({
         addMiddleware,
+        config,
         createCodegenDir,
         injectRoute,
+        updateConfig,
       }) => {
         codegenDir = createCodegenDir();
+        // The base, under a name of Blume's own: a `BASE_URL` in the
+        // environment shadows Astro's field of that name in a build's server
+        // code (see `deployBase` in components/islands/base-path.ts).
+        updateConfig({
+          vite: {
+            define: { [DEPLOY_BASE_DEFINE]: JSON.stringify(config.base) },
+          },
+        });
         // Splices each page's icon sprite in once the page has rendered (see
         // components/icon-sprite-middleware.ts). Innermost, so a project's
         // own middleware sees the finished HTML.

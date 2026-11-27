@@ -8,7 +8,11 @@ import { scopesLocales } from "../../search/adapters/locale-scope.ts";
 import { scopesVersions } from "../../search/adapters/version-scope.ts";
 import { resolvePopularIconMarkup } from "../../search/popular-icon.ts";
 import Icon from "../Icon.astro";
-import { withBase, withMountedBase } from "../islands/base-path.ts";
+import {
+  deployBase,
+  withBase,
+  withMountedBase,
+} from "../islands/base-path.ts";
 import { flattenPages } from "./nav-utils.ts";
 
 // The provider-specific loader is generated per project into `blume:search-client`
@@ -68,7 +72,7 @@ const popular =
         href: withBase(page.route),
         icon: resolvePopularIconMarkup(
           page.icon,
-          import.meta.env.BASE_URL ?? "/"
+          deployBase()
         ),
         label: page.label,
       }))
@@ -243,7 +247,7 @@ const kbd = "rounded border border-border bg-muted px-1 py-0.5 font-mono";
   <script>
     import { navigate } from "astro:transitions/client";
     import { chromeIcons as icons } from "../../theme/chrome-icons.ts";
-    import { mountBase } from "../islands/base-path.ts";
+    import { withMountedBase } from "../islands/base-path.ts";
     import { escape as escapeHtml } from "html-escaper";
 
     import { track } from "./analytics-client.ts";
@@ -798,7 +802,7 @@ const kbd = "rounded border border-border bg-muted px-1 py-0.5 font-mono";
         // Index URLs are base-less logical routes; mount them under the
         // deployment base so clicking a result lands on the page's real served
         // URL, even when the route starts with the base's own name.
-        const href = mountBase(import.meta.env.BASE_URL, hit.url);
+        const href = withMountedBase(hit.url);
         el.href = href;
         el.className = `${ROW_CLASS} ${MARK}`;
         // `line-clamp-2` already sets `display`, so no `block` here (it would

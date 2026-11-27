@@ -7,7 +7,7 @@ import { createPortal } from "react-dom";
 import type { CaptchaSettings } from "../../captcha/schema.ts";
 import type { UIStrings } from "../../core/i18n-ui.ts";
 import { copyText } from "../copy-feedback.ts";
-import { joinBase, mountBase } from "./base-path.ts";
+import { deployBase, joinBase, withMountedBase } from "./base-path.ts";
 import { splitCode, withCode } from "./code-question.ts";
 import type { CodeAttachment } from "./code-question.ts";
 import { useAssistant } from "./hooks.ts";
@@ -68,7 +68,7 @@ const DEFAULT_ASK: UIStrings["assistant"] = {
 
 // The endpoint honors the deployment `base` so grounding works under a
 // non-root base path (the server matches base-less document routes).
-const DEFAULT_ASK_ENDPOINT = joinBase(import.meta.env.BASE_URL, "api/ask");
+const DEFAULT_ASK_ENDPOINT = joinBase(deployBase(), "api/ask");
 
 // GitHub-flavored markdown with soft line breaks, matching how the docs read.
 // A dedicated instance, not the shared `marked` singleton: `setOptions`/`use`
@@ -83,7 +83,7 @@ const markdown = new Marked({
   // external URLs and fragments untouched.
   walkTokens: (token) => {
     if (token.type === "link") {
-      token.href = mountBase(import.meta.env.BASE_URL, token.href);
+      token.href = withMountedBase(token.href);
     }
   },
 });

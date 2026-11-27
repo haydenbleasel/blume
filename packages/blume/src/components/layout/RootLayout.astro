@@ -47,7 +47,11 @@ import { ogTypeFor } from "../../seo/page-kind.ts";
 import type { FaqEntry } from "../../markdown/faq.ts";
 import type { AuthorInput } from "../../seo/jsonld.ts";
 import { normalizeXHandle } from "../../seo/x-handle.ts";
-import { withBase, withMountedBase } from "../islands/base-path.ts";
+import {
+  deployBase,
+  withBase,
+  withMountedBase,
+} from "../islands/base-path.ts";
 import { routeSetFor } from "../../core/locale-links.ts";
 import {
   KEYWORDS_ATTRIBUTE,
@@ -554,7 +558,7 @@ const structuredData =
     ? null
     : buildStructuredData({
       authors,
-      base: import.meta.env.BASE_URL,
+      base: deployBase(),
       breadcrumbs: crumbs,
       description,
       faq,

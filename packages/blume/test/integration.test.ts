@@ -17,6 +17,7 @@ import {
   refreshBlumeContent,
   showBlumeErrorOverlay,
 } from "../src/astro/integration.ts";
+import { DEPLOY_BASE_DEFINE } from "../src/core/base-path.ts";
 import { scanProject } from "../src/core/project-graph.ts";
 import { compileRedirects } from "../src/core/redirect-patterns.ts";
 import type { Diagnostic } from "../src/core/types.ts";
@@ -271,6 +272,11 @@ interface InjectedPageRoute {
   prerender: boolean;
 }
 
+/** The config `astro:config:setup` merges in through `updateConfig`. */
+interface ConfigUpdate {
+  vite: { define: Record<string, string> };
+}
+
 /** The `injectTypes` call `astro:config:done` makes. */
 interface InjectedTypes {
   content: string;
@@ -291,15 +297,20 @@ const CODEGEN_DIR = new URL(".astro/integrations/blume/", CONFIG_ROOT);
 const configDone = (withSetup: boolean): InjectedTypes | undefined => {
   const integration = blumeIntegration({ contentRoutes: [], pages: [] });
   if (withSetup) {
-    // SAFETY: the setup hook only calls `addMiddleware`, `createCodegenDir`,
-    // and `injectRoute`, all of which the fixture provides.
+    // SAFETY: the setup hook only reads `config.base` and calls
+    // `addMiddleware`, `createCodegenDir`, `injectRoute`, and `updateConfig`,
+    // all of which the fixture provides.
     integration.hooks["astro:config:setup"]?.({
       addMiddleware: () => {
         // The icon-sprite middleware; irrelevant to the injected types.
       },
+      config: { base: "/" },
       createCodegenDir: () => CODEGEN_DIR,
       injectRoute: () => {
         // No pages configured, so this is never reached.
+      },
+      updateConfig: () => {
+        // The base constant; irrelevant to the injected types.
       },
     } as never);
   }
@@ -342,8 +353,10 @@ describe("blumeIntegration astro:config:setup", () => {
   it("injects each user page route as a prerendered route", () => {
     const injected: InjectedPageRoute[] = [];
     const middleware: { entrypoint: string; order: string }[] = [];
-    // SAFETY: the hook only calls `addMiddleware`, `createCodegenDir`, and
-    // `injectRoute`, which the fixture provides.
+    const updates: ConfigUpdate[] = [];
+    // SAFETY: the hook only reads `config.base` and calls `addMiddleware`,
+    // `createCodegenDir`, `injectRoute`, and `updateConfig`, which the
+    // fixture provides.
     blumeIntegration({
       contentRoutes: [],
       pages: [
@@ -353,9 +366,16 @@ describe("blumeIntegration astro:config:setup", () => {
     }).hooks["astro:config:setup"]?.({
       addMiddleware: (entry: { entrypoint: string; order: string }) =>
         middleware.push(entry),
+      config: { base: "/docs" },
       createCodegenDir: () => CODEGEN_DIR,
       injectRoute: (route: InjectedPageRoute) => injected.push(route),
+      updateConfig: (update: ConfigUpdate) => updates.push(update),
     } as never);
+
+    // The base Astro resolved, as the constant `deployBase()` reads.
+    expect(updates).toEqual([
+      { vite: { define: { [DEPLOY_BASE_DEFINE]: '"/docs"' } } },
+    ]);
 
     // Both run innermost, so a project's own middleware sees the finished
     // HTML and can replace the X-Powered-By value.
@@ -392,8 +412,10 @@ describe("blumeIntegration astro:config:setup", () => {
     ]?.({
       addMiddleware: (entry: { entrypoint: string }) =>
         middleware.push(entry.entrypoint),
+      config: { base: "/" },
       createCodegenDir: () => CODEGEN_DIR,
       injectRoute: () => {},
+      updateConfig: () => {},
     } as never);
     expect(middleware).toEqual(["blume/components/icon-sprite-middleware.ts"]);
   });

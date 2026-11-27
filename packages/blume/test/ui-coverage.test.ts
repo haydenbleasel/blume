@@ -1043,9 +1043,7 @@ describe("layout chrome sources", () => {
     // The documented homepage examples omit `page.route`; a non-root page that
     // copies them must resolve its own route from the request URL, or it
     // would advertise `/index.md` (and the homepage canonical) as its own.
-    expect(source).toContain(
-      'stripBase(import.meta.env.BASE_URL ?? "/", Astro.url.pathname)'
-    );
+    expect(source).toContain("stripBase(deployBase(), Astro.url.pathname)");
     expect(source).toContain(
       "<DiscoveryLinks discovery={discovery} markdownMirror={markdownMirror} />"
     );

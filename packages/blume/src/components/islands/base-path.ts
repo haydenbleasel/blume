@@ -1,6 +1,6 @@
 /**
  * Base-path helpers for client islands. Astro's default `trailingSlash:
- * "ignore"` passes `deployment.base` through as-is, so `BASE_URL` may arrive
+ * "ignore"` passes `deployment.base` through as-is, so the base may arrive
  * with or without a trailing slash (`/docs` or `/docs/`); every consumer must
  * treat both forms the same or endpoints/grounding break under a base path.
  */
@@ -73,20 +73,37 @@ export const mountBase = (base: string, route: string): string => {
 };
 
 /**
- * {@link prefixBase} bound to the build-time `BASE_URL` (the resolved
- * `deployment.base`), for links an author wrote. The ergonomic form for
- * `.astro` templates — `href={withBase(href)}` — since `BASE_URL` is inlined
- * by Vite wherever this module is bundled into the site.
+ * The base the site is served under: `deployment.base` as Astro resolved it,
+ * with or without a trailing slash (see the note at the top of this file).
+ *
+ * Blume's integration inlines it as a constant of its own
+ * (`DEPLOY_BASE_DEFINE` in `core/base-path.ts`), which every read goes
+ * through instead of Astro's `import.meta.env.BASE_URL`. A build can't trust
+ * that one: Astro inlines each environment variable over the
+ * `import.meta.env` field of the same name in server code, so a `BASE_URL`
+ * in the environment (a monorepo's root `.env`, a CI variable) took the
+ * configured base's place in every server-rendered link while the client
+ * kept the real one. `BASE_URL` remains the fallback where the integration
+ * defined nothing, which is the test runner.
  */
-export const withBase = (route: string): string =>
-  prefixBase(import.meta.env.BASE_URL ?? "/", route);
+export const deployBase = (): string =>
+  import.meta.env.BLUME_BASE_URL ?? import.meta.env.BASE_URL ?? "/";
 
 /**
- * {@link mountBase} bound to the build-time `BASE_URL`, for routes Blume
- * generates: `href={withMountedBase(page.route)}`.
+ * {@link prefixBase} bound to the build-time {@link deployBase}, for links an
+ * author wrote. The ergonomic form for `.astro` templates —
+ * `href={withBase(href)}` — since the base is inlined by Vite wherever this
+ * module is bundled into the site.
+ */
+export const withBase = (route: string): string =>
+  prefixBase(deployBase(), route);
+
+/**
+ * {@link mountBase} bound to the build-time {@link deployBase}, for routes
+ * Blume generates: `href={withMountedBase(page.route)}`.
  */
 export const withMountedBase = (route: string): string =>
-  mountBase(import.meta.env.BASE_URL ?? "/", route);
+  mountBase(deployBase(), route);
 
 /**
  * A pathname with the deployment base stripped (`/docs/guide` -> `/guide`),
