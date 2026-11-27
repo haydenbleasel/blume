@@ -47,7 +47,11 @@ import { ogTypeFor } from "../../seo/page-kind.ts";
 import type { FaqEntry } from "../../markdown/faq.ts";
 import type { AuthorInput } from "../../seo/jsonld.ts";
 import { normalizeXHandle } from "../../seo/x-handle.ts";
-import { withBase, withMountedBase } from "../islands/base-path.ts";
+import {
+  withBase,
+  withMountedBase,
+  withTrailingSlash,
+} from "../islands/base-path.ts";
 import { routeSetFor } from "../../core/locale-links.ts";
 import {
   KEYWORDS_ATTRIBUTE,
@@ -603,6 +607,7 @@ const localeRedirect = localeTargets
     {
       localeRedirect && (
         <script
+          data-base={withTrailingSlash(withMountedBase("/"))}
           data-default={data.config.i18n?.defaultLocale}
           data-targets={localeRedirect}
           is:inline
