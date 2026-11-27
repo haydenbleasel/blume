@@ -9,7 +9,7 @@ import type { CaptchaSettings } from "../../captcha/schema.ts";
 import type { BlumeClientData } from "../../core/data.ts";
 import { track } from "../layout/analytics-client.ts";
 import type { SearchFn, SearchResult } from "../layout/search/types.ts";
-import { joinBase, stripBase } from "./base-path.ts";
+import { deployBase, joinBase, stripBase } from "./base-path.ts";
 import { newThreadId } from "./support-link.ts";
 
 /**
@@ -173,7 +173,7 @@ export interface UseAssistant {
   thread: string;
 }
 
-const DEFAULT_ASK_ENDPOINT = joinBase(import.meta.env.BASE_URL, "api/ask");
+const DEFAULT_ASK_ENDPOINT = joinBase(deployBase(), "api/ask");
 
 export interface UseAssistantOptions {
   /**
@@ -266,7 +266,7 @@ const refusalNotice = (
 
 /** The current route with the deployment base stripped, for page grounding. */
 const currentPath = (): string =>
-  stripBase(import.meta.env.BASE_URL, window.location.pathname);
+  stripBase(deployBase(), window.location.pathname);
 
 /**
  * The conversation as the route is sent it: all of it while it fits the

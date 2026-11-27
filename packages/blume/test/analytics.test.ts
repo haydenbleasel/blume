@@ -308,7 +308,7 @@ describe("analyticsHead", () => {
       "https://x.test/a.js",
       "//cdn.x.test/b.js",
     ]);
-    // `BASE_URL` may carry a trailing slash; the root base adds nothing.
+    // The base may carry a trailing slash; the root base adds nothing.
     expect(srcs("/uv/")[0]).toBe("/uv/js/redirects.js");
     expect(srcs("/")[0]).toBe("/js/redirects.js");
   });
@@ -318,7 +318,7 @@ describe("analyticsHead", () => {
       new URL("../src/components/layout/Analytics.astro", import.meta.url),
       "utf-8"
     );
-    expect(component).toContain("import.meta.env.BASE_URL");
+    expect(component).toContain("deployBase()");
   });
 
   it("lets an explicit src win over a same-named attribute", () => {

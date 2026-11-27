@@ -1,11 +1,18 @@
-import { afterAll, describe, expect, it } from "bun:test";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { afterAll, afterEach, describe, expect, it } from "bun:test";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { fileURLToPath } from "node:url";
 
 import { dirname, join } from "pathe";
 
 import { buildLlmsFiles } from "../src/ai/llms.ts";
-import { prefixBase, withBase } from "../src/components/islands/base-path.ts";
+import {
+  deployBase,
+  prefixBase,
+  withBase,
+  withMountedBase,
+} from "../src/components/islands/base-path.ts";
+import { DEPLOY_BASE_DEFINE } from "../src/core/base-path.ts";
 import { scanProject } from "../src/core/project-graph.ts";
 import { buildRssFeeds, renderRssFeed } from "../src/deploy/rss.ts";
 import { buildSitemapFiles } from "../src/deploy/sitemap.ts";
@@ -32,10 +39,72 @@ describe("prefixBase", () => {
     expect(prefixBase("/sub", "#anchor")).toBe("#anchor");
   });
 
-  it("binds withBase to BASE_URL (unset in tests -> pass-through)", () => {
-    // `import.meta.env.BASE_URL` is undefined under the test runner, so this
-    // resolves to a `/` base and returns the route unchanged.
+  it("binds withBase to the deployment base (root in tests -> pass-through)", () => {
+    // Nothing defines a base under the test runner, so this resolves to a
+    // `/` base and returns the route unchanged.
     expect(withBase("/guide")).toBe("/guide");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Where the base is read from (`deployBase`)
+// ---------------------------------------------------------------------------
+
+/** Put an environment variable back the way a test found it. */
+const restoreEnv = (name: string, value: string | undefined): void => {
+  if (value === undefined) {
+    Reflect.deleteProperty(process.env, name);
+  } else {
+    process.env[name] = value;
+  }
+};
+
+describe("deployBase", () => {
+  // Bun aliases `import.meta.env` to `process.env`, so the environment stands
+  // in for the constants a build inlines. Other suites leave `BASE_URL` set.
+  const { BASE_URL, BLUME_BASE_URL } = process.env;
+
+  afterEach(() => {
+    restoreEnv("BASE_URL", BASE_URL);
+    restoreEnv("BLUME_BASE_URL", BLUME_BASE_URL);
+  });
+
+  it("reads Blume's own constant, whatever Astro's field holds", () => {
+    // A server build inlines the environment's `BASE_URL` over Astro's field.
+    process.env.BASE_URL = "https://api.example.com";
+    process.env.BLUME_BASE_URL = "/docs";
+    expect(deployBase()).toBe("/docs");
+    expect(withBase("/guide")).toBe("/docs/guide");
+    expect(withMountedBase("/guide")).toBe("/docs/guide");
+  });
+
+  it("falls back to Astro's field, then to the root", () => {
+    Reflect.deleteProperty(process.env, "BLUME_BASE_URL");
+    process.env.BASE_URL = "/sub";
+    expect(deployBase()).toBe("/sub");
+    Reflect.deleteProperty(process.env, "BASE_URL");
+    expect(deployBase()).toBe("/");
+  });
+
+  it("is the only place the site's code reads the base", async () => {
+    // A real path, not `URL.pathname` (percent-encoding, Windows drive paths).
+    const srcRoot = fileURLToPath(new URL("../src/", import.meta.url));
+    const accessor = "components/islands/base-path.ts";
+    const direct: string[] = [];
+    for await (const found of new Bun.Glob("**/*.{astro,ts,tsx}").scan(
+      srcRoot
+    )) {
+      const file = found.replaceAll("\\", "/");
+      const source = await readFile(join(srcRoot, file), "utf-8");
+      if (file !== accessor && source.includes("import.meta.env.BASE_URL")) {
+        direct.push(file);
+      }
+    }
+    expect(direct).toStrictEqual([]);
+    // And it reads the constant the integration defines.
+    expect(await readFile(join(srcRoot, accessor), "utf-8")).toContain(
+      `${DEPLOY_BASE_DEFINE} ??`
+    );
   });
 });
 

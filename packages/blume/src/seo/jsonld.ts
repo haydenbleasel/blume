@@ -111,7 +111,7 @@ export interface StructuredDataInput {
    * `/v1.0` in an archived version). Defaults to `/`.
    */
   homeRoute?: string;
-  /** Deployment base (`import.meta.env.BASE_URL`); prefixed onto absolute URLs. */
+  /** Deployment base (`deployBase()`); prefixed onto absolute URLs. */
   base?: string;
   /** Content type — `blog` and `changelog` map to richer article types. */
   pageType?: string;

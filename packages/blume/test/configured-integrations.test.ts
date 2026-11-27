@@ -319,17 +319,17 @@ const waitForDevServer = async (
 };
 
 /**
- * The environment a fixture's CLI process starts with. `assistant.test.ts`
- * and `hooks.test.ts` set `BASE_URL` for the modules they import directly,
- * and in a full-suite run it is still set in this process. Astro inlines
- * environment variables over `import.meta.env` in server code, so a
- * `BASE_URL` passed down would replace the fixture's own `deployment.base`
- * in every server-rendered link.
+ * The environment a fixture's CLI process starts with, plus `extra`.
+ * `assistant.test.ts` and `hooks.test.ts` set `BASE_URL` for the modules they
+ * import directly, and in a full-suite run it is still set in this process.
+ * Astro inlines environment variables over `import.meta.env` in a build's
+ * server code, so the fixtures start without it and a test that wants one
+ * there says so.
  */
-const childEnv = (): NodeJS.ProcessEnv => {
+const childEnv = (extra: Record<string, string> = {}): NodeJS.ProcessEnv => {
   const env: NodeJS.ProcessEnv = { ...process.env, NO_COLOR: "1" };
   delete env.BASE_URL;
-  return env;
+  return { ...env, ...extra };
 };
 
 const startDev = async (root: string, requestedPort?: number) => {
@@ -415,11 +415,12 @@ class CliTimeoutError extends Error {
 const runCli = async (
   root: string,
   args: string[],
-  timeout = 120_000
+  timeout = 120_000,
+  env: Record<string, string> = {}
 ): Promise<{ exitCode: number; output: string }> => {
   const proc = Bun.spawn(["bun", CLI, ...args], {
     cwd: root,
-    env: childEnv(),
+    env: childEnv(env),
     stderr: "pipe",
     stdout: "pipe",
   });
@@ -458,16 +459,17 @@ const runCli = async (
  */
 const runIsolatedBuild = async (
   root: string,
+  env: Record<string, string> = {},
   attemptsLeft = 2
 ): Promise<{ exitCode: number; output: string }> => {
   let result: { exitCode: number; output: string };
   try {
-    result = await runCli(root, ["build", "--isolated"], 90_000);
+    result = await runCli(root, ["build", "--isolated"], 90_000, env);
   } catch (error) {
     if (!(error instanceof CliTimeoutError) || attemptsLeft <= 1) {
       throw error;
     }
-    return runIsolatedBuild(root, attemptsLeft - 1);
+    return runIsolatedBuild(root, env, attemptsLeft - 1);
   }
   return result;
 };
@@ -626,6 +628,38 @@ export default {
   expect(entry).toContain(
     '"item":"https://docs.example.com/docs/changelog","name":"Changelog","position":1'
   );
+}, 240_000);
+
+it("keeps deployment.base in a build whose environment sets BASE_URL", async () => {
+  const root = await writeProject({
+    "blume.config.ts": `
+import { node } from "blume/deploy";
+
+export default {
+  deployment: node({ base: "/docs", site: "https://docs.example.com" }),
+  ${offlineFontsSource},
+};
+`,
+    "docs/guides/index.md": "# Guides\n",
+    "docs/guides/setup.md": "# Setup\n",
+    "docs/index.md": "# Home\n",
+  });
+
+  // Another app's variable, the way a monorepo's root `.env` hands it over.
+  // Astro's build inlines it over its own `BASE_URL` field in server code.
+  const built = await runIsolatedBuild(root, {
+    BASE_URL: "https://api.example.com",
+  });
+  expect(built.exitCode, built.output).toBe(0);
+  const html = await readFile(
+    join(root, ".blume-verify/dist/client/guides/setup/index.html"),
+    "utf-8"
+  );
+  expect(html).not.toContain("api.example.com");
+  // A sidebar link, the Markdown mirror, and the page's own JSON-LD URL.
+  expect(html).toContain('href="/docs/guides"');
+  expect(html).toContain('href="/docs/guides/setup.md"');
+  expect(html).toContain('"url":"https://docs.example.com/docs/guides/setup"');
 }, 240_000);
 
 it("renders agents.mcp.clients in the built Connect to MCP menu", async () => {
