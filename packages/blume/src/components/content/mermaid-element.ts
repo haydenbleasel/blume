@@ -17,9 +17,20 @@ import type { Mounted } from "pele";
 // here would load the renderer everywhere.
 const importPele = () => import("pele");
 let loader: ReturnType<typeof importPele> | null = null;
-const loadPele = () => {
+const loadPele = async () => {
   loader ??= importPele();
-  return loader;
+  try {
+    return await loader;
+  } catch (error) {
+    // A failed download is forgotten, so the next diagram to mount asks
+    // again. Client-router navigations keep this module alive, so a kept
+    // rejection would fail every diagram until a full page reload. Safari
+    // fetches the chunk again on the next import; Chromium caches a failed
+    // module fetch for the life of the document, so there the reload is
+    // still needed.
+    loader = null;
+    throw error;
+  }
 };
 
 const errorMessage = () =>
@@ -27,7 +38,6 @@ const errorMessage = () =>
 
 export class BlumeMermaid extends HTMLElement {
   #diagram: Mounted | null = null;
-  #font = "";
   #observer: MutationObserver | null = null;
   #renderToken = 0;
 
@@ -41,31 +51,31 @@ export class BlumeMermaid extends HTMLElement {
     output.setAttribute("aria-busy", "true");
     this.replaceChildren(output);
 
-    // The font Pele measured. A theme can change `--blume-font-body`, and
-    // Pele only refreshes measurements when asked, so track the token across
-    // `data-theme` flips and refresh only when it actually changes.
-    const effectiveFont = () => {
-      const token = getComputedStyle(this)
-        .getPropertyValue("--blume-font-body")
-        .trim();
-      return token || getComputedStyle(this).fontFamily;
-    };
-
     // A reconnect or a newer mount invalidates a pending import or render.
     this.#renderToken += 1;
     const token = this.#renderToken;
+    // Whether Pele has drawn this diagram at least once.
+    let drawn = false;
     const showError = (error: Error) => {
       if (token !== this.#renderToken) {
+        return;
+      }
+      // Readers get only the message below; the writer needs Pele's parser
+      // error (line and snippet) to fix the source. It goes to the console,
+      // and `blume dev` also shows it under the message.
+      console.error("[blume] Pele could not render a diagram:", error);
+      // A re-layout that fails after a good render leaves Pele's last drawing
+      // on screen, dimmed under its own one-line error, and Pele restores it
+      // on the next layout that works. Replacing that here would strand the
+      // message: Pele skips the DOM write when the next layout matches what
+      // it last drew, so nothing would put the diagram back.
+      if (drawn) {
         return;
       }
       // Pele writes its own error text before calling back; replace it with
       // the localized message the rest of the chrome uses.
       output.replaceChildren();
       output.textContent = errorMessage();
-      // Readers get only the message above; the writer needs Pele's parser
-      // error (line and snippet) to fix the source. It goes to the console,
-      // and `blume dev` also shows it under the message.
-      console.error("[blume] Pele could not render a diagram:", error);
       if (import.meta.env.DEV) {
         const detail = document.createElement("pre");
         detail.className = "mt-2 overflow-x-auto text-muted-foreground text-xs";
@@ -94,28 +104,24 @@ export class BlumeMermaid extends HTMLElement {
             ),
           onRender: () => {
             if (token === this.#renderToken) {
+              drawn = true;
               output.removeAttribute("aria-busy");
             }
           },
-          // Pele's zoom chrome speaks English only; a wide diagram reflows instead.
+          // No pan-and-zoom controls: a diagram reflows or scales to the
+          // column, and one kept at its natural width scrolls in the element.
           zoom: false,
         });
 
-        this.#font = effectiveFont();
+        // A theme can change the body or monospace font, and Pele re-measures
+        // only when asked. `refresh()` compares the fonts it measured with the
+        // current `--pele-font` and `--pele-font-mono` and does nothing when
+        // neither changed, so it is safe to call on every `data-theme` write,
+        // including the one the theme script makes after each client-router
+        // swap. A re-layout that fails reports through `onError`.
         this.#observer?.disconnect();
         this.#observer = new MutationObserver(() => {
-          const font = effectiveFont();
-          if (font === this.#font) {
-            return;
-          }
-          this.#font = font;
-          try {
-            this.#diagram?.refresh();
-          } catch (error) {
-            showError(
-              error instanceof Error ? error : new Error(String(error))
-            );
-          }
+          this.#diagram?.refresh();
         });
         this.#observer.observe(document.documentElement, {
           attributeFilter: ["data-theme"],
@@ -132,7 +138,6 @@ export class BlumeMermaid extends HTMLElement {
     this.#renderToken += 1;
     this.#observer?.disconnect();
     this.#observer = null;
-    this.#font = "";
     this.#diagram?.destroy();
     this.#diagram = null;
   }

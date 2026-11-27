@@ -22,6 +22,10 @@
 // menu on a probe site in Chrome at 390, 768, and 1,100 pixels, and ran
 // Export to PDF and Export to EPUB from it before and after a client-side
 // navigation.
+// Updated for the Pele diagram renderer: a diagram's colors come from the
+// theme's CSS variables. In headless Chromium on the docs dev server, a
+// beforeprint event on a dark page turned a diagram's fills and labels light
+// with no redraw. The mermaid-cli image was not rendered again.
 import Callout from "blume/components/content/Callout.astro";
 import CodeBlock from "blume/components/content/CodeBlock.astro";
 import GuidePage from "../_guides/GuidePage.astro";
@@ -220,7 +224,7 @@ Test keys only send to phone numbers you've verified in the dashboard.
   />
   <p>
     Run <code>npx blume dev</code> and open <code>/export-test</code>. Wait
-    for the diagram to draw before you export. Mermaid renders in the browser after the page loads, and a diagram
+    for the diagram to draw before you export. A diagram renders in the browser after the page loads, and one
     that hasn't finished prints as a blank space.
   </p>
 
@@ -415,10 +419,9 @@ Test keys only send to phone numbers you've verified in the dashboard.
     <code>![How a message moves from your app to a phone](./images/delivery.svg)</code>.
     The image doesn't follow the site's dark theme the way a live diagram
     does, so save this for diagrams readers need offline. The CLI also draws
-    with Mermaid's own defaults, not Blume's dagre layout and classic look; to
-    match the site, start the <code>.mmd</code> file with a front matter block
-    that sets <code>layout: dagre</code> and <code>look: classic</code> under{" "}
-    <code>config:</code>. The{" "}
+    with Mermaid's own layout engine and colors, where the site draws with
+    Pele in your theme's colors, so expect the image to look different from
+    the live diagram. The{" "}
     <a href="/guides/architecture-documentation-mermaid">Mermaid guide</a>{" "}
     covers writing diagrams in the first place.
   </p>
@@ -495,14 +498,16 @@ npx blume preview`}
   />
   <h3>A diagram prints in dark colors</h3>
   <p>
-    The page prints in the light theme, but a Mermaid diagram redraws itself
-    for a theme change in the background, and a print that starts before the
-    redraw finishes keeps the dark drawing. Switch the site to the light
-    theme, wait for the diagram to redraw, and export again.
+    The page prints in the light theme, and a diagram takes its colors from
+    the theme, so it switches with the page. What stays dark is a color the
+    diagram sets itself: a <code>fill</code> or <code>stroke</code> in a{" "}
+    <code>style</code> or <code>classDef</code> line, or a sequence{" "}
+    <code>rect</code>, keeps its value in both themes and on paper. Remove
+    those colors, or pick ones that read on white.
   </p>
   <h3>A diagram is blank in the PDF</h3>
   <p>
-    It was printed before Mermaid finished drawing it. Wait until the diagram
-    shows on screen, then print again.
+    It was printed before it finished drawing. Wait until the diagram shows
+    on screen, then print again.
   </p>
 </GuidePage>

@@ -852,7 +852,9 @@ describe("Pele diagram tokens", () => {
     expect(entry).toContain("--pele-muted: var(--blume-muted-foreground);");
     expect(entry).toContain("--pele-line: var(--blume-foreground);");
     expect(entry).toContain("--pele-surface: var(--blume-muted);");
-    expect(entry).toContain("--pele-border: var(--blume-border);");
+    // Outlines carry meaning (a dashed node, a lifeline), so they take a
+    // text-grade color, not the hairline chrome border.
+    expect(entry).toContain("--pele-border: var(--blume-muted-foreground);");
     // The fonts are measured before layout, not just drawn.
     expect(entry).toContain("--pele-font: var(--blume-font-body);");
     expect(entry).toContain("--pele-font-mono: var(--blume-font-mono);");

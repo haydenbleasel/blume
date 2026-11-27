@@ -31,6 +31,12 @@
 // Updated for the Pele renderer: the diagram element now calls Pele's mount(),
 // theme colors come from --pele-* variables mapped onto --blume-* tokens (so
 // there is no theme re-render), and Mermaid's ELK/neo opt-ins no longer exist.
+// Ran against pele 1.13.0: render() with useMaxWidth: false in flowchart,
+// sequence, and gantt front matter (the SVG drops max-width), HTML tags in a
+// label, and click targets. In headless Chromium on the docs dev server: the
+// components diagram's nodes and dashed `external` class, laid out left to
+// right, in both themes, and a wide flowchart with and without
+// useMaxWidth: false (natural width, and the element scrolls).
 import CodeBlock from "blume/components/content/CodeBlock.astro";
 import GuidePage from "../_guides/GuidePage.astro";
 import { guideById } from "../_guides/guides.ts";
@@ -366,8 +372,8 @@ done`}
   />
   <p>
     The first run downloads the CLI and the headless browser it renders with.
-    Pele targets Mermaid 12.1.0 syntax, but the CLI's latest release is 12.0.0,
-    which bundles Mermaid 12.0.0. Treat it as a close syntax check, not an
+    The loop pins the CLI to 12.0.0, which bundles Mermaid 12.0.0, while Pele
+    targets Mermaid 12.1.0 syntax. Treat it as a close syntax check, not an
     exact Pele check or a preview: the CLI lays the diagram out with Mermaid's
     engine rather than Pele's, so its drawing and edge-case syntax support can
     differ from the site's.
@@ -453,15 +459,21 @@ npx blume validate`}
     <code>venn1</code>–<code>venn8</code>, and{" "}
     <code>xyChart.plotColorPalette</code>). Remove it if you copied the
     diagram from Mermaid's editor. Colors set with <code>style</code> or{" "}
-    <code>classDef</code> still stay fixed in both themes, so a light{" "}
-    <code>fill</code> can leave light text unreadable in dark mode. Style with
-    outlines and dashes instead, as the <code>external</code> class does.
+    <code>classDef</code> still stay fixed in both themes. Pele keeps the
+    label readable by switching it to dark or light text, but a pale{" "}
+    <code>fill</code> stays pale on a dark page. Style with outlines and
+    dashes instead, as the <code>external</code> class does.
   </p>
   <h3>Links and HTML in a diagram don't work</h3>
   <p>
-    Pele renders labels as SVG text, so HTML tags in a label show up as text;
-    use plain text or line breaks instead. A <code>click</code> statement that
-    opens an <code>http</code>, <code>https</code>, <code>mailto</code>, or{" "}
+    Pele draws labels as SVG text, not HTML. Basic formatting tags still work:{" "}
+    <code>&lt;b&gt;</code>, <code>&lt;i&gt;</code>, <code>&lt;u&gt;</code>,{" "}
+    <code>&lt;code&gt;</code>, <code>&lt;sub&gt;</code>,{" "}
+    <code>&lt;sup&gt;</code>, and <code>&lt;br&gt;</code> for a line break.
+    Other HTML tags are removed and their text kept, so a{" "}
+    <code>&lt;span&gt;</code> with a <code>style</code>, an image, or a link
+    inside a label has no effect. A <code>click</code> statement that opens an{" "}
+    <code>http</code>, <code>https</code>, <code>mailto</code>, or{" "}
     <code>tel</code> URL works; a JavaScript callback is ignored, and other
     schemes such as <code>javascript:</code> and <code>obsidian:</code> are
     dropped. For anything else, put the link in the prose next to the
@@ -472,8 +484,21 @@ npx blume validate`}
     Pele lays a diagram out for the content column, and a wide flowchart can
     switch to a vertical layout, but a diagram that is inherently wide — a long
     left-to-right chain, a large Gantt, a crowded sequence diagram — still
-    scales down to fit. Split it into smaller diagrams, one per concern. The
-    <code>useMaxWidth</code> front matter that kept a Mermaid diagram at its
-    natural width does nothing here.
+    scales down to fit. Split it into smaller diagrams, one per concern, or let
+    it keep its natural width and scroll sideways by adding front matter at
+    the top of the source:
+  </p>
+  <CodeBlock
+    code={`---
+config:
+  flowchart:
+    useMaxWidth: false
+---
+flowchart TB`}
+    lang="mermaid"
+  />
+  <p>
+    For a sequence diagram, use <code>sequence:</code> in place of{" "}
+    <code>flowchart:</code>, and for a Gantt chart, <code>gantt:</code>.
   </p>
 </GuidePage>

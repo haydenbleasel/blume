@@ -164,7 +164,11 @@ blume-mermaid,
   /* Subgraphs sit a step darker than node fills in light mode and a step
      lighter in dark; mixing toward the foreground keeps that direction. */
   --pele-surface-alt: color-mix(in oklab, var(--blume-muted) 92%, var(--blume-foreground));
-  --pele-border: var(--blume-border);
+  /* Pele strokes node outlines, sequence lifelines, and class and table
+     rules with this. --blume-border is a hairline tint for chrome edges,
+     about 1.2:1 against a node here, which hides a dashed outline or a
+     lifeline; the muted foreground is legible in both themes. */
+  --pele-border: var(--blume-muted-foreground);
   --pele-accent: var(--blume-accent);
   --pele-radius: var(--blume-radius);
   --pele-font: var(--blume-font-body);

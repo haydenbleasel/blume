@@ -493,7 +493,9 @@ flowchart LR
 ```
 ````
 
-図はクライアント側でレンダリングされるため、これは MDX 専用の機能であり、Pele は図を含むページでのみ読み込まれます。図が 1 つもないサイトでは、Pele はまったく配信されません。Pele は独自のエンジンで図をレイアウトするため、Mermaid の `layout` と `look` オプション、および `theme` 設定は適用されません。Mermaid の `themeVariables` のうち、グラフの系列パレット（`pie1`–`pie8`、`git0`–`git7`、`cScale0`–`cScale8`、`venn1`–`venn8`、`xyChart.plotColorPalette`）だけが反映されます。`style`、`classDef`、または sequence の `rect` で設定した色は両方のテーマで固定され、それ以外はサイトのトークンに従います。図はコンテンツ列の幅に合わせて再レイアウトされ、幅の広いフローチャートは縦方向のレイアウトに切り替わることもあります。常に縮小して収めるのではなく、ラベルにはテーマのフォントが使われます。Pele が解析できない図は、その場所に「Could not render this diagram.」と表示されます。パーサーエラーは、解析が止まった行とともにブラウザのコンソールに出力され、`blume dev` ではそのメッセージの下にも表示されます。このセクションの残りは代表的な種類のギャラリーです — 全一覧は [Mermaid のドキュメント](https://mermaid.js.org/intro/)を参照してください。
+図はクライアント側でレンダリングされるため、これは MDX 専用の機能であり、Pele は図を含むページでのみ読み込まれます。図が 1 つもないサイトでは、Pele はまったく配信されません。Pele は独自のエンジンで図をレイアウトするため、Mermaid の `layout` と `look` オプション、および `theme` 設定は適用されません。Mermaid の `themeVariables` のうち、グラフの系列パレット（`pie1`–`pie8`、`git0`–`git7`、`cScale0`–`cScale8`、`venn1`–`venn8`、`xyChart.plotColorPalette`）だけが反映されます。`style`、`classDef`、または sequence の `rect` で設定した色は両方のテーマで固定され、円グラフのスライスや Git のブランチといったグラフの系列は Pele 独自のパレットを保ちます。それ以外はサイトのトークンに従います。図の色を変更するには、[`theme.css`](/docs/configuration/theming#themecss) の `blume-mermaid, .pele` セレクターで、対応する [`--pele-*` 変数](https://pele.run/theming)を設定します。Blume はそのセレクターで変数をマッピングしているため、`:root` に設定した値は、`--pele-series-1` のように Blume が手を加えていない変数にしか反映されません。
+
+図はコンテンツ列の幅に合わせて再レイアウトされ、幅の広いフローチャートは縦方向のレイアウトに切り替わることもあります。それでも幅が広すぎる図は、収まるように縮小されます。図のフロントマターで `useMaxWidth: false` を指定すると、本来の幅が保たれ、代わりに横にスクロールできるようになります。ラベルにはテーマのフォントが使われます。Pele が解析できない図は、その場所に「Could not render this diagram.」と表示されます。パーサーエラーは、解析が止まった行とともにブラウザのコンソールに出力され、`blume dev` ではそのメッセージの下にも表示されます。このセクションの残りは代表的な種類のギャラリーです — 全一覧は [Mermaid のドキュメント](https://mermaid.js.org/intro/)を参照してください。
 
 ### フローチャート [#flowchart]
 

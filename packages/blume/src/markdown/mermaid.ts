@@ -10,8 +10,9 @@ interface CodeNode extends MdastNode {
  * Satteri MDAST plugin that turns a ` ```mermaid ` code block into a
  * `<blume-mermaid>` custom element carrying the raw diagram source. There is no
  * importable component — the fence is the whole interface. The element is
- * rendered on the client (Pele needs a DOM), so the source rides on a string
- * attribute rather than as child text (which MDX would try to parse).
+ * rendered on the client, where Pele can measure labels in the page's own
+ * fonts and lay the diagram out for the column, so the source rides on a
+ * string attribute rather than as child text (which MDX would try to parse).
  */
 /**
  * A ```mermaid (or ~~~mermaid) fence opener at the start of a line. Used to
@@ -39,8 +40,9 @@ export const mermaidPlugin = () => ({
             // Pele's SVG carries width/height attributes but shrinks through
             // max-width:100%, so the wrapper must fill the column (w-full) for
             // that percentage to mean the column; the SVG centers itself with
-            // auto margins. overflow-x-auto keeps a diagram that can't reflow
-            // scrollable instead of clipped.
+            // auto margins. A diagram that sets `useMaxWidth: false` drops the
+            // max-width and keeps its natural size; overflow-x-auto scrolls it
+            // instead of clipping it.
             "not-prose my-6 flex overflow-x-auto [&>div]:w-full [&>div>svg]:mx-auto [&>div>svg]:block"
           ),
           jsxAttribute("data-source", node.value),
