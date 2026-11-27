@@ -63,6 +63,8 @@ A big batch of components landed this release — columns, frames, trees, and to
 - 日付は設定された [`dateFormat`](/docs/configuration#date-format) に従いますが、行のグループですでに表示されている年は省略されます。
 - 下書きと `sidebar.hidden` のエントリはスキップされます。
 
+このページには、検索エンジンがインデックスできるエントリのうち最新のものの日付が付けられます（[`noindex`](/docs/discoverability/metadata#per-page-overrides) のリリースもタイムラインには表示されますが、対象外です）。この日付は、ページ下部の「最終更新」の行、JSON-LD の `dateModified`、[サイトマップ](/docs/discoverability/sitemap-and-robots#sitemap)の `<lastmod>` に反映されます。
+
 このページの見出しは **Changelog**（英語）で、その下に 1 行の説明が表示されます。設定ファイルの `changelog` で独自のものを指定できます。これらはページの `<title>`、メタディスクリプション、OG カード、そして `/changelog.md` にある Markdown ミラーの冒頭にも使われます:
 
 ```ts blume.config.ts

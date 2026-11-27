@@ -51,6 +51,7 @@ Todo identificador abaixo — uma chave de projeto, um ID de medição, um token
 | `hotjar()` | [Hotjar](#hotjar) | `id` |
 | `logrocket()` | [LogRocket](#logrocket) | `id` |
 | `mixpanel()` | [Mixpanel](#mixpanel) | `token` |
+| `notra()` | [Notra](#notra) | `webKey` |
 | `oneDollarStats()` | [OneDollarStats](#onedollarstats) | — |
 | `pirsch()` | [Pirsch](#pirsch) | `code` |
 | `plausible()` | [Plausible](#plausible) | `domain` |
@@ -209,6 +210,23 @@ analytics: [
 ```
 
 `clientId` vira `data-client-id`. Qualquer outra opção vira um atributo `data-` próprio na tag, então use o nome exatamente como o atributo é escrito, em kebab-case (`track-web-vitals`, `track-errors`, `track-outgoing-links`, `api-url`, …). O Databuddy ignora um nome em camelCase como `trackWebVitals`. Os valores são strings: `"true"` ou `"false"` para uma opção liga/desliga, e um array JSON para `skip-patterns` e `mask-patterns`. O Databuddy lê qualquer outro valor de lista como vazio.
+
+## Notra
+
+Copie a **chave web pública** do seu projeto (`nwk.…`, em **Settings → Tracking** no [Notra](https://usenotra.com)) e passe-a ao `notra()`.
+
+```ts blume.config.ts lineNumbers
+analytics: [notra({ webKey: "nwk.xxxxxxxxxxxxxxxx" })],
+```
+
+O Blume carrega o build do notra.js fixado pelo [`@usenotra/sdk`](https://www.npmjs.com/package/@usenotra/sdk), com o hash de Subresource Integrity dele. O navegador se recusa a executar o script se um único byte mudar, e você nunca define o hash por conta própria: é uma nova versão do Blume que atualiza o build fixado. O notra.js conta visitantes sem cookies e acompanha sozinho a navegação do lado do cliente.
+
+- `errors: true` carrega o `notra.plus.js`, que também reporta erros de JavaScript.
+- `hash: true` conta uma visualização de página toda vez que o `#fragment` muda. O Blume não tem rotas por hash, então isso significa cada clique no sumário, cada troca de aba e cada acordeão aberto. Deixe desativado, a menos que uma página sua faça roteamento por hash.
+- `endpoint` é a origem de um serviço de ingestão auto-hospedado ou de um proxy que serve o script em `/api/` e recebe as visualizações de página em `/api/collect`. A tag pede a ele o build fixado, `/api/notra.<build>.js`, um nome de arquivo que muda sempre que o build fixado muda. Defina `pinned: false` quando ele servir só o `/api/notra.js`, ou um build diferente do fixado.
+- `src` carrega uma URL de script sua no lugar dos builds do Notra, então `endpoint`, `errors` e `pinned` deixam de escolher o arquivo. `integrity` define o hash dele. Um `src` relativo à raiz é um arquivo em `public/`, então recebe o [`deployment.base`](/docs/deployment#subpath-deploys), assim como um [script personalizado](#custom-scripts).
+- `api` é para onde vão as visualizações de página. Com `endpoint` ou `src` e sem `api`, o notra.js envia para `/api/collect` na origem de onde o script veio, e não para o Notra. Uma cópia do notra.js em `public/` não registra nada num site estático até você definir `api: "https://ingest.usenotra.com/api/collect"`.
+- Sem um `src`, `pinned: false` carrega o `notra.js` (ou o `notra.plus.js`) sem build fixado. Assim como um `src` seu, ele não leva hash de integridade, a menos que você defina `integrity`.
 
 ## OneDollarStats
 
@@ -431,6 +449,14 @@ Um `src` relativo à raiz aponta para um arquivo em `public/` (`src: "/js/redire
 | `mixpanel()` | `token` | — | Token do projeto no Mixpanel. Obrigatória. |
 | `mixpanel()` | `region` | `us` | Região de residência de dados: `us`, `eu` ou `in`. |
 | `mixpanel()` | qualquer outra | `track_pageview: "url-with-path-and-query-string"` | Mesclada nas opções do `mixpanel.init` sem alterações. |
+| `notra()` | `webKey` | — | Chave web pública do Notra (`nwk.…`). Obrigatória. |
+| `notra()` | `errors` | `false` | Carrega o `notra.plus.js`, que também reporta erros de JavaScript. |
+| `notra()` | `hash` | `false` | Conta cada mudança de `#fragment` como uma visualização de página (`data-hash`). |
+| `notra()` | `endpoint` | — | Origem de um serviço de ingestão auto-hospedado ou de um proxy que serve o script em `/api/` e recebe as visualizações de página em `/api/collect`. Sem `endpoint` nem `src`, o script é carregado de `https://static.usenotra.com`. |
+| `notra()` | `api` | `https://ingest.usenotra.com/api/collect`, ou `/api/collect` na origem do script com `endpoint` ou `src` | Endpoint do beacon (`data-api`). |
+| `notra()` | `src` | — | URL completa do script, para auto-hospedagem. Sobrescreve `endpoint`, `errors` e `pinned`. Um `src` relativo à raiz recebe a base do deploy. |
+| `notra()` | `integrity` | o hash do build fixado, ou nenhum com `src` ou `pinned: false` | Valor de Subresource Integrity (`sha384-…`). |
+| `notra()` | `pinned` | `true` | Carrega o build fixado, com o hash de integridade dele. |
 | `oneDollarStats()` | `hostname` | — | Nome de host, sem esquema nem caminho, sob o qual todo evento é registrado, em qualquer host. |
 | `oneDollarStats()` | qualquer outra | — | Renderizada como um atributo `data-` na tag (`"hash-routing": "false"` é omitido). |
 | `pirsch()` | `code` | — | Código de identificação do Pirsch. Obrigatória. |
@@ -452,4 +478,4 @@ Um `src` relativo à raiz aponta para um arquivo em `public/` (`src: "/js/redire
 
 ## Eventos personalizados [#custom-events]
 
-O feedback de página do Blume (`feedback`, e `feedback_comment` quando o [feedback escrito](/docs/configuration#written-feedback) está ativado), a [busca](/docs/configuration/search#search-analytics) (`search`, `search_select`), o [assistente](/docs/configuration/assistant#analytics) (`ask`, `ask_answer`, `ask_error`) e o player de [narração](/docs/configuration/narration#analytics) (`narration_play`, `narration_complete`) enviam eventos personalizados por meio de todo adaptador configurado que tenha uma API no cliente — PostHog, Mixpanel, Heap, Segment, Hightouch, Amplitude, LogRocket, Adobe, Google Analytics, Google Tag Manager (como um push de `{ event }` no `window.dataLayer`), Plausible, Databuddy, Fathom, OneDollarStats (com cada valor de propriedade como string), Pirsch, Clarity, Hotjar e Vercel. O Fathom, o Clarity e o Hotjar recebem só o nome do evento, então contam cada evento sem as propriedades dele. A Cloudflare e o Clearbit não têm API de eventos, e o Clics não tem uma API global que o Blume possa chamar. Todo evento também é disparado como um CustomEvent `blume:track` no `window`, com `{ event, props }` em `detail`, para que um adaptador `script()` possa repassá-lo para qualquer outro lugar. O assistente nunca envia o texto de uma pergunta a um provedor, e a busca envia as consultas exatamente como foram digitadas, a menos que você defina [`search.analytics.queries`](/docs/configuration/search#search-analytics) como `false`, o que faz ela enviar o tamanho de cada consulta no lugar do texto; de qualquer forma, o texto continua chegando ao evento `blume:track`, para que um listener escrito por você o repasse. Para fazer o deploy do seu site já construído, veja [Deploy](/docs/deployment).
+O feedback de página do Blume (`feedback`, e `feedback_comment` quando o [feedback escrito](/docs/configuration#written-feedback) está ativado), a [busca](/docs/configuration/search#search-analytics) (`search`, `search_select`), o [assistente](/docs/configuration/assistant#analytics) (`ask`, `ask_answer`, `ask_error`) e o player de [narração](/docs/configuration/narration#analytics) (`narration_play`, `narration_complete`) enviam eventos personalizados por meio de todo adaptador configurado que tenha uma API no cliente — PostHog, Mixpanel, Heap, Segment, Hightouch, Amplitude, LogRocket, Adobe, Google Analytics, Google Tag Manager (como um push de `{ event }` no `window.dataLayer`), Plausible, Databuddy, Fathom, OneDollarStats (com cada valor de propriedade como string), Pirsch, Clarity, Hotjar e Vercel. O Fathom, o Clarity e o Hotjar recebem só o nome do evento, então contam cada evento sem as propriedades dele. A Cloudflare, o Clearbit e o Notra não têm API de eventos, e o Clics não tem uma API global que o Blume possa chamar. Todo evento também é disparado como um CustomEvent `blume:track` no `window`, com `{ event, props }` em `detail`, para que um adaptador `script()` possa repassá-lo para qualquer outro lugar. O assistente nunca envia o texto de uma pergunta a um provedor, e a busca envia as consultas exatamente como foram digitadas, a menos que você defina [`search.analytics.queries`](/docs/configuration/search#search-analytics) como `false`, o que faz ela enviar o tamanho de cada consulta no lugar do texto; de qualquer forma, o texto continua chegando ao evento `blume:track`, para que um listener escrito por você o repasse. Para fazer o deploy do seu site já construído, veja [Deploy](/docs/deployment).

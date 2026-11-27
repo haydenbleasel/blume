@@ -14,8 +14,8 @@ agents: {
 
 Enquanto estiver ativado, o `blume build` grava dois arquivos na raiz do seu site:
 
-- **`/llms.txt`** — um índice compacto: o título e a descrição do seu site, seguidos de uma lista com links de todas as páginas e seus resumos (a meta description de cada página: `seo.description`, quando a página define uma, ou `description`, caso contrário), organizada em seções que espelham sua barra lateral — pastas e grupos viram títulos, então o agente enxerga a estrutura da documentação, e não um bloco único e achatado.
-- **`/llms-full.txt`** — o corpus inteiro: o corpo completo em Markdown de cada página, com sua URL de origem, em um único arquivo.
+- **`/llms.txt`** — um índice compacto: o título e a descrição do seu site, seguidos de uma lista com links de todas as páginas e seus resumos (a meta description de cada página: `seo.description`, quando a página define uma, ou `description`, caso contrário), organizada em seções que espelham sua barra lateral — pastas e grupos viram títulos, então o agente enxerga a estrutura da documentação, e não um bloco único e achatado. As seções seguem a ordem das [abas](/docs/content/navigation) do seu cabeçalho, então a documentação aparece antes de um changelog longo quando as abas a colocam primeiro, e as [páginas personalizadas](/docs/advanced/custom-pages#custom-pages-for-agents) são listadas sob a aba da seção em que estão (ou sob **Pages**).
+- **`/llms-full.txt`** — o corpus inteiro: o corpo completo em Markdown de cada página, com sua URL de origem, em um único arquivo, na ordem em que o `llms.txt` as lista.
 
 Páginas em rascunho, páginas ocultas da barra lateral (`sidebar.hidden`, ou a forma abreviada `hidden` no nível superior) e páginas com `noindex` são excluídas — exceto as páginas geradas da referência de API, cujo lugar nos dois arquivos é definido por `openapi`, mais abaixo, e não por `noindex`. Defina [`deployment.site`](/docs/deployment) para que os links e as URLs de origem resolvam para endereços absolutos.
 

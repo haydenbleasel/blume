@@ -63,6 +63,8 @@ Sobald du mindestens einen Eintrag mit `type: changelog` hast, generiert Blume a
 - Das Datum folgt dem konfigurierten [`dateFormat`](/docs/configuration#date-format), ohne das Jahr, das die Gruppe der Zeile bereits anzeigt.
 - Entwürfe und Einträge mit `sidebar.hidden` werden übersprungen.
 
+Als Datum der Seite gilt ihr neuester Eintrag, den Suchmaschinen indexieren dürfen (ein Release mit [`noindex`](/docs/discoverability/metadata#per-page-overrides) erscheint weiterhin in der Timeline, zählt aber nicht): Er bestimmt die Zeile „Zuletzt aktualisiert“ am Fuß der Seite, ihr JSON-LD-`dateModified` und ihr `<lastmod>` in der [Sitemap](/docs/discoverability/sitemap-and-robots#sitemap).
+
 Die Seite trägt die Überschrift **Changelog** (auf Englisch), darunter steht eine einzeilige Beschreibung. Lege mit `changelog` in deiner Konfiguration eigene fest; sie werden außerdem zum `<title>` der Seite, zu ihrer Meta-Description und OG-Card sowie zum Anfang ihres Markdown-Spiegels unter `/changelog.md`:
 
 ```ts blume.config.ts

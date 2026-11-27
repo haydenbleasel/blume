@@ -21,6 +21,7 @@ export default defineConfig({
         // prereleases: false,  // include prereleases (default off)
         // drafts: false,       // include drafts (needs a write token)
         // limit: 100,          // cap releases, newest-first
+        // noindex: { minWords: 60 }, // keep short releases out of search
         // baseUrl: "https://github.acme.com/api/v3", // GitHub Enterprise Server
       }),
     ],
@@ -36,6 +37,10 @@ changelog: {
   description: "Every release of the Acme SDK, from GitHub.",
 },
 ```
+
+### 短いリリース [#short-releases]
+
+頻繁にリリースするリポジトリでは、バージョンの更新や 1 行の修正など、内容の少ないリリースページが数多く生まれます。検索エンジンがそれらをすべてインデックスすると、サイトの大半が内容の薄いページだと判断されてしまいます。`noindex` を設定すると、それらをインデックスから除外できます。`{ minWords: 60 }` を指定すると、リリースノートの本文が 60 語未満のリリースが `noindex` になります（見出し、コード、changesets の先頭にあるコミットハッシュは語数に含まれません）。`true` を指定すると、すべてのリリースが `noindex` になります。noindex のリリースでも、ページ、`/changelog` タイムライン上の位置、RSS アイテムはそのまま残りますが、他の [`noindex`](/docs/discoverability/metadata#per-page-overrides) ページと同様に、[サイトマップ](/docs/discoverability/sitemap-and-robots#sitemap)、[`llms.txt`](/docs/discoverability/llms-txt)、[構造化データ](/docs/discoverability/structured-data)からは除外されます。
 
 プライベートリポジトリは `GITHUB_TOKEN` 環境変数で認証します。これは他の GitHub 機能で使われるものと同じトークンで、設定ファイルに直接記述されることはありません。アダプターがこの変数を宣言しているため、未設定のままビルドすると警告が表示されます。GitHub Enterprise Server 上のリポジトリの場合は、`baseUrl` にその REST API（`https://<host>/api/v3`）を設定してください。`GITHUB_TOKEN` はそのサーバーに送信されるため、そのサーバー用のトークンである必要があります。[すべてのリモートソース](/docs/content/sources#caching-and-offline-builds)と同様に `.blume/cache/<source>/` にキャッシュされ、API に到達できない場合はオフラインでキャッシュから提供されます。変更履歴は補助的なコンテンツであるため、キャッシュがない状態で取得に失敗した場合（たとえばトークンのない CI ビルドなど）でも、ビルドを失敗させることはなく、警告を出したうえで空の変更履歴になります。変更履歴を表示するには、CI 環境とデプロイ環境で `GITHUB_TOKEN` を設定してください。
 

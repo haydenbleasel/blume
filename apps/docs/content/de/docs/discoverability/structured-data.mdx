@@ -38,7 +38,10 @@ seo: {
   },
   software: {
     license: "MIT",
-    operatingSystem: "Node.js 22+",
+    softwareVersion: "2.4.0",
+    softwareRequirements: "Node.js 22+",
+    downloadUrl: "https://www.npmjs.com/package/acme",
+    installUrl: "https://docs.acme.com/quickstart",
     price: 0, // emitted as an Offer; 0 marks it free
     sameAs: ["https://www.npmjs.com/package/acme"],
   },
@@ -47,7 +50,7 @@ seo: {
 
 `organization` fügt jeder Seite einen **Organization**-Knoten hinzu – die WebSite- und Seiten-Knoten verweisen als `publisher` darauf – mit E-Mail und Telefonnummer als `ContactPoint` (`contactType` ist standardmäßig `"customer support"`) und der Adresse als `PostalAddress`, den beiden Feldern, nach denen Prüfungen zur Unternehmensverifizierung suchen. `name` und `url` übernehmen standardmäßig die Werte der Website; ein root-relatives `logo` wird wie jede Seiten-URL absolut gemacht.
 
-`software` fügt der Startseite einen **SoftwareApplication**-Knoten hinzu: Name und Beschreibung des Produkts (standardmäßig die der Website), `applicationCategory` (Standard `"DeveloperApplication"`), Betriebssystem, Lizenz, ein `Offer`, wenn `price` gesetzt ist, sowie die Registry- oder Repository-URLs in `sameAs`. Übergib `software: true`, um alle Standardwerte zu übernehmen. Die Organisation wird, sofern konfiguriert, als deren `publisher` angegeben.
+`software` fügt der Startseite einen **SoftwareApplication**-Knoten hinzu: Name und Beschreibung des Produkts (standardmäßig die der Website), `applicationCategory` (Standard `"DeveloperApplication"`), die aktuelle `softwareVersion`, das `operatingSystem`, auf dem es läuft, und die `softwareRequirements`, die es braucht (eine Runtime wie Node.js gehört dorthin, nicht in `operatingSystem`), die `downloadUrl` und `installUrl`, über die man es bekommt, Lizenz, ein `Offer`, wenn `price` gesetzt ist, sowie die Registry- oder Repository-URLs in `sameAs`. Übergib `software: true`, um alle Standardwerte zu übernehmen. Die Organisation wird, sofern konfiguriert, als deren `publisher` angegeben.
 
 ## Gemeinsame Entitäts-Identifier [#shared-entity-identifiers]
 
@@ -93,6 +96,20 @@ seo: {
 
 Das aufgelöste [Open-Graph-Bild](/docs/discoverability/open-graph) wird außerdem als `image` des Seiten-Knotens aufgenommen – egal ob es aus dem Frontmatter, einem Standardwert der Website oder einer generierten Karte stammt.
 
+## Fragen und Antworten [#questions-and-answers]
+
+Eine Seite, die als Fragen und Antworten geschrieben ist – etwa eine FAQ- oder Troubleshooting-Seite –, kann das im Frontmatter angeben:
+
+```yaml lineNumbers
+---
+title: FAQ
+seo:
+  faq: true
+---
+```
+
+Die Seite enthält dann zusätzlich einen **FAQPage**-Knoten: Jede `##`-Überschrift, die mit einem Fragezeichen endet, ist eine Frage, und der Text bis zur nächsten `##`-Überschrift ist ihre akzeptierte Antwort – als reiner Text, ohne Codeblöcke. Eine Frage ohne Text darunter wird übersprungen, ebenso jede `##`-Überschrift, die keine Frage ist.
+
 ## Eigene Seiten [#custom-pages]
 
-Eine eigene [`.astro`-Seite](/docs/advanced/custom-pages), die über `PageLayout` gerendert wird, gibt denselben Graphen aus, damit eine Marketing-Startseite nicht die eine URL ohne strukturierte Daten ist. Eine eigene Seite hat keine Inhaltsdatei, aus der sich ein Datum ablesen ließe, also übergib `lastModified`, um ihr ein `dateModified` zu geben. Übergib `structuredDataEnabled={config.structuredData}`, um sie mit dieser Einstellung synchron zu halten, oder `structuredDataEnabled={false}`, um sie nur für diese Seite abzuschalten.
+Eine eigene [`.astro`-Seite](/docs/advanced/custom-pages), die über `PageLayout` gerendert wird, gibt denselben Graphen aus, damit eine Marketing-Startseite nicht die eine URL ohne strukturierte Daten ist. Eine eigene Seite hat keine Inhaltsdatei, aus der sich ein Datum ablesen ließe, also übergib `lastModified`, um ihr ein `dateModified` zu geben, und `published` für ihr `datePublished`. Sie ist ein Artikel, sofern du nichts anderes angibst: `structuredDataType` legt den Typ des Seiten-Knotens fest (`"WebPage"`, `"CollectionPage"`), und `pageType="blog"` macht sie zu einem `BlogPosting`. Übergib `structuredDataEnabled={config.structuredData}`, um sie mit dieser Einstellung synchron zu halten, oder `structuredDataEnabled={false}`, um sie nur für diese Seite abzuschalten.

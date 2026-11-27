@@ -38,7 +38,10 @@ seo: {
   },
   software: {
     license: "MIT",
-    operatingSystem: "Node.js 22+",
+    softwareVersion: "2.4.0",
+    softwareRequirements: "Node.js 22+",
+    downloadUrl: "https://www.npmjs.com/package/acme",
+    installUrl: "https://docs.acme.com/quickstart",
     price: 0, // emitted as an Offer; 0 marks it free
     sameAs: ["https://www.npmjs.com/package/acme"],
   },
@@ -47,7 +50,7 @@ seo: {
 
 `organization` प्रत्येक पृष्ठ में एक **Organization** नोड जोड़ता है — WebSite और पृष्ठ नोड्स इसे `publisher` के रूप में उद्धृत करते हैं — जिसमें ईमेल और टेलीफ़ोन एक `ContactPoint` के रूप में (`contactType` का डिफ़ॉल्ट `"customer support"` है) और पता एक `PostalAddress` के रूप में होता है; यही वे दो फ़ील्ड हैं जिन्हें व्यवसाय-सत्यापन जाँचें खोजती हैं। `name` और `url` का डिफ़ॉल्ट साइट के मान होते हैं; रूट-सापेक्ष `logo` को किसी भी पृष्ठ URL की तरह निरपेक्ष बना दिया जाता है।
 
-`software` मुखपृष्ठ में एक **SoftwareApplication** नोड जोड़ता है: उत्पाद का नाम और विवरण (डिफ़ॉल्ट रूप से साइट के), `applicationCategory` (डिफ़ॉल्ट `"DeveloperApplication"`), ऑपरेटिंग सिस्टम, लाइसेंस, `price` सेट होने पर एक `Offer`, और `sameAs` में रजिस्ट्री या रिपॉज़िटरी URL। सभी डिफ़ॉल्ट अपनाने के लिए `software: true` पास करें। संगठन, यदि कॉन्फ़िगर किया गया हो, तो उसे इसके `publisher` के रूप में उद्धृत किया जाता है।
+`software` मुखपृष्ठ में एक **SoftwareApplication** नोड जोड़ता है: उत्पाद का नाम और विवरण (डिफ़ॉल्ट रूप से साइट के), `applicationCategory` (डिफ़ॉल्ट `"DeveloperApplication"`), वर्तमान `softwareVersion`, वह `operatingSystem` जिस पर यह चलता है और वे `softwareRequirements` जिनकी इसे आवश्यकता होती है (Node.js जैसा कोई रनटाइम वहीं आता है, `operatingSystem` में नहीं), इसे प्राप्त करने के लिए `downloadUrl` और `installUrl`, लाइसेंस, `price` सेट होने पर एक `Offer`, और `sameAs` में रजिस्ट्री या रिपॉज़िटरी URL। सभी डिफ़ॉल्ट अपनाने के लिए `software: true` पास करें। संगठन, यदि कॉन्फ़िगर किया गया हो, तो उसे इसके `publisher` के रूप में उद्धृत किया जाता है।
 
 ## साझा इकाई पहचानकर्ता [#shared-entity-identifiers]
 
@@ -93,6 +96,20 @@ seo: {
 
 निर्धारित [Open Graph छवि](/docs/discoverability/open-graph) भी पृष्ठ नोड की `image` के रूप में शामिल की जाती है, चाहे वह फ्रंटमैटर से आए, साइट डिफ़ॉल्ट से, या किसी जनरेट किए गए कार्ड से।
 
+## प्रश्न और उत्तर [#questions-and-answers]
+
+प्रश्नों और उत्तरों के रूप में लिखा गया कोई पृष्ठ, जैसे FAQ या समस्या-निवारण पृष्ठ, फ्रंटमैटर में इसकी घोषणा कर सकता है:
+
+```yaml lineNumbers
+---
+title: FAQ
+seo:
+  faq: true
+---
+```
+
+तब पृष्ठ में एक **FAQPage** नोड भी शामिल होता है: प्रश्नवाचक चिह्न पर समाप्त होने वाला प्रत्येक `##` शीर्षक एक प्रश्न होता है, और अगले `##` शीर्षक तक का पाठ उसका स्वीकृत उत्तर होता है, जो सादे पाठ के रूप में होता है और जिसमें कोड ब्लॉक शामिल नहीं किए जाते। जिस प्रश्न के नीचे कोई पाठ न हो, उसे छोड़ दिया जाता है, और ऐसे किसी भी `##` शीर्षक को भी छोड़ दिया जाता है जो प्रश्न नहीं है।
+
 ## कस्टम पृष्ठ [#custom-pages]
 
-`PageLayout` के माध्यम से रेंडर किया गया कोई कस्टम [`.astro` पृष्ठ](/docs/advanced/custom-pages) वही ग्राफ़ उत्सर्जित करता है, ताकि कोई मार्केटिंग मुखपृष्ठ ऐसा एकमात्र URL न रह जाए जिसमें संरचित डेटा न हो। किसी कस्टम पृष्ठ की कोई सामग्री फ़ाइल नहीं होती जिससे उसकी तिथि निर्धारित की जा सके, इसलिए उसे `dateModified` देने के लिए `lastModified` पास करें। इस सेटिंग के साथ समन्वयित रखने के लिए `structuredDataEnabled={config.structuredData}` पास करें, या केवल उसी पृष्ठ के लिए इसे बंद करने के लिए `structuredDataEnabled={false}` पास करें।
+`PageLayout` के माध्यम से रेंडर किया गया कोई कस्टम [`.astro` पृष्ठ](/docs/advanced/custom-pages) वही ग्राफ़ उत्सर्जित करता है, ताकि कोई मार्केटिंग मुखपृष्ठ ऐसा एकमात्र URL न रह जाए जिसमें संरचित डेटा न हो। किसी कस्टम पृष्ठ की कोई सामग्री फ़ाइल नहीं होती जिससे उसकी तिथि निर्धारित की जा सके, इसलिए उसे `dateModified` देने के लिए `lastModified` पास करें, और उसकी `datePublished` के लिए `published` पास करें। जब तक आप अन्यथा न बताएँ, यह एक article होता है: `structuredDataType` पृष्ठ नोड का प्रकार निर्धारित करता है (`"WebPage"`, `"CollectionPage"`), और `pageType="blog"` इसे एक `BlogPosting` बना देता है। इस सेटिंग के साथ समन्वयित रखने के लिए `structuredDataEnabled={config.structuredData}` पास करें, या केवल उसी पृष्ठ के लिए इसे बंद करने के लिए `structuredDataEnabled={false}` पास करें।
