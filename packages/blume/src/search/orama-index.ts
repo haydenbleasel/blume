@@ -71,11 +71,89 @@ const BOOST = { description: 2, keywords: 3, title: 3 };
 const boostedDatabases = new WeakSet<AnyOrama>();
 
 /** A search match as Orama's sort function sees it: id, score, document. */
-type RankedMatch = [unknown, number, OramaDoc];
+type RankedMatch = [number, number, OramaDoc];
 
-/** Rank matches by relevance times the page's `search.boost`. */
-const byBoostedScore = (a: RankedMatch, b: RankedMatch): number =>
-  b[1] * (b[2].boost ?? 1) - a[1] * (a[2].boost ?? 1);
+/** Fold spelling and punctuation while keeping word order and boundaries. */
+const normalizePhrase = (value: string): string =>
+  foldLatinTerm(stripSoftHyphens(value).normalize("NFC").toLowerCase())
+    .replaceAll(/[^\p{L}\p{M}\p{N}]+/gu, " ")
+    .trim();
+
+/** A page's title and keywords, normalized for {@link phraseMatcher}. */
+type PhraseFields = WeakMap<OramaDoc, string[]>;
+
+/**
+ * Each index's pages' titles and keywords, normalized and led by a space so a
+ * phrase is only found starting at a word. Kept for the life of the index,
+ * which hands every query the same document objects: the dialog searches on
+ * each keystroke, and normalizing every matched page again would cost more
+ * than the search itself. Kept per index, so one built again from edited pages
+ * reads their new titles.
+ */
+const phraseFields = new WeakMap<AnyOrama, PhraseFields>();
+
+const phraseFieldsOf = (db: AnyOrama): PhraseFields => {
+  let fields = phraseFields.get(db);
+  if (!fields) {
+    fields = new WeakMap();
+    phraseFields.set(db, fields);
+  }
+  return fields;
+};
+
+/**
+ * Whether a page's title or one of its keywords holds a multiword query as a
+ * phrase. Every word but the last must be whole. The last matches as a prefix,
+ * the way Orama matches it, so a page keeps its place while a reader is still
+ * typing the word: `coding agen` finds "Memory for coding agents" as surely
+ * as `coding agents` does. A one-word query has no phrase to find.
+ */
+const phraseMatcher = (
+  db: AnyOrama,
+  term: string
+): ((doc: OramaDoc) => boolean) | undefined => {
+  const phrase = normalizePhrase(term);
+  if (!phrase.includes(" ")) {
+    return;
+  }
+  const needle = ` ${phrase}`;
+  const normalized = phraseFieldsOf(db);
+  return (doc) => {
+    let fields = normalized.get(doc);
+    if (!fields) {
+      fields = [doc.title, ...(doc.keywords ?? [])].map(
+        (value) => ` ${normalizePhrase(value)}`
+      );
+      normalized.set(doc, fields);
+    }
+    return fields.some((field) => field.includes(needle));
+  };
+};
+
+/**
+ * Use the same ranking before each locale's limit and when merging locales.
+ * Pages holding the query as a phrase come first, and relevance times the
+ * page's `search.boost` orders each group. The phrase is the stronger signal
+ * on purpose, so a boost never moves a page from one group to the other.
+ */
+const searchRanking = (db: AnyOrama, term: string) => {
+  const hasBoosts = boostedDatabases.has(db);
+  const matchesPhrase = phraseMatcher(db, term);
+  const compareRank = (
+    a: OramaDoc,
+    aScore: number,
+    b: OramaDoc,
+    bScore: number
+  ): number =>
+    Number(matchesPhrase?.(b) ?? false) - Number(matchesPhrase?.(a) ?? false) ||
+    bScore * (b.boost ?? 1) - aScore * (a.boost ?? 1);
+  const sortBy =
+    matchesPhrase || hasBoosts
+      ? (a: RankedMatch, b: RankedMatch): number =>
+          compareRank(a[2], a[1], b[2], b[1]) || (hasBoosts ? 0 : a[0] - b[0])
+      : undefined;
+  return { compareRank, sortBy };
+};
 
 /**
  * The script {@link latinTokenizer} indexes. {@link LATIN_SEPARATOR} splits on
@@ -470,10 +548,6 @@ const rankedHits = async (
   return found.hits;
 };
 
-/** A hit's rank across searches: its relevance times the page's boost. */
-const boostedScore = (hit: Hit): number =>
-  hit.score * (hit.document.boost ?? 1);
-
 /**
  * Query the index, returning the matching documents (highest-ranked first).
  * `filters` narrows results by exact `where` matches on the enum fields:
@@ -483,7 +557,7 @@ const boostedScore = (hit: Hit): number =>
  * On an index whose translations have tokenizers of their own, a query scoped
  * to a locale is tokenized with that locale's tokenizer. An unscoped query
  * searches each locale's pages with its own tokenizer, and the Latin-script
- * pages with {@link latinTokenizer}, then merges the matches by score: every
+ * pages with {@link latinTokenizer}, then merges the ranked matches: every
  * search runs over the one index, so their scores share its term statistics.
  */
 export const queryOramaIndex = async (
@@ -507,14 +581,16 @@ export const queryOramaIndex = async (
   if (facetTerms.length > 0) {
     where.facetTerms = { containsAll: facetTerms };
   }
-  // Boosts multiply every match's score before the limit applies (Orama
-  // sorts the whole match set with a sort function), so a boosted page can
-  // rise past matches outside the first page.
+  // Sort before Orama limits each result list (it sorts the whole match set
+  // with a sort function), so a page can rise past matches outside the first
+  // page. A phrase in the title or a keyword ranks first, then relevance
+  // times the page's boost.
+  const { compareRank, sortBy } = searchRanking(db, term);
   const unfiltered = {
     boost: BOOST,
     limit,
     properties: ["title", "keywords", "description", "content"],
-    ...(boostedDatabases.has(db) && { sortBy: byBoostedScore }),
+    sortBy,
     term,
   };
   const params =
@@ -556,7 +632,7 @@ export const queryOramaIndex = async (
   const found = await Promise.all(searches);
   return found
     .flat()
-    .toSorted((a, b) => boostedScore(b) - boostedScore(a))
+    .toSorted((a, b) => compareRank(a.document, a.score, b.document, b.score))
     .slice(0, limit)
     .map((hit) => hit.document);
 };

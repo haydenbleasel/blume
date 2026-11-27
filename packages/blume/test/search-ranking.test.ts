@@ -54,6 +54,66 @@ const routes = async (docs: OramaDoc[], term: string): Promise<string[]> => {
   return found.map((doc) => doc.route);
 };
 
+/**
+ * Two pages matching `memory for coding agents`: the reference scores higher
+ * on its short body, while only the guide's title holds the phrase.
+ */
+const MEMORY_DOCS: OramaDoc[] = [
+  {
+    content: "memory coding agents, for scopes",
+    description: "",
+    route: "/reference",
+    title: "Memory operations for admins",
+  },
+  {
+    content: Array.from({ length: 80 }, (_, i) => `example${i}`).join(" "),
+    description: "A guide to decisions",
+    route: "/guide",
+    title: "Memory for coding agents across sessions",
+  },
+];
+
+/**
+ * Three pages matching `authentication guide`: the legacy guide's title and
+ * the current page's keyword hold the phrase, while the boosted page only
+ * uses its words apart.
+ */
+const authDocs = (legacyBoost: number): OramaDoc[] => [
+  {
+    boost: 5,
+    content: "The authentication guide covers signing in.",
+    description: "",
+    route: "/auth",
+    title: "Authentication",
+  },
+  {
+    boost: legacyBoost,
+    content: "Old notes.",
+    description: "",
+    route: "/legacy",
+    title: "Legacy authentication guide",
+  },
+  {
+    content: "New notes.",
+    description: "",
+    keywords: ["authentication guide"],
+    route: "/current",
+    title: "Signing in",
+  },
+];
+
+/** The top result for each query, over one index. */
+const topRoutes = async (
+  docs: OramaDoc[],
+  terms: string[]
+): Promise<(string | undefined)[]> => {
+  const db = await buildOramaIndex(docs);
+  const found = await Promise.all(
+    terms.map((term) => queryOramaIndex(db, term, 1))
+  );
+  return found.map(([doc]) => doc?.route);
+};
+
 describe("ranking in the Orama index", () => {
   it("multiplies each match's relevance by its page's boost", async () => {
     expect(await routes(DOCS, "widget")).toStrictEqual([
@@ -72,6 +132,89 @@ describe("ranking in the Orama index", () => {
 
   it("finds a page by its keywords", async () => {
     expect(await routes(DOCS, "gizmo")).toStrictEqual(["/charlie"]);
+  });
+
+  it("ranks a whole title phrase before scattered body matches before limiting hits", async () => {
+    expect(
+      await topRoutes(MEMORY_DOCS, ["memory for coding agents"])
+    ).toStrictEqual(["/guide"]);
+  });
+
+  it("keeps a phrase first while its last word is still being typed", async () => {
+    const query = "memory for coding agents";
+    // Every keystroke from the second word's first letter on.
+    const typed = Array.from(
+      { length: query.length - "memory ".length },
+      (_, i) => query.slice(0, "memory f".length + i)
+    );
+    expect(await topRoutes(MEMORY_DOCS, typed)).toStrictEqual(
+      typed.map(() => "/guide")
+    );
+    // Only the last word matches by its opening letters, and one word alone is
+    // no phrase: both rank by relevance, which favors the reference.
+    expect(
+      await topRoutes(MEMORY_DOCS, ["memor for coding agents", "memory"])
+    ).toStrictEqual(["/reference", "/reference"]);
+  });
+
+  it("reads the new titles of an index built again from edited pages", async () => {
+    const query = ["memory for coding agents"];
+    const pages = MEMORY_DOCS.map((doc) => ({ ...doc }));
+    expect(await topRoutes(pages, query)).toStrictEqual(["/guide"]);
+    // Move the phrase to the other page in place, then index the same objects.
+    for (const page of pages) {
+      page.title =
+        page.route === "/guide"
+          ? "Memory operations for admins"
+          : "Memory for coding agents across sessions";
+    }
+    expect(await topRoutes(pages, query)).toStrictEqual(["/reference"]);
+  });
+
+  it("orders pages holding the phrase by boost, without letting a boost cross it", async () => {
+    // The boosted page only uses the words apart, so its boost leaves it last.
+    expect(await routes(authDocs(1), "authentication guide")).toStrictEqual([
+      "/legacy",
+      "/current",
+      "/auth",
+    ]);
+    // Demoting the legacy guide drops it under the current page, and no lower.
+    expect(await routes(authDocs(0.5), "authentication guide")).toStrictEqual([
+      "/current",
+      "/legacy",
+      "/auth",
+    ]);
+  });
+
+  it("applies the same phrase ranking when combining locale results", async () => {
+    const db = await buildOramaIndex(
+      [
+        {
+          boost: 5,
+          content: "Memoire, configuration, agent",
+          description: "",
+          locale: "en",
+          route: "/reference",
+          title: "Mémoire for agents and admins",
+        },
+        {
+          content: "Setup and usage",
+          description: "",
+          keywords: ["Mémoire agent"],
+          locale: "ja",
+          route: "/ja/guide",
+          title: "設定ガイド",
+        },
+      ],
+      "en"
+    );
+
+    expect(await queryOramaIndex(db, "memoire agent", 1)).toMatchObject([
+      { route: "/ja/guide" },
+    ]);
+    expect(
+      await queryOramaIndex(db, "memoire agent", 1, { locale: "en" })
+    ).toMatchObject([{ route: "/reference" }]);
   });
 });
 
