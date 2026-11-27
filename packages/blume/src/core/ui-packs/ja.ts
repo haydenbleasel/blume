@@ -189,6 +189,8 @@ export const ja: UIStringsOverride = {
       "エンドポイントが変更されました。使用するには再接続してください。",
     example: "例",
     examples: "例",
+    exclusiveMax: "{n} 未満",
+    exclusiveMin: "{n} より大きい",
     fields: "フィールド",
     fillParameters:
       "接続する前に、すべてのチャネルパラメーターを入力してください: {names}。",
@@ -232,6 +234,7 @@ export const ja: UIStringsOverride = {
     noAuthorizationOn: "{servers} では認証は不要です。",
     noExamplePayload: "ペイロードの例はありません。",
     noExampleResponse: "レスポンスの例はありません。",
+    not: "{value} 以外",
     notAllowed: "{path} は次のいずれかである必要があります: {values}",
     notConnected: "接続されていません。",
     notConnectedStream:
@@ -246,6 +249,7 @@ export const ja: UIStringsOverride = {
     operations: "オペレーション",
     option: "オプション {n}",
     or: "または",
+    outOfRange: "{path} が範囲外です（{limits}）",
     overview: "概要",
     parameters: "パラメーター",
     pathParameters: "パスパラメーター",
@@ -262,6 +266,7 @@ export const ja: UIStringsOverride = {
     response: "レスポンス",
     responses: "レスポンス",
     returns: "戻り値",
+    schemaMismatch: "{path} がスキーマに一致しません",
     scopes: "スコープ:",
     send: "送信",
     sending: "送信中…",

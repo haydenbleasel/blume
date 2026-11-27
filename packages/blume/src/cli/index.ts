@@ -3,8 +3,8 @@ import { defineCommand, runMain } from "citty";
 import { getBlumeVersion } from "../core/version.ts";
 import { commandMeta } from "./command-meta.ts";
 import { loadEnvFiles } from "./env.ts";
+import { installFatalErrorHandlers } from "./fatal-errors.ts";
 import { normalizeHostArgs } from "./host-args.ts";
-import { reportInternalError } from "./internal-error.ts";
 import { lazyCommand } from "./lazy-command.ts";
 // consola reads CONSOLA_LEVEL / NODE_ENV / TEST / CI / DEBUG when its module
 // evaluates. Import the logger here, ahead of `loadEnvFiles`, so those values
@@ -116,13 +116,6 @@ const main = defineCommand({
 
 loadEnvFiles(process.cwd());
 
-process.on("uncaughtException", (error) => {
-  reportInternalError(error);
-  process.exit(1);
-});
-process.on("unhandledRejection", (error) => {
-  reportInternalError(error);
-  process.exit(1);
-});
+installFatalErrorHandlers();
 
 runMain(main, { rawArgs: normalizeHostArgs(process.argv.slice(2)) });

@@ -62,9 +62,24 @@ export interface ValidationSchema {
   /** `null` is also accepted: 3.0 `nullable`, or `"null"` in a 3.1 type array. */
   nullable?: boolean;
   properties?: Record<string, ValidationSchema>;
+  /** The schema every property `properties` doesn't name must match. */
+  additionalProperties?: ValidationSchema;
   required?: string[];
   items?: ValidationSchema;
   enum?: unknown[];
+  const?: unknown;
+  minimum?: number;
+  maximum?: number;
+  exclusiveMinimum?: number;
+  exclusiveMaximum?: number;
+  minLength?: number;
+  maxLength?: number;
+  minItems?: number;
+  maxItems?: number;
+  allOf?: ValidationSchema[];
+  anyOf?: ValidationSchema[];
+  oneOf?: ValidationSchema[];
+  not?: ValidationSchema;
 }
 
 export interface PlaygroundBody {

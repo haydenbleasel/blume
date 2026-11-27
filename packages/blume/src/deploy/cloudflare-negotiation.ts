@@ -622,6 +622,10 @@ export default {
       if (asset.ok) {
         return withHeaders(asset, (headers) => {
           headers.set("content-type", "text/markdown; charset=utf-8");
+          // The page's own URL answering in Markdown is the page, so the
+          // \`noindex\` its \`.md\` copy carries (see \`deploy/headers.ts\`)
+          // stays off it.
+          headers.delete("x-robots-tag");
           headers.append("vary", "Accept");
           if (home) {
             if (HOME_LINK_HEADER !== null) {
@@ -633,6 +637,19 @@ export default {
           }
         });
       }
+    }
+    // A content page asked for with a trailing slash: the static layer would
+    // answer an asset this way with a redirect, but the Astro Worker serves
+    // the page itself, so the slashed URL would be a second copy of it. Send
+    // the reader to the one URL the page is canonical at, query kept.
+    if (variant !== null && !home && url.pathname.endsWith("/")) {
+      return new Response(null, {
+        headers: {
+          ...POWERED_BY,
+          location: url.pathname.replace(/\\/+$/u, "") + url.search,
+        },
+        status: 301,
+      });
     }
     const response = await server.fetch(request, env, context);
     const twin = await notFoundTwin(request, url, response, assets);

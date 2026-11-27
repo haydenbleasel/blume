@@ -33,7 +33,7 @@ The `{#custom-id}` form used by Pandoc, kramdown, and Markdown-based specificati
 ## Getting started \{#setup\}
 ```
 
-Fragment links can also target a raw HTML element with an `id` (`<a id="setup"></a>`), or an `<a name="setup">`; `blume validate` accepts those alongside heading anchors.
+Fragment links can also target a raw HTML element with an `id` (`<a id="setup"></a>`) or an `<a name="setup">`. The [`blume validate` reference](/docs/cli/validate) lists every anchor it accepts.
 
 An empty `<a>` inside a heading is the heading's own anchor, the way GitBook exports (`<a href="#setup" id="setup"></a>`) and wikis (`<a name="setup"></a>`) write one. Blume takes it out of the heading and gives the heading its `id`, or else its `name`, so `#setup` links keep landing there and the heading keeps its own self-link. A `[#custom-id]` marker on the same heading wins.
 

@@ -32,6 +32,17 @@ const tabbedPage = (scroll: number) => [
   entry("configure", 900 - scroll),
 ];
 
+/**
+ * `## Install`, then `## Configure`, after clicking "Configure" in the table
+ * of contents. The click scrolls it to the 72px scroll padding, but the
+ * browser snaps the scroll position to whole pixels, so the heading can settle
+ * at `top`, just below the line instead of on it.
+ */
+const clickedTo = (top: number) => [
+  entry("install", top - 700),
+  entry("configure", top),
+];
+
 describe(activeTocEntry, () => {
   it("defaults to the first heading before any reaches the trigger line", () => {
     expect(activeTocEntry(tabbedPage(0), TRIGGER, false)?.id).toBe("install");
@@ -44,6 +55,14 @@ describe(activeTocEntry, () => {
     expect(activeTocEntry(tabbedPage(850), TRIGGER, false)?.id).toBe(
       "configure"
     );
+  });
+
+  it("counts a heading that lands a fraction of a pixel below the line", () => {
+    expect(activeTocEntry(clickedTo(72.05), TRIGGER, false)?.id).toBe(
+      "configure"
+    );
+    // A heading a whole pixel or more below the line hasn't reached it yet.
+    expect(activeTocEntry(clickedTo(73), TRIGGER, false)?.id).toBe("install");
   });
 
   it("picks the last rendered heading at the bottom of the page", () => {

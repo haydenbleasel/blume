@@ -20,6 +20,7 @@ import {
   tempDir,
   withEnv,
 } from "./cms-fixtures.ts";
+import { renderMd } from "./mdx-render.ts";
 
 afterAll(cleanupTempDirs);
 
@@ -161,6 +162,44 @@ plain **bold** *em* \`x*y\` ~~old~~ under [site](https://x.dev) entry [file](htt
 
 {/* unsupported Contentful node: mystery */}
 `);
+  });
+
+  it("keeps a table's rows whole around a backslash, a pipe, and a bare URL", async () => {
+    const cell = (...content: JsonValue[]): JsonObject =>
+      node("table-cell", [paragraph(...content)]);
+    const md = contentfulRichTextToMarkdown(
+      node("document", [
+        node("table", [
+          node("table-row", [cell(text("Command")), cell(text("Docs"))]),
+          node("table-row", [
+            // `\\|` in a code span would split the row.
+            cell(text("grep 'a\\|b'", "code")),
+            // A backslash in a bare URL would reach its href.
+            cell(text("https://x.dev/a|b\r\nmore")),
+          ]),
+          // A row wider than the header keeps its last cell.
+          node("table-row", [
+            cell(text("1")),
+            cell(text("2")),
+            cell(text("3")),
+          ]),
+        ]),
+      ])
+    );
+    expect(md).toBe(
+      [
+        "| Command | Docs |  |",
+        "| --- | --- | --- |",
+        String.raw`| <code>grep \'a\\\|b\'</code> | https://x.dev/a%7Cb more |`,
+        "| 1 | 2 | 3 |",
+        "",
+      ].join("\n")
+    );
+    // The page renders the code as typed and links the URL where it points.
+    const { code } = await renderMd(md);
+    expect(code).toContain(String.raw`<td><code>grep 'a\|b'</code></td>`);
+    expect(code).toContain('<a href="https://x.dev/a%7Cb">');
+    expect(code).toContain("<td>3</td>");
   });
 
   it("lowers a document the SDK already resolved", () => {

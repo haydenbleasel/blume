@@ -33,6 +33,7 @@ import {
   withMirrorRedirects,
 } from "../deploy/redirects.ts";
 import { API_RAIL_KEY } from "../markdown/api-rail.ts";
+import { FAQ_KEY } from "../markdown/faq.ts";
 import { TITLE_ID_KEY } from "../markdown/title-heading.ts";
 import { VIEWS_KEY } from "../markdown/views.ts";
 import type { OgCache } from "../og/cache.ts";
@@ -2565,6 +2566,10 @@ const { Content, headings: allHeadings, remarkPluginFrontmatter } = await render
 // A page written in \`<View>\` blocks gets their picker above the content;
 // the views plugin lists them through the render's frontmatter (see
 // markdown/views.ts), and only a list of titled entries counts.
+// A page with \`seo.faq: true\` gets a FAQPage node from its question
+// headings, which the FAQ plugin reports the same way (see markdown/faq.ts).
+const faqRaw = remarkPluginFrontmatter?.${FAQ_KEY};
+const faq = Array.isArray(faqRaw) ? faqRaw : undefined;
 const viewsRaw = remarkPluginFrontmatter?.${VIEWS_KEY};
 const views = Array.isArray(viewsRaw)
   ? viewsRaw.filter((view) => typeof view?.title === "string")
@@ -2884,6 +2889,7 @@ const LayoutComponent = resolveSlot(layoutOverrides.Layout, RootLayout);
   pageMode={frontmatter.mode}
   published={frontmatter.date ?? frontmatter.changelog?.date ?? published}
   authors={frontmatter.authors}
+  faq={faq}
   lastModified={lastModified}
   noindex={effectiveNoindex}
   structuredDataEnabled={data.config.structuredData}
@@ -3022,6 +3028,7 @@ const LayoutComponent = resolveSlot(layoutOverrides.Layout, RootLayout);
   feeds={data.feeds}
   discovery={data.config.discovery}
   siteUrl={data.config.site}
+  lastModified={data.changelogModified}
   noindex={false}
   structuredDataEnabled={data.config.structuredData}
 >

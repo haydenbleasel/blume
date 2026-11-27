@@ -76,16 +76,23 @@ const parameters = channelParameters(channel, document);
 const messages = operation ? operationMessages(operation, channel, document) : [];
 const protocol = protocolOf(operation, channel, servers, document.components);
 
-/** Declared example first, else a sampled value from the payload schema. */
-const exampleOf = (message: (typeof messages)[number]["message"]): unknown =>
-  message.examples?.[0]?.payload ?? exampleValue(payloadSchema(message), schemas);
+/**
+ * Declared example first (a declared `null` included), else a sampled value
+ * from the payload schema; `undefined` when there is neither.
+ */
+const exampleOf = (message: (typeof messages)[number]["message"]): unknown => {
+  const declared = message.examples?.[0]?.payload;
+  return declared === undefined
+    ? exampleValue(payloadSchema(message), schemas)
+    : declared;
+};
 
 const messagePanels = await Promise.all(
   messages.map(async (named, index) => {
     const example = exampleOf(named.message);
     return {
       html:
-        example === undefined || example === null
+        example === undefined
           ? null
           : await highlightCode(toJson(example), "json", {
               icons: false,

@@ -60,22 +60,12 @@ const rowLine = (
 };
 
 /**
- * The release list alone, as year headings over linked rows — what
- * `<Changelog />` renders, in Markdown. Split out of the document below so the
- * component's serializer publishes exactly the list the generated page's
- * mirror does: an authored `/changelog` page brings its own heading and prose,
- * and only the list comes from here.
- *
- * Entries are the default locale's, as everywhere else this list is published
- * — see `components/content/Changelog.astro` for why the rule is the same on
- * the rendered page.
+ * The entries the index lists, newest first: every visible changelog entry of
+ * the current docs in the default locale (see `changelogIndexBlocks`).
  */
-export const changelogIndexBlocks = (
-  project: BlumeProject,
-  options: IndexOptions = {}
-): string[] => {
+const changelogIndexRows = (project: BlumeProject): IndexRow[] => {
   const { i18n } = project.config;
-  const rows: IndexRow[] = project.graph.pages
+  return project.graph.pages
     .filter(
       (page) =>
         page.contentType === "changelog" &&
@@ -90,6 +80,40 @@ export const changelogIndexBlocks = (
       page,
     }))
     .toSorted((a, b) => compareChangelogDates(a.date, b.date));
+};
+
+/**
+ * When the generated changelog index last changed, as ISO 8601: the date of
+ * the newest entry it lists that search engines may index — a `noindex`
+ * release still shows on the timeline but doesn't date the page. Null when no
+ * such entry is dated. The page's JSON-LD `dateModified` and "Last updated"
+ * line carry it, and the sitemap reads it back from there.
+ */
+export const changelogIndexModified = (
+  project: BlumeProject
+): string | null => {
+  const newest = changelogIndexRows(project).find(
+    (row) => row.date !== null && !row.page.meta.seo.noindex
+  );
+  return newest?.date?.toISOString() ?? null;
+};
+
+/**
+ * The release list alone, as year headings over linked rows — what
+ * `<Changelog />` renders, in Markdown. Split out of the document below so the
+ * component's serializer publishes exactly the list the generated page's
+ * mirror does: an authored `/changelog` page brings its own heading and prose,
+ * and only the list comes from here.
+ *
+ * Entries are the default locale's, as everywhere else this list is published
+ * — see `components/content/Changelog.astro` for why the rule is the same on
+ * the rendered page.
+ */
+export const changelogIndexBlocks = (
+  project: BlumeProject,
+  options: IndexOptions = {}
+): string[] => {
+  const rows = changelogIndexRows(project);
 
   // Undated entries sort last, under a heading of their own.
   return groupChangelogYears(rows, (row) =>

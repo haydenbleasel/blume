@@ -187,6 +187,8 @@ export const it: UIStringsOverride = {
     endpointChanged: "L'endpoint è cambiato. Riconnettiti per usarlo.",
     example: "Esempio",
     examples: "Esempi",
+    exclusiveMax: "minore di {n}",
+    exclusiveMin: "maggiore di {n}",
     fields: "Campi",
     fillParameters:
       "Compila tutti i parametri del canale prima di connetterti: {names}.",
@@ -230,6 +232,7 @@ export const it: UIStringsOverride = {
     noAuthorizationOn: "Nessuna autorizzazione richiesta su {servers}.",
     noExamplePayload: "Nessun payload di esempio.",
     noExampleResponse: "Nessuna risposta di esempio.",
+    not: "non {value}",
     notAllowed: "{path} deve essere uno tra: {values}",
     notConnected: "Non connesso.",
     notConnectedStream:
@@ -244,6 +247,7 @@ export const it: UIStringsOverride = {
     operations: "Operazioni",
     option: "Opzione {n}",
     or: "oppure",
+    outOfRange: "{path} è fuori intervallo ({limits})",
     overview: "Panoramica",
     parameters: "Parametri",
     pathParameters: "Parametri di percorso",
@@ -260,6 +264,7 @@ export const it: UIStringsOverride = {
     response: "Risposta",
     responses: "Risposte",
     returns: "Restituisce",
+    schemaMismatch: "{path} non corrisponde al suo schema",
     scopes: "Ambiti:",
     send: "Invia",
     sending: "Invio in corso…",

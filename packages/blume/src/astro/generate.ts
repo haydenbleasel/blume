@@ -21,6 +21,7 @@ import { OPENAPI_PATH } from "../ai/api/paths.ts";
 import { buildApiSpec } from "../ai/api/spec.ts";
 import { buildAskData } from "../ai/ask-data.ts";
 import { resolveAskBackend } from "../ai/ask.ts";
+import { changelogIndexModified } from "../ai/changelog-markdown.ts";
 import { buildHomeLinkHeader } from "../ai/link-headers.ts";
 import { buildRawMarkdown, markdownRoutePaths } from "../ai/markdown.ts";
 import type { RawMarkdownEntry } from "../ai/markdown.ts";
@@ -1227,6 +1228,9 @@ export const buildRuntimeData = (project: BlumeProject): string => {
     : {};
 
   const data: BlumeData = {
+    // The generated changelog index's date, which its layout emits as
+    // `dateModified` and the sitemap reads back.
+    changelogModified: changelogIndexModified(project),
     config: {
       analytics: config.analytics,
       api: resolveApiPages(config),

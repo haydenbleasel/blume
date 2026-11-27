@@ -46,11 +46,15 @@ export interface SoftwareIdentity {
   applicationCategory: string;
   /** Defaults to the site description. */
   description?: string;
+  downloadUrl?: string;
+  installUrl?: string;
   /** License URL or SPDX identifier. */
   license?: string;
   /** Defaults to the site title. */
   name?: string;
   operatingSystem?: string;
+  softwareRequirements?: string;
+  softwareVersion?: string;
   /** Emitted as an `Offer` when set; `0` marks the software free. */
   price?: number | string;
   priceCurrency: string;
@@ -111,6 +115,16 @@ export interface StructuredDataInput {
   base?: string;
   /** Content type — `blog` and `changelog` map to richer article types. */
   pageType?: string;
+  /**
+   * The page node's `@type`, in place of the one the content type picks (a
+   * custom page's `structuredDataType`).
+   */
+  schemaType?: string;
+  /**
+   * The page's questions and answers (front matter `seo.faq`, see
+   * `markdown/faq.ts`), emitted as a `FAQPage` node when there are any.
+   */
+  faq?: readonly { answer: string; question: string }[];
   /** Publish date (string or YAML Date); emitted as ISO `datePublished`. */
   published?: DateInput;
   /** Last-modified date; emitted as ISO `dateModified`. */
@@ -235,9 +249,10 @@ const organizationNode = (
 
 /**
  * The homepage `SoftwareApplication` node: the product's identity (name,
- * description, category), an `Offer` when a price is declared (`0` for free
- * software), license, registry/repository profiles, and the organization as
- * its publisher when one is configured.
+ * description, category), its current version, what it runs on and needs,
+ * where to download and install it, an `Offer` when a price is declared (`0`
+ * for free software), license, registry/repository profiles, and the
+ * organization as its publisher when one is configured.
  */
 const softwareNode = (
   software: SoftwareIdentity,
@@ -260,9 +275,16 @@ const softwareNode = (
   if (description) {
     node.description = description;
   }
-  if (software.operatingSystem) {
-    node.operatingSystem = software.operatingSystem;
-  }
+  Object.assign(
+    node,
+    definedStrings({
+      downloadUrl: software.downloadUrl,
+      installUrl: software.installUrl,
+      operatingSystem: software.operatingSystem,
+      softwareRequirements: software.softwareRequirements,
+      softwareVersion: software.softwareVersion,
+    })
+  );
   if (software.price !== undefined) {
     node.offers = {
       "@type": "Offer",
@@ -322,7 +344,7 @@ const pageNode = (
 ): JsonLdNode => {
   const node: JsonLdNode = {
     "@id": `${context.pageUrl}#page`,
-    "@type": pageSchemaType(input, context.home),
+    "@type": input.schemaType ?? pageSchemaType(input, context.home),
     inLanguage: input.locale || "en",
     name: input.title,
     url: context.pageUrl,
@@ -419,6 +441,29 @@ const addWebsiteNode = (
 };
 
 /**
+ * The page's `FAQPage` node (front matter `seo.faq`): each question with its
+ * accepted answer, attached to the page node. Null when it has none.
+ */
+const faqNode = (
+  input: StructuredDataInput,
+  pageUrl: string
+): JsonLdNode | null =>
+  input.faq && input.faq.length > 0
+    ? {
+        "@id": `${pageUrl}#faq`,
+        "@type": "FAQPage",
+        inLanguage: input.locale || "en",
+        isPartOf: { "@id": `${pageUrl}#page` },
+        mainEntity: input.faq.map((entry) => ({
+          "@type": "Question",
+          acceptedAnswer: { "@type": "Answer", text: entry.answer },
+          name: entry.question,
+        })),
+        url: pageUrl,
+      }
+    : null;
+
+/**
  * Build a schema.org JSON-LD `@graph` for a page: site identity (the WebSite,
  * plus the configured Organization everywhere and the SoftwareApplication on
  * the homepage), the page itself (a WebPage on the homepage, an article
@@ -483,6 +528,10 @@ export const buildStructuredData = (input: StructuredDataInput): JsonLdNode => {
     if (breadcrumbs) {
       graph.push(breadcrumbs);
     }
+  }
+  const faq = faqNode(input, pageUrl);
+  if (faq) {
+    graph.push(faq);
   }
 
   return { "@context": "https://schema.org", "@graph": graph };

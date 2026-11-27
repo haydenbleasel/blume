@@ -108,7 +108,10 @@ describe("buildNetlifyConfigHeaders", () => {
     });
     expect(entries).toContainEqual({
       for: "/docs/*.md",
-      values: { "Content-Type": "text/markdown; charset=utf-8" },
+      values: {
+        "Content-Type": "text/markdown; charset=utf-8",
+        "X-Robots-Tag": "noindex",
+      },
     });
     // The same paths the static `_headers` file names.
     const staticPaths = buildNetlifyHeaders(config, "</llms.txt>; rel=x")

@@ -34,7 +34,7 @@ Pandoc、kramdown、および Markdown ベースの仕様策定ツールチェ�
 ## Getting started \{#setup\}
 ```
 
-フラグメントリンクは、`id` を持つ生の HTML 要素（`<a id="setup"></a>`）や `<a name="setup">` を対象にすることもできます。`blume validate` は見出しアンカーと並んでそれらも受け付けます。
+フラグメントリンクは、`id` を持つ生の HTML 要素（`<a id="setup"></a>`）や `<a name="setup">` を対象にすることもできます。[`blume validate` のリファレンス](/docs/cli/validate)には、受け付けられるすべてのアンカーが記載されています。
 
 見出し内の空の `<a>` は、GitBook のエクスポート（`<a href="#setup" id="setup"></a>`）や wiki（`<a name="setup"></a>`）の書き方と同様に、その見出し自身のアンカーとして扱われます。Blume はそれを見出しから取り除き、その `id`（なければ `name`）を見出しに与えるため、`#setup` へのリンクは引き続きそこに到達し、見出しも自身へのリンクを保ちます。同じ見出しに `[#custom-id]` マーカーがある場合は、そちらが優先されます。
 

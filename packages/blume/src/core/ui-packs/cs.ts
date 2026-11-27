@@ -186,6 +186,8 @@ export const cs: UIStringsOverride = {
     endpointChanged: "Endpoint se změnil. Pro jeho použití se znovu připojte.",
     example: "Příklad",
     examples: "Příklady",
+    exclusiveMax: "menší než {n}",
+    exclusiveMin: "větší než {n}",
     fields: "Pole",
     fillParameters:
       "Před připojením vyplňte všechny parametry kanálu: {names}.",
@@ -229,6 +231,7 @@ export const cs: UIStringsOverride = {
     noAuthorizationOn: "Na {servers} není potřeba autorizace.",
     noExamplePayload: "Žádný příklad datové části.",
     noExampleResponse: "Žádný příklad odpovědi.",
+    not: "ne {value}",
     notAllowed: "{path} musí být jedna z hodnot: {values}",
     notConnected: "Nepřipojeno.",
     notConnectedStream:
@@ -243,6 +246,7 @@ export const cs: UIStringsOverride = {
     operations: "Operace",
     option: "Možnost {n}",
     or: "nebo",
+    outOfRange: "{path} je mimo povolený rozsah ({limits})",
     overview: "Přehled",
     parameters: "Parametry",
     pathParameters: "Parametry cesty",
@@ -259,6 +263,7 @@ export const cs: UIStringsOverride = {
     response: "Odpověď",
     responses: "Odpovědi",
     returns: "Vrací",
+    schemaMismatch: "{path} neodpovídá svému schématu",
     scopes: "Rozsahy:",
     send: "Odeslat",
     sending: "Odesílání…",

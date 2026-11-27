@@ -3,14 +3,16 @@ import { rewriteRelativeAssets } from "../core/content-assets.ts";
 import matter from "../core/frontmatter.ts";
 import { isHiddenPage } from "../core/hidden-pages.ts";
 import { metaDescription } from "../core/manifest.ts";
+import { isRootTab, isUnderPath } from "../core/navigation.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
 import { extractHeadings } from "../core/sources/normalize.ts";
 import { readExpandedEntryText } from "../core/sources/read.ts";
-import type { NavNode, Navigation, PageRecord } from "../core/types.ts";
+import type { NavNode, NavTab, Navigation, PageRecord } from "../core/types.ts";
 import { buildRssFeeds } from "../deploy/rss.ts";
 import { AI_CATALOG_PATH, hasAiCatalog } from "./ai-catalog.ts";
 import { API_CATALOG_PATH, hasApiCatalog } from "./api-catalog.ts";
 import { API_PAGES_PATH, OPENAPI_PATH } from "./api/paths.ts";
+import type { BuiltAgentPage } from "./built-pages.ts";
 import { downlevelComponents } from "./component-markdown.ts";
 import { linkText, pageUrl } from "./link-text.ts";
 import { relativeLinkRewriter } from "./relative-links.ts";
@@ -23,8 +25,18 @@ import {
 import type { SkillArtifact } from "./skills.ts";
 import { applyAgentVisibility } from "./visibility.ts";
 
-/** Inputs only the build has: the published skills, collected once per build. */
+/**
+ * Inputs only the build has: the published skills, collected once per build,
+ * and the custom pages read back from the built HTML.
+ */
 export interface LlmsIndexOptions {
+  /**
+   * Custom `.astro` pages that join the agent surfaces (see
+   * `ai/built-pages.ts`), listed under the navigation tab whose section they
+   * sit in. Absent (empty) for the homepage Markdown mirror, which is
+   * synthesized before the pages are built.
+   */
+  pages?: readonly BuiltAgentPage[];
   /**
    * The Agent Skills the build publishes under `/.well-known/agent-skills/`,
    * listed in their own section with each skill's description — which is
@@ -33,6 +45,63 @@ export interface LlmsIndexOptions {
    */
   skills?: readonly SkillArtifact[];
 }
+
+/** The heading for custom pages that sit under no section tab. */
+const PAGES_SECTION = "Pages";
+
+/**
+ * The position of the tab whose section holds `route` (the longest matching
+ * tab path), or one past the last tab when none does — so sections sort in
+ * the order the header shows its tabs, and ones outside every tab go last.
+ */
+const tabRank = (
+  tabs: readonly NavTab[],
+  route: string | undefined
+): number => {
+  let rank = tabs.length;
+  let length = -1;
+  if (route === undefined) {
+    return rank;
+  }
+  for (const [index, { path }] of tabs.entries()) {
+    if (isUnderPath(route, path) && path.length > length) {
+      rank = index;
+      ({ length } = path);
+    }
+  }
+  return rank;
+};
+
+/** A route that places a sidebar group: its folder, its link, or its first page. */
+const groupRoute = (node: NavNode): string | undefined => {
+  if (node.kind === "page") {
+    return node.route;
+  }
+  return (
+    node.path ??
+    node.route ??
+    node.children.map(groupRoute).find((route) => route !== undefined)
+  );
+};
+
+/**
+ * The section tab a custom page sits under: the most specific tab whose path
+ * prefixes its route, other than the tree's root tab (a page under no section
+ * gets the generic section rather than the docs' own).
+ */
+const sectionTab = (nav: Navigation, route: string): NavTab | undefined => {
+  let match: NavTab | undefined;
+  for (const tab of nav.tabs) {
+    if (
+      isUnderPath(route, tab.path) &&
+      !isRootTab(tab, nav.root ?? "/") &&
+      (!match || tab.path.length > match.path.length)
+    ) {
+      match = tab;
+    }
+  }
+  return match;
+};
 
 /** A skill description on one line — SKILL.md frontmatter may wrap it. */
 const oneLine = (text: string): string => text.replaceAll(/\s+/gu, " ").trim();
@@ -153,32 +222,77 @@ const indexedNavigations = (
   return [...current, ...archived];
 };
 
+/** A rendered `llms.txt` index and the order its page links appear in. */
+interface RenderedIndex {
+  /** Every linked route, in the order the index lists it. */
+  order: string[];
+  text: string;
+}
+
+/** A section of the index, placed by the tab it sits under. */
+interface IndexSection {
+  rank: number;
+  render: () => string[];
+}
+
 /**
  * Build the compact `llms.txt` index: title and summary, then the sidebar tree
  * rendered as sections — group labels become headings, pages become link lists —
  * so the file mirrors how the docs are organized rather than one flat blob.
- * Also serves as the homepage's synthesized Markdown mirror when the home
- * route is a landing page (see `buildRawMarkdown`).
+ * Top-level sections follow the order of the header's tabs, and custom pages
+ * read back from the build join the tab whose section they sit in. Also
+ * serves as the homepage's synthesized Markdown mirror when the home route is
+ * a landing page (see `buildRawMarkdown`).
  */
-export const buildLlmsIndex = (
+const renderLlmsIndex = (
   project: BlumeProject,
-  options: LlmsIndexOptions = {}
-): string => {
+  options: LlmsIndexOptions
+): RenderedIndex => {
   const { config } = project;
   const { site } = config.deployment.options;
   const base = normalizeBasePath(config.deployment.options.base);
   const eligible = eligiblePages(project);
   const byRoute = new Map(eligible.map((page) => [page.route, page]));
   const seen = new Set<string>();
+  const order: string[] = [];
+  const customPages = options.pages ?? [];
+  const customSeen = new Set<string>();
 
   const line = (page: PageRecord): string => {
     seen.add(page.route);
+    order.push(page.route);
     // The page's meta description, so a page summarized only in
     // `seo.description` (a generated reference page) still gets one.
     const description = metaDescription(page);
     const summary = description ? `: ${description}` : "";
     return `- [${linkText(page.title)}](${pageUrl(page.route, site, base)})${summary}`;
   };
+
+  const customLine = (page: BuiltAgentPage): string => {
+    customSeen.add(page.route);
+    order.push(page.route);
+    const { description, title } = page.document;
+    const summary = description ? `: ${description}` : "";
+    return `- [${linkText(title)}](${pageUrl(page.route, site, base)})${summary}`;
+  };
+
+  // A tab's custom pages: the tab's own page first, then by route.
+  const customSection = (
+    label: string,
+    pages: BuiltAgentPage[],
+    path: string | undefined,
+    depth: number
+  ): string[] => [
+    `${"#".repeat(depth)} ${label}`,
+    pages
+      .toSorted(
+        (a, b) =>
+          Number(b.route === path) - Number(a.route === path) ||
+          a.route.localeCompare(b.route)
+      )
+      .map(customLine)
+      .join("\n"),
+  ];
 
   // One nav level -> Markdown blocks: the level's loose pages as a link list,
   // then each group as a heading (depth-capped at h6) followed by its own
@@ -199,9 +313,11 @@ export const buildLlmsIndex = (
       // An explicit-config group may link its index page on the group itself
       // (`root`) rather than as a child; keep it at the top of the section.
       const rootPage = node.route ? byRoute.get(node.route) : undefined;
+      const rootLine =
+        rootPage && !seen.has(rootPage.route) ? line(rootPage) : null;
       const blocks = renderLevel(node.children, depth + 1);
-      if (rootPage && !seen.has(rootPage.route)) {
-        blocks.unshift(line(rootPage));
+      if (rootLine) {
+        blocks.unshift(rootLine);
       }
       if (blocks.length > 0) {
         groupBlocks.push(
@@ -214,29 +330,62 @@ export const buildLlmsIndex = (
   };
 
   // Loose pages at a tree's root get a "Docs" section of their own, so every
-  // link sits under an h2 as llms.txt consumers expect.
-  const renderNav = (nav: Navigation, depth: number): string[] => {
+  // link sits under an h2 as llms.txt consumers expect. The groups, and the
+  // custom pages when this is the site's own tree, follow in tab order.
+  const renderNav = (
+    nav: Navigation,
+    depth: number,
+    withCustomPages: boolean
+  ): string[] => {
     const loose = nav.sidebar.filter((node) => node.kind === "page");
-    const groups = nav.sidebar.filter((node) => node.kind === "group");
     const looseBlocks = renderLevel(loose, depth + 1);
+    const sections: IndexSection[] = nav.sidebar
+      .filter((node) => node.kind === "group")
+      .map((group) => ({
+        rank: tabRank(nav.tabs, groupRoute(group)),
+        render: () => renderLevel([group], depth),
+      }));
+    if (withCustomPages) {
+      const byTab = new Map<NavTab | undefined, BuiltAgentPage[]>();
+      for (const page of customPages) {
+        const tab = sectionTab(nav, page.route);
+        byTab.set(tab, [...(byTab.get(tab) ?? []), page]);
+      }
+      for (const [tab, pages] of byTab) {
+        sections.push({
+          rank: tab ? nav.tabs.indexOf(tab) : nav.tabs.length,
+          render: () =>
+            customSection(tab?.label ?? PAGES_SECTION, pages, tab?.path, depth),
+        });
+      }
+    }
     return [
       ...(looseBlocks.length > 0
         ? [`${"#".repeat(depth)} Docs`, ...looseBlocks]
         : []),
-      ...renderLevel(groups, depth),
+      ...sections
+        .toSorted((a, b) => a.rank - b.rank)
+        .flatMap((section) => section.render()),
     ];
   };
 
   const blocks: string[] = [];
   for (const { label, nav } of indexedNavigations(project)) {
     if (label) {
-      const localized = renderNav(nav, 3);
+      const localized = renderNav(nav, 3, false);
       if (localized.length > 0) {
         blocks.push(`## ${label}`, ...localized);
       }
       continue;
     }
-    blocks.push(...renderNav(nav, 2));
+    blocks.push(...renderNav(nav, 2, true));
+  }
+
+  // Custom pages no tree took (a locale tree missing its navigation) keep a
+  // section of their own.
+  const unplaced = customPages.filter((page) => !customSeen.has(page.route));
+  if (unplaced.length > 0) {
+    blocks.push(...customSection(PAGES_SECTION, unplaced, undefined, 2));
   }
 
   // Pages the navigation doesn't reach (an explicit sidebar that omits them,
@@ -292,8 +441,14 @@ export const buildLlmsIndex = (
   // the file sections — "when to use this" guidance in the site's own words.
   const { details } = config.agents.llmsTxt;
   const lead = details ? `${header}\n\n${details}` : header;
-  return `${[lead, ...blocks].join("\n\n")}\n`;
+  return { order, text: `${[lead, ...blocks].join("\n\n")}\n` };
 };
+
+/** The `llms.txt` index (see {@link renderLlmsIndex}). */
+export const buildLlmsIndex = (
+  project: BlumeProject,
+  options: LlmsIndexOptions = {}
+): string => renderLlmsIndex(project, options).text;
 
 // A line an ATX heading opens (`# Title`); any other first line can only open
 // a setext heading, underlined on the line after it.
@@ -315,55 +470,80 @@ const withoutTitleHeading = (body: string, title: string): string => {
     : body;
 };
 
-/** Build `llms-full.txt`: the full Markdown body of every current-docs page. */
-const buildFull = async (project: BlumeProject): Promise<string> => {
-  const { config } = project;
-  const pages = eligiblePages(project, { versions: "current" }).toSorted(
-    (a, b) => a.route.localeCompare(b.route)
+/** A page's `llms-full.txt` section: its title, its URL, then its body. */
+const fullSection = (title: string, url: string, body: string): string =>
+  [`# ${title}`, `Source: ${url}`, "", withoutTitleHeading(body, title)].join(
+    "\n"
   );
+
+/**
+ * Build `llms-full.txt`: the full Markdown body of every current-docs page,
+ * and of every custom page read back from the build, in the order the index
+ * lists them (`order`): it links every page this file holds.
+ */
+const buildFull = async (
+  project: BlumeProject,
+  customPages: readonly BuiltAgentPage[],
+  order: readonly string[]
+): Promise<string> => {
+  const { config } = project;
+  const url = (route: string): string =>
+    pageUrl(
+      route,
+      config.deployment.options.site,
+      normalizeBasePath(config.deployment.options.base)
+    );
+  const position = new Map(order.map((route, index) => [route, index]));
   const components = projectComponentSerializers(project);
   const rewriteLinks = relativeLinkRewriter(project);
 
-  const sections = await Promise.all(
-    pages.map(async (page) => {
-      let raw = await readExpandedEntryText(project, page);
-      // Colocated `./image.png` references resolve to nothing for a reader of
-      // llms-full.txt; point them at the served originals instead.
-      if (page.sourcePath) {
-        raw = rewriteRelativeAssets({
-          deployBase: config.deployment.options.base,
-          format: page.format,
-          projectRoot: project.context.root,
-          source: raw,
-          sourcePath: page.sourcePath,
-        });
-      }
-      // Page links too: a reader of one flat file has no page URL to resolve
-      // `./install` against, and `/install` needs the base the site is
-      // served under.
-      raw = rewriteLinks(raw, page);
-      // Resolve `<Visibility>` audiences (web-only content omitted from the
-      // agent-facing output, agents-only unwrapped), then downlevel supported
-      // components to plain Markdown.
-      const parsed = matter(raw);
-      const body = downlevelComponents(
-        applyAgentVisibility(parsed.content),
-        components,
-        parsed.data
-      ).trim();
-      const url = pageUrl(
-        page.route,
-        config.deployment.options.site,
-        normalizeBasePath(config.deployment.options.base)
-      );
-      return [
-        `# ${page.title}`,
-        `Source: ${url}`,
-        "",
-        withoutTitleHeading(body, page.title),
-      ].join("\n");
-    })
+  const contentSection = async (page: PageRecord): Promise<string> => {
+    let raw = await readExpandedEntryText(project, page);
+    // Colocated `./image.png` references resolve to nothing for a reader of
+    // llms-full.txt; point them at the served originals instead.
+    if (page.sourcePath) {
+      raw = rewriteRelativeAssets({
+        deployBase: config.deployment.options.base,
+        format: page.format,
+        projectRoot: project.context.root,
+        source: raw,
+        sourcePath: page.sourcePath,
+      });
+    }
+    // Page links too: a reader of one flat file has no page URL to resolve
+    // `./install` against, and `/install` needs the base the site is
+    // served under.
+    raw = rewriteLinks(raw, page);
+    // Resolve `<Visibility>` audiences (web-only content omitted from the
+    // agent-facing output, agents-only unwrapped), then downlevel supported
+    // components to plain Markdown.
+    const parsed = matter(raw);
+    const body = downlevelComponents(
+      applyAgentVisibility(parsed.content),
+      components,
+      parsed.data
+    ).trim();
+    return fullSection(page.title, url(page.route), body);
+  };
+
+  const entries = [
+    ...eligiblePages(project, { versions: "current" }).map((page) => ({
+      render: (): Promise<string> | string => contentSection(page),
+      route: page.route,
+    })),
+    ...customPages.map((page) => ({
+      render: () =>
+        fullSection(
+          page.document.title,
+          url(page.route),
+          page.document.markdown
+        ),
+      route: page.route,
+    })),
+  ].toSorted(
+    (a, b) => (position.get(a.route) ?? 0) - (position.get(b.route) ?? 0)
   );
+  const sections = await Promise.all(entries.map((entry) => entry.render()));
 
   const header = config.description
     ? `# ${config.title}\n\n> ${config.description}\n`
@@ -376,7 +556,10 @@ const buildFull = async (project: BlumeProject): Promise<string> => {
 export const buildLlmsFiles = async (
   project: BlumeProject,
   options: LlmsIndexOptions = {}
-): Promise<{ index: string; full: string }> => ({
-  full: await buildFull(project),
-  index: buildLlmsIndex(project, options),
-});
+): Promise<{ index: string; full: string }> => {
+  const index = renderLlmsIndex(project, options);
+  return {
+    full: await buildFull(project, options.pages ?? [], index.order),
+    index: index.text,
+  };
+};

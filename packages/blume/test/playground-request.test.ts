@@ -630,8 +630,19 @@ describe("operationModel", () => {
       },
     });
     expect(bare.body?.fields).toBeUndefined();
+    const notObject = buildModel({
+      method: "post",
+      requestBody: {
+        content: {
+          "application/json": { example: { a: 1 }, schema: { type: "string" } },
+        },
+      },
+    });
+    expect(notObject.body?.fields).toBeUndefined();
 
-    // A non-object example contributes no field defaults.
+    // A body with no example object (a scalar, or no example that passes its
+    // schema) still gets typed fields, empty: an empty optional one isn't
+    // sent, and an empty required one tells the API what is missing.
     const scalarExample = buildModel({
       method: "post",
       requestBody: {
@@ -647,6 +658,22 @@ describe("operationModel", () => {
       },
     });
     expect(scalarExample.body?.fields?.[0]?.value).toBe("");
+    const impossible = buildModel({
+      method: "post",
+      requestBody: {
+        content: {
+          "application/json": {
+            schema: {
+              properties: { n: { not: { const: 0 }, type: "integer" } },
+              required: ["n"],
+              type: "object",
+            },
+          },
+        },
+      },
+    });
+    expect(impossible.body).toMatchObject({ example: "" });
+    expect(impossible.body?.fields).toMatchObject([{ name: "n", value: "" }]);
   });
 
   it("merges allOf and $ref composition into flat fields", () => {

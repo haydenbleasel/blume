@@ -106,11 +106,41 @@ const normalizeFlags = (args: string[]): string[] =>
     if (arg === "--save-dev") {
       return ["-D"];
     }
+    // Yarn Berry rejects npm's `--save-exact`, and pnpm rejects (npm silently
+    // ignores) yarn's and bun's `--exact`; every manager accepts `-E`.
+    if (arg === "--save-exact" || arg === "--exact") {
+      return ["-E"];
+    }
     if (arg === "--save" || arg === "-S") {
       return [];
     }
     return [arg];
   });
+
+/**
+ * Drop the `--` that ends the input manager's own options. Only npm needs one
+ * before arguments meant for an initializer or script; pnpm and Yarn pass a
+ * literal `--` through to them, so it's re-inserted per manager on render.
+ */
+const dropSeparator = (args: string[]): string[] => {
+  const index = args.indexOf("--");
+  return index === -1 ? args : args.toSpliced(index, 1);
+};
+
+/**
+ * npm reads flags after a `create` initializer as its own config, so they need
+ * a `--` in front (`npm create vite my-app -- --template react-ts`). Every
+ * other manager forwards them as written.
+ */
+const npmCreateArgs = (args: string[]): string[] => {
+  const initializer = args.findIndex((arg) => !arg.startsWith("-"));
+  const flag = args.findIndex(
+    (arg, index) => index > initializer && arg.startsWith("-")
+  );
+  return initializer === -1 || flag === -1
+    ? args
+    : [...args.slice(0, flag), "--", ...args.slice(flag)];
+};
 
 /**
  * Parse an input command (a bare package list like `react react-dom` or an
@@ -150,10 +180,15 @@ const parseIntent = (input: string): Intent => {
   const operation = normalizeVerb(verb);
   if (operation === null) {
     // Unknown subcommand (e.g. `npm test`); run it as a script.
-    return { args: rest, operation: "run" };
+    return { args: dropSeparator(rest), operation: "run" };
   }
   if (operation === "add" && verbArgs.length === 0) {
     return { args: [], operation: "install" };
+  }
+  // Initializer and script arguments belong to the program they're passed
+  // to, so they skip the install-flag rewrites.
+  if (operation === "create" || operation === "run") {
+    return { args: dropSeparator(verbArgs), operation };
   }
   return { args: normalizeFlags(verbArgs), operation };
 };
@@ -173,9 +208,12 @@ const COMMAND_FOR = {
  * package-manager-detector's maintained agent tables (the engine behind `ni`).
  */
 const buildCommand = (manager: PackageManager, intent: Intent): string => {
-  // The tables carry no `create`; every manager spells it the same way.
+  // The tables carry no `create`; every manager spells the verb the same way,
+  // and only npm needs a `--` before the initializer's flags. (The tables'
+  // `run` already inserts npm's `--` itself.)
   if (intent.operation === "create") {
-    return `${manager} create ${intent.args.join(" ")}`;
+    const args = manager === "npm" ? npmCreateArgs(intent.args) : intent.args;
+    return `${manager} create ${args.join(" ")}`;
   }
   // A `-g`/`--global` flag selects the dedicated global command (the tables
   // place the flag themselves, per manager).

@@ -299,6 +299,36 @@ describe("attribute lists in .mdx", () => {
       { code: "BLUME_MDC_SYNTAX", column: 1, line: 1 },
     ]);
   });
+
+  it("leaves braces in math alone", () => {
+    // MDX parses `$$…$$` before expressions, so `{i=1}` in a formula is
+    // LaTeX, whether the math is a block, a quoted block, or inline.
+    const quiet = [
+      String.raw`$$
+\sum_{i=1}^{n} x_i
+$$
+`,
+      String.raw`> $$
+> \sum_{i=1}^{n} x_i
+> $$
+`,
+      String.raw`$$\sum_{i=1}^{n} x_i$$
+`,
+      String.raw`The sum $$\sum_{i=1}^{n} x_i$$ converges, as does $$$x_{k=0}$$$.
+`,
+    ];
+    for (const text of quiet) {
+      expect(found(text, "mdx")).toStrictEqual([]);
+    }
+    // An escaped `$` opens no math, and a run of another length doesn't
+    // close it.
+    const text = String.raw`A \$$ { a=1 } $$ and $$$ { x=0 } $$ then { b=2 }.
+`;
+    expect(found(text, "mdx")).toStrictEqual([
+      { code: "BLUME_MDX_ATTRIBUTE_LIST", column: 7, line: 1 },
+      { code: "BLUME_MDX_ATTRIBUTE_LIST", column: 42, line: 1 },
+    ]);
+  });
 });
 
 describe("attribute lists in .md", () => {

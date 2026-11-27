@@ -1220,11 +1220,15 @@ export interface SoftwareConfig {
   applicationCategory?: string;
   /** Product description. Defaults to the site description. */
   description?: string;
+  /** Where to download the product, e.g. its package registry page. */
+  downloadUrl?: string;
+  /** Where to install it from, e.g. its setup guide. */
+  installUrl?: string;
   /** License URL or SPDX identifier (`"MIT"`). */
   license?: string;
   /** Product name. Defaults to the site title. */
   name?: string;
-  /** Supported platform(s), e.g. `"Node.js 22+"`. */
+  /** Supported operating system(s), e.g. `"macOS, Linux, Windows"`. */
   operatingSystem?: string;
   /** Price, emitted as an `Offer`; `0` marks the software free. */
   price?: number | string;
@@ -1232,6 +1236,10 @@ export interface SoftwareConfig {
   priceCurrency?: string;
   /** Package registry, repository, and profile URLs for the product. */
   sameAs?: string[];
+  /** What it needs to run, e.g. `"Node.js 22+"`. */
+  softwareRequirements?: string;
+  /** The current release, e.g. `"8.3.0"`. */
+  softwareVersion?: string;
 }
 
 /** Discoverability: OG images, feeds, sitemap, robots, and structured data. */

@@ -44,6 +44,9 @@ const HEADER_RULES: readonly { contentType: string; ext: string }[] = [
   { contentType: "text/plain; charset=utf-8", ext: "txt" },
 ];
 
+/** The extensions of the pages' Markdown copies, kept out of search indexes. */
+const MIRROR_RULE_EXTENSIONS = ["md", "mdx"] as const;
+
 /** Where the generated endpoint serves content-source images from. */
 export const CONTENT_ASSETS_ROOT = "/blume-assets";
 
@@ -99,6 +102,18 @@ export const headerRules = (
     path: `${deployBase}/*.${rule.ext}`,
     value: rule.contentType,
   }));
+  // A page's Markdown copy says what its HTML says, so in a search index it
+  // would only compete with the page. Agents fetch the copies by URL and
+  // ignore the directive. Every host's header rules match a glob but can't
+  // all fill a per-path value, so the copies are `noindex` rather than
+  // canonical to their pages.
+  for (const ext of MIRROR_RULE_EXTENSIONS) {
+    rules.push({
+      name: "X-Robots-Tag",
+      path: `${deployBase}/*.${ext}`,
+      value: "noindex",
+    });
+  }
   // One rule for the whole site: `/*` matches the homepage too, and a host
   // that joins the values of overlapping rules would send a second one twice.
   if (config.poweredBy) {

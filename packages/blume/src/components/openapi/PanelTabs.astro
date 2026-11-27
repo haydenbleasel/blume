@@ -55,8 +55,8 @@ const idFor = (kind: "tab" | "panel", key: string): string =>
 
 // A `.prose` wrapper gives Shiki its scoped token colors; the global style at
 // the foot of this file strips the standalone code block's own box (border,
-// injected copy button, language label) so the code sits flush inside the one
-// panel border.
+// language label) so the code sits flush inside the one panel border. The
+// layout script adds no buttons over a panel's code, which would cover it.
 const CODE_WRAP = "prose max-w-none text-xs";
 const TAB_CLASS =
   "-mb-px cursor-pointer border-transparent border-b-2 bg-transparent py-2 font-medium text-muted-foreground text-xs transition-colors hover:text-foreground aria-[selected=true]:border-accent aria-[selected=true]:text-foreground";
@@ -92,18 +92,22 @@ const TAB_CLASS =
               </button>
             ))}
           </div>
-          {copy && (
-            <button
-              aria-label={strings.copyPanel.replaceAll("{name}", () => heading)}
-              class="group shrink-0 cursor-pointer rounded px-1.5 py-1 text-muted-foreground text-xs hover:text-foreground"
-              data-copied-label={strings.copied}
-              data-panel-copy
-              type="button"
-            >
-              <span class="group-data-[copied]:hidden">{strings.copy}</span>
-              <span class="hidden group-data-[copied]:inline">{strings.copied}</span>
-            </button>
-          )}
+          {/* The layout script puts the code Ask button here, before Copy,
+              when the assistant is on (RootLayout.astro). */}
+          <div class="flex shrink-0 items-center gap-1" data-panel-actions>
+            {copy && (
+              <button
+                aria-label={strings.copyPanel.replaceAll("{name}", () => heading)}
+                class="group shrink-0 cursor-pointer rounded px-1.5 py-1 text-muted-foreground text-xs hover:text-foreground"
+                data-copied-label={strings.copied}
+                data-panel-copy
+                type="button"
+              >
+                <span class="group-data-[copied]:hidden">{strings.copy}</span>
+                <span class="hidden group-data-[copied]:inline">{strings.copied}</span>
+              </button>
+            )}
+          </div>
         </div>
         {panels.map((panel, index) => (
           <div
@@ -119,7 +123,7 @@ const TAB_CLASS =
                 <Fragment set:html={panel.html} />
               </div>
             ) : (
-              <div class="px-3 py-4 text-muted-foreground text-xs">
+              <div class="px-3 py-4 text-muted-foreground text-xs" data-panel-text>
                 {panel.text ?? ""}
               </div>
             )}
@@ -136,8 +140,8 @@ const TAB_CLASS =
 
 <style is:global>
   /* Strip the standalone code block's own chrome inside a panel: the border,
-     margin, radius, and the copy button + language label the prose code theme
-     adds — the panel supplies a single border and its own copy button. */
+     margin, radius, and the language label the prose code theme adds — the
+     panel supplies a single border, and its header holds the buttons. */
   blume-panel-tabs pre.astro-code {
     margin: 0 !important;
     border: 0 !important;
@@ -148,7 +152,10 @@ const TAB_CLASS =
   blume-panel-tabs pre.astro-code::before {
     content: none !important;
   }
-  blume-panel-tabs [data-blume-copy] {
-    display: none !important;
+  /* The header's Ask button reads the visible panel's code; a panel that is
+     only a plain-text note (no example response) has none to ask about. */
+  blume-panel-tabs:has(> [data-panel]:not(.hidden) > [data-panel-text])
+    [data-blume-ask] {
+    display: none;
   }
 </style>

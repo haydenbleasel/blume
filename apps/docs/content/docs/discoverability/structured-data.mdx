@@ -37,7 +37,10 @@ seo: {
   },
   software: {
     license: "MIT",
-    operatingSystem: "Node.js 22+",
+    softwareVersion: "2.4.0",
+    softwareRequirements: "Node.js 22+",
+    downloadUrl: "https://www.npmjs.com/package/acme",
+    installUrl: "https://docs.acme.com/quickstart",
     price: 0, // emitted as an Offer; 0 marks it free
     sameAs: ["https://www.npmjs.com/package/acme"],
   },
@@ -46,7 +49,7 @@ seo: {
 
 `organization` adds an **Organization** node to every page — the WebSite and page nodes cite it as `publisher` — with the email and telephone as a `ContactPoint` (`contactType` defaults to `"customer support"`) and the address as a `PostalAddress`, the two fields business-verification checks look for. `name` and `url` default to the site's; a root-relative `logo` is absolutized like any page URL.
 
-`software` adds a **SoftwareApplication** node to the homepage: the product's name and description (defaulting to the site's), `applicationCategory` (default `"DeveloperApplication"`), operating system, license, an `Offer` when `price` is set, and the registry or repository URLs in `sameAs`. Pass `software: true` to take every default. The organization, when configured, is cited as its `publisher`.
+`software` adds a **SoftwareApplication** node to the homepage: the product's name and description (defaulting to the site's), `applicationCategory` (default `"DeveloperApplication"`), the current `softwareVersion`, the `operatingSystem` it runs on and the `softwareRequirements` it needs (a runtime like Node.js belongs there, not in `operatingSystem`), the `downloadUrl` and `installUrl` to get it from, license, an `Offer` when `price` is set, and the registry or repository URLs in `sameAs`. Pass `software: true` to take every default. The organization, when configured, is cited as its `publisher`.
 
 ## Shared entity identifiers
 
@@ -92,6 +95,20 @@ Front matter `date` or `changelog.date` still wins. Git dates the rest, through 
 
 The resolved [Open Graph image](/docs/discoverability/open-graph) is also included as the page node's `image`, whether it comes from frontmatter, a site default, or a generated card.
 
+## Questions and answers
+
+A page written as questions and answers, an FAQ or a troubleshooting page, can say so in front matter:
+
+```yaml lineNumbers
+---
+title: FAQ
+seo:
+  faq: true
+---
+```
+
+The page then also carries a **FAQPage** node: each `##` heading that ends in a question mark is a question, and the text up to the next `##` heading is its accepted answer, as plain text, code blocks left out. A question with no text under it is skipped, and so is any `##` heading that isn't a question.
+
 ## Custom pages
 
-A custom [`.astro` page](/docs/advanced/custom-pages) rendered through `PageLayout` emits the same graph, so a marketing home page isn't the one URL without structured data. A custom page has no content file to date, so pass `lastModified` to give it a `dateModified`. Pass `structuredDataEnabled={config.structuredData}` to keep it in sync with this setting, or `structuredDataEnabled={false}` to turn it off for that page alone.
+A custom [`.astro` page](/docs/advanced/custom-pages) rendered through `PageLayout` emits the same graph, so a marketing home page isn't the one URL without structured data. A custom page has no content file to date, so pass `lastModified` to give it a `dateModified`, and `published` for its `datePublished`. It's an article unless you say otherwise: `structuredDataType` sets the page node's type (`"WebPage"`, `"CollectionPage"`), and `pageType="blog"` makes it a `BlogPosting`. Pass `structuredDataEnabled={config.structuredData}` to keep it in sync with this setting, or `structuredDataEnabled={false}` to turn it off for that page alone.

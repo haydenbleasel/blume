@@ -174,6 +174,11 @@ const xHandleSchema = z.string().transform(normalizeXHandle).optional();
 const seoMetaSchema = z.strictObject({
   canonical: z.url().optional(),
   description: z.string().optional(),
+  /**
+   * Add a `FAQPage` JSON-LD node: each `##` heading ending in "?" is a
+   * question, and the text up to the next `##` heading its answer.
+   */
+  faq: z.boolean().optional(),
   image: z.string().optional(),
   noindex: z.boolean().default(false),
   title: z.string().optional(),
@@ -1724,12 +1729,16 @@ const organizationConfigSchema = z.strictObject({
 const softwareConfigSchema = z.strictObject({
   applicationCategory: z.string().default("DeveloperApplication"),
   description: z.string().optional(),
+  downloadUrl: z.url().optional(),
+  installUrl: z.url().optional(),
   license: z.string().optional(),
   name: z.string().optional(),
   operatingSystem: z.string().optional(),
   price: z.union([z.number().nonnegative(), z.string()]).optional(),
   priceCurrency: z.string().default("USD"),
   sameAs: z.array(z.url()).default([]),
+  softwareRequirements: z.string().optional(),
+  softwareVersion: z.string().optional(),
 });
 
 type SoftwareResolved = z.output<typeof softwareConfigSchema>;

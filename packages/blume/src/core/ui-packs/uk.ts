@@ -189,6 +189,8 @@ export const uk: UIStringsOverride = {
       "Ендпоінт змінився. Підключіться знову, щоб його використовувати.",
     example: "Приклад",
     examples: "Приклади",
+    exclusiveMax: "менше {n}",
+    exclusiveMin: "більше {n}",
     fields: "Поля",
     fillParameters:
       "Перед підключенням заповніть усі параметри каналу: {names}.",
@@ -232,6 +234,7 @@ export const uk: UIStringsOverride = {
     noAuthorizationOn: "На {servers} авторизація не потрібна.",
     noExamplePayload: "Немає прикладу корисного навантаження.",
     noExampleResponse: "Немає прикладу відповіді.",
+    not: "не {value}",
     notAllowed: "Значення {path} має бути одним із: {values}",
     notConnected: "Немає підключення.",
     notConnectedStream:
@@ -246,6 +249,7 @@ export const uk: UIStringsOverride = {
     operations: "Операції",
     option: "Варіант {n}",
     or: "або",
+    outOfRange: "Значення {path} поза допустимим діапазоном ({limits})",
     overview: "Огляд",
     parameters: "Параметри",
     pathParameters: "Параметри шляху",
@@ -262,6 +266,7 @@ export const uk: UIStringsOverride = {
     response: "Відповідь",
     responses: "Відповіді",
     returns: "Повертає",
+    schemaMismatch: "Значення {path} не відповідає своїй схемі",
     scopes: "Області доступу:",
     send: "Надіслати",
     sending: "Надсилання…",

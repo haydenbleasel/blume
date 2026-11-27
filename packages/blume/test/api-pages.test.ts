@@ -84,6 +84,10 @@ describe(endpointTarget, () => {
   });
 });
 
+/** A query field's schema, from the parts a case sets. */
+const typed = (field: Partial<EndpointField>) =>
+  fieldSchema({ location: "query", name: "q", ...field });
+
 describe("fields as schema", () => {
   const endpointFields: EndpointField[] = [
     { location: "path", name: "id", type: "string" },
@@ -159,6 +163,39 @@ describe("fields as schema", () => {
     expect(fieldSchema({ location: "body", name: "n" })).toEqual({
       type: "string",
     });
+  });
+
+  it("types a placeholder or default that spells a value of its field's type", () => {
+    const body = endpointBody([
+      {
+        location: "body",
+        name: "email",
+        placeholder: "ada@example.com",
+        type: "string",
+      },
+      { location: "body", name: "age", placeholder: "42", type: "integer" },
+      { default: "20", location: "body", name: "limit", type: "integer" },
+      { default: "true", location: "body", name: "on", type: "boolean" },
+    ]);
+    expect(body?.content["application/json"].example).toStrictEqual({
+      age: 42,
+      email: "ada@example.com",
+      limit: 20,
+      on: true,
+    });
+    expect(typed({ default: "false", type: "boolean" }).default).toBe(false);
+    expect(typed({ placeholder: "4.5", type: "number" }).example).toBe(4.5);
+    // Text that isn't such a value stays as written, and the samples leave
+    // it out.
+    expect(typed({ placeholder: "4.5", type: "integer" }).example).toBe("4.5");
+    expect(typed({ placeholder: "yes", type: "boolean" }).example).toBe("yes");
+    expect(typed({ placeholder: " ", type: "number" }).example).toBe(" ");
+    expect(typed({ default: 3, type: "integer" }).default).toBe(3);
+    expect(
+      endpointBody([
+        { location: "body", name: "n", placeholder: "4.5", type: "integer" },
+      ])?.content["application/json"].example
+    ).toStrictEqual({ n: 0 });
   });
 
   it("starts Try it with the required fields and the ones with a value", () => {

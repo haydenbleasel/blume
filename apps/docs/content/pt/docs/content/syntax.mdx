@@ -34,7 +34,7 @@ A forma `{#custom-id}`, usada pelo Pandoc, pelo kramdown e por toolchains de esp
 ## Getting started \{#setup\}
 ```
 
-Links de fragmento também podem apontar para um elemento HTML puro com um `id` (`<a id="setup"></a>`), ou para um `<a name="setup">`; o `blume validate` aceita esses casos junto com as âncoras de título.
+Links de fragmento também podem apontar para um elemento HTML puro com um `id` (`<a id="setup"></a>`) ou para um `<a name="setup">`. A [referência do `blume validate`](/docs/cli/validate) lista todas as âncoras que ele aceita.
 
 Um `<a>` vazio dentro de um título é a própria âncora do título, do jeito que as exportações do GitBook (`<a href="#setup" id="setup"></a>`) e as wikis (`<a name="setup"></a>`) a escrevem. O Blume o remove do título e dá ao título o `id` dele, ou então o `name`, para que links `#setup` continuem chegando ali e o título mantenha seu próprio link para si mesmo. Um marcador `[#custom-id]` no mesmo título tem prioridade.
 

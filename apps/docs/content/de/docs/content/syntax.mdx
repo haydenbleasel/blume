@@ -34,7 +34,7 @@ Die von Pandoc, kramdown und Markdown-basierten Spezifikations-Toolchains verwen
 ## Getting started \{#setup\}
 ```
 
-Fragment-Links können auch auf ein rohes HTML-Element mit einer `id` (`<a id="setup"></a>`) oder auf ein `<a name="setup">` zeigen; `blume validate` akzeptiert diese neben Überschriften-Ankern.
+Fragment-Links können auch auf ein rohes HTML-Element mit einer `id` (`<a id="setup"></a>`) oder auf ein `<a name="setup">` zeigen. Die [Referenz zu `blume validate`](/docs/cli/validate) führt jeden Anker auf, den es akzeptiert.
 
 Ein leeres `<a>` innerhalb einer Überschrift ist der eigene Anker der Überschrift, so wie GitBook-Exporte (`<a href="#setup" id="setup"></a>`) und Wikis (`<a name="setup"></a>`) ihn schreiben. Blume nimmt es aus der Überschrift heraus und gibt der Überschrift seine `id` oder andernfalls seinen `name`, sodass `#setup`-Links weiterhin dort landen und die Überschrift ihren eigenen Selbstlink behält. Ein `[#custom-id]`-Marker an derselben Überschrift hat Vorrang.
 

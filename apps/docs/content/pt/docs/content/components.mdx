@@ -62,7 +62,7 @@ Uma sequência vertical numerada para instruções ordenadas — instalações, 
 
 ## Tabs
 
-Alterne entre conteúdos equivalentes no mesmo lugar — variantes de linguagem, comandos específicos de sistema operacional ou abordagens alternativas — sem empilhar tudo na página. Cada `Tab` recebe um `title`.
+Alterne entre conteúdos equivalentes no mesmo lugar — variantes de linguagem, comandos específicos de sistema operacional ou abordagens alternativas — sem empilhar tudo na página. Cada `Tab` recebe um `title` e um `id` opcional.
 
 <Tabs>
   <Tab title="macOS">Use o Homebrew para instalar o toolchain.</Tab>
@@ -80,7 +80,7 @@ Adicione `inline` para renderizar sem bordas — uma faixa de abas sobre uma lin
 
 Grupos com abas de mesmo título alternam juntos — escolha “macOS” em um e todos os grupos com uma aba macOS acompanham. Adicione `syncKey` para delimitar essa sincronização: apenas os grupos que compartilham a mesma chave alternam juntos, então grupos não relacionados que por acaso tenham um título de aba em comum permanecem independentes, ou `sync={false}` para deixar um grupo totalmente de fora dela.
 
-A aba ativa é gravada no hash da URL, então um link abre nela; passe `hash={false}` para não alterar a URL. `defaultTabIndex` escolhe a aba que abre primeiro (contando a partir de zero, padrão `0`) quando nenhum link ou seleção sincronizada define uma. `dropdown` troca a faixa de abas por um menu de seleção (somente no layout com caixa), `borderBottom={false}` remove a linha sob a faixa, e cada `Tab` recebe um `icon` exibido antes do seu título.
+A aba ativa é gravada no hash da URL, como o seu `id` ou, na falta dele, o slug do seu título (`#windows`), então um link abre nela; passe `hash={false}` para não alterar a URL. `defaultTabIndex` escolhe a aba que abre primeiro (contando a partir de zero, padrão `0`) quando nenhum link ou seleção sincronizada define uma. `dropdown` troca a faixa de abas por um menu de seleção (somente no layout com caixa), `borderBottom={false}` remove a linha sob a faixa, e cada `Tab` recebe um `icon` exibido antes do seu título.
 
 <Tabs inline param="install">
   <Tab title="macOS">Use o Homebrew para instalar o toolchain.</Tab>
@@ -246,7 +246,9 @@ Ilustre a estrutura de um projeto ou de uma pasta. Envolva uma lista normal em M
 
 ## Accordion
 
-Empilhe elementos recolhíveis relacionados em um único contêiner com borda e divisórias entre eles — perguntas frequentes, etapas opcionais ou exemplos longos. Cada filho é um `AccordionItem` (`title`, `icon` opcional, `description`, `defaultOpen`). O `title` renderiza Markdown em linha, então trechos de código, ênfase e links nele aparecem como apareceriam em uma frase; HTML bruto nele aparece como texto. Para uma única divulgação independente, use [Expandable](#expandable).
+Empilhe elementos recolhíveis relacionados em um único contêiner com borda e divisórias entre eles — perguntas frequentes, etapas opcionais ou exemplos longos. Cada filho é um `AccordionItem` (`title`, `id` opcional, `icon`, `description`, `defaultOpen`). O `title` renderiza Markdown em linha, então trechos de código, ênfase e links nele aparecem como apareceriam em uma frase; HTML bruto nele aparece como texto. Para uma única divulgação independente, use [Expandable](#expandable).
+
+Um link para um item o abre. A âncora dele é o seu `id` ou, na falta dele, o slug do seu título (`#does-it-support-mdx` abaixo), e uma que se repete na página recebe `-2`, `-3` depois da primeira.
 
 <Accordion>
   <AccordionItem title="Ele tem suporte a MDX?">
@@ -270,7 +272,7 @@ Empilhe elementos recolhíveis relacionados em um único contêiner com borda e 
 
 ## Expandable
 
-Uma divulgação em linha e leve para detalhes aninhados — expandindo as subpropriedades de um campo ou uma nota opcional. `title` rotula o botão de alternância (o padrão é “Mostrar mais”) e renderiza Markdown em linha, como o de um item de accordion; defina `defaultOpen` para começar expandido.
+Uma divulgação em linha e leve para detalhes aninhados — expandindo as subpropriedades de um campo ou uma nota opcional. `title` rotula o botão de alternância (o padrão é “Mostrar mais”) e renderiza Markdown em linha, como o de um item de accordion; defina `defaultOpen` para começar expandido. Um link para o slug do seu título (`#show-advanced-options`) o abre, como acontece com um item de accordion.
 
 <Expandable title="Mostrar opções avançadas">
   Essas configurações são opcionais e raramente precisam ser alteradas.

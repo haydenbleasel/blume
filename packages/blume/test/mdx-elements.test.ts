@@ -118,6 +118,11 @@ describe("extractElementUses", () => {
       expect(extractElementUses(body)).toStrictEqual([]);
     }
   });
+
+  it("reports none, rather than throw, for nesting deep enough to overflow", () => {
+    const body = `${"> ".repeat(30_000)}<Badge text="x" />\n`;
+    expect(extractElementUses(body)).toStrictEqual([]);
+  });
 });
 
 describe("normalizeEntry event handlers", () => {

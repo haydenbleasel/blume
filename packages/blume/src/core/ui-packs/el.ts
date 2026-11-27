@@ -189,6 +189,8 @@ export const el: UIStringsOverride = {
       "Το τελικό σημείο άλλαξε. Συνδεθείτε ξανά για να το χρησιμοποιήσετε.",
     example: "Παράδειγμα",
     examples: "Παραδείγματα",
+    exclusiveMax: "μικρότερο από {n}",
+    exclusiveMin: "μεγαλύτερο από {n}",
     fields: "Πεδία",
     fillParameters:
       "Συμπληρώστε όλες τις παραμέτρους του καναλιού πριν από τη σύνδεση: {names}.",
@@ -232,6 +234,7 @@ export const el: UIStringsOverride = {
     noAuthorizationOn: "Δεν απαιτείται εξουσιοδότηση σε {servers}.",
     noExamplePayload: "Δεν υπάρχει παράδειγμα ωφέλιμου φορτίου.",
     noExampleResponse: "Δεν υπάρχει παράδειγμα απόκρισης.",
+    not: "όχι {value}",
     notAllowed: "Το {path} πρέπει να είναι ένα από: {values}",
     notConnected: "Χωρίς σύνδεση.",
     notConnectedStream:
@@ -246,6 +249,7 @@ export const el: UIStringsOverride = {
     operations: "Λειτουργίες",
     option: "Επιλογή {n}",
     or: "ή",
+    outOfRange: "Το {path} είναι εκτός ορίων ({limits})",
     overview: "Επισκόπηση",
     parameters: "Παράμετροι",
     pathParameters: "Παράμετροι διαδρομής",
@@ -262,6 +266,7 @@ export const el: UIStringsOverride = {
     response: "Απόκριση",
     responses: "Αποκρίσεις",
     returns: "Επιστρέφει",
+    schemaMismatch: "Το {path} δεν ταιριάζει με το σχήμα του",
     scopes: "Εμβέλειες:",
     send: "Αποστολή",
     sending: "Γίνεται αποστολή…",

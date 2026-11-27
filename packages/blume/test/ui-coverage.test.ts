@@ -1023,15 +1023,22 @@ describe("layout chrome sources", () => {
     expect(source).toContain(": ogEnabled && ogCardGenerated && siteBase");
   });
 
-  it("advertises the homepage Markdown mirror from PageLayout", async () => {
+  it("advertises the Markdown copy the build writes from PageLayout", async () => {
     // `/index.md` always exists (`markdownRoutePaths` appends the root; a
-    // landing page gets the synthesized llms.txt index), and the homepage HTTP
-    // `Link` header already advertises it — so a PageLayout homepage must carry
-    // the same `alternate` in its head for hosts that can't set that header,
-    // while any other custom route (no mirror) must not advertise one.
+    // landing page gets the synthesized llms.txt index), and the build writes
+    // a copy of every other static custom page it reads back — so a PageLayout
+    // page carries the `alternate` `customMirrorName` names, and none when the
+    // page is dynamic, noindexed, or excluded.
     const source = await layoutSource("PageLayout.astro");
+    expect(source).toContain('dynamic: Astro.routePattern.includes("["),');
+    expect(source).toContain("excluded: aiExcluded,");
+    expect(source).toContain("noindex: noindex === true,");
+    expect(source).toMatch(
+      /withMountedBase\(`\$\{encodeURI\(mirrorName\)\}\.md`\)/u
+    );
+    // An excluded page's `<main>` is web-only, which the build reads back.
     expect(source).toContain(
-      'const markdownMirror = route === "/" ? withMountedBase("/index.md") : null;'
+      'data-blume-visibility={aiExcluded ? "web" : undefined}'
     );
     // The documented homepage examples omit `page.route`; a non-root page that
     // copies them must resolve its own route from the request URL, or it

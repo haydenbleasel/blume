@@ -189,6 +189,8 @@ export const ru: UIStringsOverride = {
       "Эндпоинт изменился. Подключитесь снова, чтобы использовать его.",
     example: "Пример",
     examples: "Примеры",
+    exclusiveMax: "меньше {n}",
+    exclusiveMin: "больше {n}",
     fields: "Поля",
     fillParameters:
       "Перед подключением заполните все параметры канала: {names}.",
@@ -232,6 +234,7 @@ export const ru: UIStringsOverride = {
     noAuthorizationOn: "На {servers} авторизация не требуется.",
     noExamplePayload: "Нет примера полезной нагрузки.",
     noExampleResponse: "Нет примера ответа.",
+    not: "не {value}",
     notAllowed: "Значение {path} должно быть одним из: {values}",
     notConnected: "Нет подключения.",
     notConnectedStream:
@@ -246,6 +249,7 @@ export const ru: UIStringsOverride = {
     operations: "Операции",
     option: "Вариант {n}",
     or: "или",
+    outOfRange: "Значение {path} вне допустимого диапазона ({limits})",
     overview: "Обзор",
     parameters: "Параметры",
     pathParameters: "Параметры пути",
@@ -262,6 +266,7 @@ export const ru: UIStringsOverride = {
     response: "Ответ",
     responses: "Ответы",
     returns: "Возвращает",
+    schemaMismatch: "Значение {path} не соответствует своей схеме",
     scopes: "Области доступа:",
     send: "Отправить",
     sending: "Отправка…",

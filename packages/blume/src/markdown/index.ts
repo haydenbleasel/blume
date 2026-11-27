@@ -23,6 +23,7 @@ import { codeTitleTransformer } from "./code-title.ts";
 import { contentAssetsPlugin } from "./content-assets.ts";
 import { directiveToCalloutPlugin } from "./directives.ts";
 import { externalLinksPlugin } from "./external-links.ts";
+import { faqPlugin } from "./faq.ts";
 import { MARKDOWN_BODY_FEATURES, MDX_BODY_FEATURES } from "./features.ts";
 import { fenceLanguagePlugin } from "./fence-language.ts";
 import { githubAlertsPlugin } from "./github-alerts.ts";
@@ -495,6 +496,7 @@ export const blumeMdxProcessor = (options: BlumeMdxOptions = {}) =>
         ...blumeSharedMdastPlugins(options),
         asMdastPlugin(apiRailPlugin()),
         asMdastPlugin(viewsPlugin()),
+        asMdastPlugin(faqPlugin()),
         asMdastPlugin(promptTextPlugin()),
       ],
     }),

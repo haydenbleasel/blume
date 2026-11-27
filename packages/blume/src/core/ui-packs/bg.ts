@@ -189,6 +189,8 @@ export const bg: UIStringsOverride = {
       "Крайната точка е променена. Свържете се отново, за да я използвате.",
     example: "Пример",
     examples: "Примери",
+    exclusiveMax: "по-малко от {n}",
+    exclusiveMin: "по-голямо от {n}",
     fields: "Полета",
     fillParameters:
       "Попълнете всички параметри на канала преди свързване: {names}.",
@@ -232,6 +234,7 @@ export const bg: UIStringsOverride = {
     noAuthorizationOn: "Не е нужна оторизация на {servers}.",
     noExamplePayload: "Няма примерен полезен товар.",
     noExampleResponse: "Няма примерен отговор.",
+    not: "не е {value}",
     notAllowed: "{path} трябва да е едно от: {values}",
     notConnected: "Няма връзка.",
     notConnectedStream:
@@ -246,6 +249,7 @@ export const bg: UIStringsOverride = {
     operations: "Операции",
     option: "Вариант {n}",
     or: "или",
+    outOfRange: "{path} е извън допустимите граници ({limits})",
     overview: "Общ преглед",
     parameters: "Параметри",
     pathParameters: "Параметри в пътя",
@@ -262,6 +266,7 @@ export const bg: UIStringsOverride = {
     response: "Отговор",
     responses: "Отговори",
     returns: "Връща",
+    schemaMismatch: "{path} не съответства на схемата си",
     scopes: "Обхвати:",
     send: "Изпрати",
     sending: "Изпращане…",
