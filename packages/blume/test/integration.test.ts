@@ -274,7 +274,12 @@ interface InjectedPageRoute {
 
 /** The config `astro:config:setup` merges in through `updateConfig`. */
 interface ConfigUpdate {
-  vite: { define: Record<string, string> };
+  vite: {
+    plugins: {
+      config: () => { define: Record<string, string> };
+      name: string;
+    }[];
+  };
 }
 
 /** The `injectTypes` call `astro:config:done` makes. */
@@ -372,10 +377,13 @@ describe("blumeIntegration astro:config:setup", () => {
       updateConfig: (update: ConfigUpdate) => updates.push(update),
     } as never);
 
-    // The base Astro resolved, as the constant `deployBase()` reads.
-    expect(updates).toEqual([
-      { vite: { define: { [DEPLOY_BASE_DEFINE]: '"/docs"' } } },
-    ]);
+    // The base, as the constant `deployBase()` reads, defined by a Vite
+    // plugin so it is read when Vite's config is created.
+    const plugins = updates.flatMap((update) => update.vite.plugins);
+    expect(plugins.map((plugin) => plugin.name)).toEqual(["blume:deploy-base"]);
+    expect(plugins[0]?.config()).toEqual({
+      define: { [DEPLOY_BASE_DEFINE]: '"/docs"' },
+    });
 
     // Both run innermost, so a project's own middleware sees the finished
     // HTML and can replace the X-Powered-By value.
@@ -418,6 +426,42 @@ describe("blumeIntegration astro:config:setup", () => {
       updateConfig: () => {},
     } as never);
     expect(middleware).toEqual(["blume/components/icon-sprite-middleware.ts"]);
+  });
+});
+
+describe("blumeIntegration deployment base constant", () => {
+  it("defines the base Astro ends up with, not the one setup saw", () => {
+    const integration = blumeIntegration({ contentRoutes: [], pages: [] });
+    const updates: ConfigUpdate[] = [];
+    // SAFETY: the setup hook only reads `config.base` and calls the four
+    // functions the fixture provides.
+    integration.hooks["astro:config:setup"]?.({
+      addMiddleware: () => {},
+      config: { base: "/docs" },
+      createCodegenDir: () => CODEGEN_DIR,
+      injectRoute: () => {},
+      updateConfig: (update: ConfigUpdate) => updates.push(update),
+    } as never);
+    const [plugin] = updates.flatMap((update) => update.vite.plugins);
+
+    // An integration listed after Blume's can still change `base` during
+    // setup. Astro reports the result on `astro:config:done`, and only then
+    // creates the Vite config that calls the plugin.
+    // SAFETY: the done hook only reads `config.base`/`root`/`srcDir` and
+    // calls `injectTypes`, all of which the fixture provides.
+    integration.hooks["astro:config:done"]?.({
+      config: {
+        base: "/moved",
+        root: new URL(CONFIG_ROOT),
+        srcDir: new URL("src/", CONFIG_ROOT),
+      },
+      injectTypes: (types: InjectedTypes) =>
+        new URL(types.filename, CODEGEN_DIR),
+    } as never);
+
+    expect(plugin?.config()).toEqual({
+      define: { [DEPLOY_BASE_DEFINE]: '"/moved"' },
+    });
   });
 });
 

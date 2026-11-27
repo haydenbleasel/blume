@@ -502,6 +502,9 @@ export const blumeIntegration = (
   // What the dev server's trailing-slash handling needs from the config
   // (see `core/static-host.ts`): the base the URLs carry, and `public/`.
   let staticHost: Pick<AstroConfig, "base" | "publicDir"> | null = null;
+  // The base the site's own code is built with (see `deployBase` in
+  // components/islands/base-path.ts), as the latest config hook saw it.
+  let deployBase = "/";
   return {
     hooks: {
       "astro:build:done": async ({ dir, logger }) => {
@@ -522,6 +525,7 @@ export const blumeIntegration = (
       "astro:config:done": ({ config, injectTypes }) => {
         astroRoot = config.root;
         staticHost = config;
+        deployBase = config.base;
         const from = fileURLToPath(
           codegenDir ?? defaultCodegenDir(config.root)
         );
@@ -544,10 +548,20 @@ export const blumeIntegration = (
         codegenDir = createCodegenDir();
         // The base, under a name of Blume's own: a `BASE_URL` in the
         // environment shadows Astro's field of that name in a build's server
-        // code (see `deployBase` in components/islands/base-path.ts).
+        // code. Defined from a Vite plugin because Astro creates the Vite
+        // config after `astro:config:done`, so the value is the final base
+        // even when an integration listed after this one changes it.
+        deployBase = config.base;
         updateConfig({
           vite: {
-            define: { [DEPLOY_BASE_DEFINE]: JSON.stringify(config.base) },
+            plugins: [
+              {
+                config: () => ({
+                  define: { [DEPLOY_BASE_DEFINE]: JSON.stringify(deployBase) },
+                }),
+                name: "blume:deploy-base",
+              },
+            ],
           },
         });
         // Splices each page's icon sprite in once the page has rendered (see
