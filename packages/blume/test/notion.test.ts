@@ -1048,7 +1048,7 @@ describe("notionSource (table blocks)", () => {
     },
   };
 
-  const loadTable = async (rows: BlockList, mdx?: boolean) => {
+  const loadTable = async (rows: BlockList) => {
     const lists = new Map<string, BlockList>([
       [
         "tbl",
@@ -1073,7 +1073,6 @@ describe("notionSource (table blocks)", () => {
         client: clientFor(lists, [tablePage]),
         database: "db1",
         fetchImpl,
-        mdx,
         name: "handbook",
       },
       await ctxFor()
@@ -1109,17 +1108,6 @@ describe("notionSource (table blocks)", () => {
         "Done",
       ].join("\n")
     );
-  });
-
-  it("reads table cells as MDX source when mdx is set", async () => {
-    const body = await loadTable(
-      [
-        row("head", [[rich("Name")], [rich("Status")]]),
-        row("beta", [[rich("{version}")], [rich("<Badge>new</Badge> a|b")]]),
-      ],
-      true
-    );
-    expect(body).toContain("| {version} | <Badge>new</Badge> a\\|b |");
   });
 
   it("renders a table without rows as nothing", async () => {
