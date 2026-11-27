@@ -534,9 +534,11 @@ const blogPage = (over: Partial<PageRecord>): PageRecord =>
   ({
     contentType: "blog",
     description: "desc",
+    locale: "en",
     meta: pageMetaSchema.parse({}),
     route: "/blog/a",
     title: "A",
+    version: "",
     ...over,
   }) as PageRecord;
 

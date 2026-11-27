@@ -167,6 +167,7 @@ const BLUME_KEYS = new Set([
   "authMethod",
   "authors",
   "changelog",
+  "cover",
   "date",
   "deprecated",
   "description",
@@ -184,6 +185,7 @@ const BLUME_KEYS = new Set([
   "seo",
   "sidebar",
   "slug",
+  "tags",
   "title",
   "type",
 ]);
@@ -2500,6 +2502,29 @@ const pageFields = (page, out, extra) => {
   }
 };
 
+/**
+ * Jekyll reads a `tags` string as space-separated tags; Blume reads a list,
+ * of non-blank tags. An empty one (`tags:`, `tags: " "`) is none, which
+ * Blume's schema rejects: dropped.
+ */
+const tagList = (value) => {
+  if (Array.isArray(value)) {
+    const tags = value.filter((tag) => textOf(tag) !== undefined);
+    if (tags.length === 0) {
+      return;
+    }
+    return tags.length === value.length ? value : tags;
+  }
+  const text = textOf(value);
+  if (text !== undefined) {
+    return text.split(/\s+/u);
+  }
+  // A mapping or a boolean isn't empty: kept for the schema to report.
+  return isRecord(value) || value === true || value === false
+    ? value
+    : undefined;
+};
+
 /** Keys the codemod doesn't map: kept, and reported unless Blume reads them. */
 const otherFields = (page, out) => {
   const { data, report } = page;
@@ -2511,6 +2536,23 @@ const otherFields = (page, out) => {
       ) {
         edit(report, `front matter ${key} removed`);
       }
+      continue;
+    }
+    if (key === "tags") {
+      const tags = tagList(value);
+      if (tags === undefined) {
+        edit(report, "empty front matter tags removed");
+        continue;
+      }
+      if (tags !== value) {
+        edit(
+          report,
+          Array.isArray(value)
+            ? "blank front matter tags removed"
+            : "front matter tags split into a list"
+        );
+      }
+      out[key] = tags;
       continue;
     }
     out[key] = value;

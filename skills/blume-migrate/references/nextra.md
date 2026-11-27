@@ -74,6 +74,10 @@ Nextra enables math via `nextra({ latex: true })` (KaTeX or MathJax). In Blume, 
 
 Repoint `dev`/`build`/`start` scripts to the Blume CLI; remove `next`/`nextra`/`nextra-theme-*` deps and add `blume`. Delete after harvesting: `next.config.*` (redirects first!), `theme.config.*` (v2/v3), `app/layout.*` + the catch-all gateway + `mdx-components.*` (v4).
 
+## Blog
+
+`nextra-theme-blog` sites, and docs-theme sites with a folder of posts → `type: blog` pages (see SKILL.md "Blogs"). Keep `title`, `date`, and `description`; `tag` or `tags` (a comma-separated string or a list) → a `tags` list, and `author` → `authors`. Delete the theme's listing pages (`type: posts` and `type: tag` front matter in v2 and v3, the hand-written index and tag pages under `app/` in v4): Blume generates `/blog` and `/blog/tags/<tag>`. Redirect the old index route to `/blog` (unless it already is `/blog`), each old tag route (`/tags/<tag>`) to its tag page (Blume lowercases the label and turns each run of punctuation into `-`), and the theme's feed route to `/blog/rss.xml`.
+
 ## Dropped — report these
 
 Footer content other than a copyright line; `primaryHue`-style theming beyond an accent color; `faviconGlyph`; `_meta` separators, menus, `newWindow`; per-page `theme` switches (and `layout: "full"` approximated as `mode: wide`); root-level pages `_meta` ordered after a folder; `<Bleed>`; MathJax macros; word-highlight/copy fence meta; any icon you can't reconstruct as a Lucide name.
