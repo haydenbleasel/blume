@@ -1,9 +1,11 @@
 import { describe, expect, it } from "bun:test";
 
 import {
-  NOTRA_SCRIPT_PLUS_RELEASE,
-  NOTRA_SCRIPT_RELEASE,
+  NOTRA_SCRIPT_PLUS_RELEASE as SDK_SCRIPT_PLUS_RELEASE,
+  NOTRA_SCRIPT_RELEASE as SDK_SCRIPT_RELEASE,
+  notraScript,
 } from "@usenotra/sdk/script";
+import type { NotraScriptOptions } from "@usenotra/sdk/script";
 
 import {
   AMPLITUDE_DEFAULT_INIT,
@@ -41,6 +43,14 @@ import {
 } from "../src/analytics/index.ts";
 import { LOGROCKET_SCRIPT_SRC } from "../src/analytics/logrocket.ts";
 import { MIXPANEL_REGION_HOSTS } from "../src/analytics/mixpanel.ts";
+import type { NotraOptions } from "../src/analytics/notra.ts";
+import {
+  NOTRA_COLLECT_URL,
+  NOTRA_SCRIPT_ORIGIN,
+  NOTRA_SCRIPT_PLUS_RELEASE,
+  NOTRA_SCRIPT_RELEASE,
+  notraOptionsSchema,
+} from "../src/analytics/notra.ts";
 import { ONE_DOLLAR_STATS_SCRIPT_SRC } from "../src/analytics/one-dollar-stats.ts";
 import { PIRSCH_SCRIPT_SRC } from "../src/analytics/pirsch.ts";
 import { PLAUSIBLE_QUEUE } from "../src/analytics/plausible.ts";
@@ -80,6 +90,82 @@ const scripts = (adapter: ReturnType<typeof all>[number]): HeadScript[] =>
     }
     return { attributes: node.attributes, content: node.content };
   });
+
+/** The attributes on the one tag `notra()` emits. */
+const notraAttributes = (options: NotraOptions): HeadScript["attributes"] => {
+  const [tag] = scripts(notra(options));
+  if (!tag) {
+    throw new Error("expected a notra tag");
+  }
+  return tag.attributes;
+};
+
+/**
+ * The tag `@usenotra/sdk` writes for the same options, spelled the way a
+ * `HeadScript` spells it: a bare `data-hash`, and `crossorigin` in lowercase.
+ */
+const sdkNotraAttributes = (
+  options: NotraOptions
+): HeadScript["attributes"] => {
+  const { crossOrigin, "data-hash": hash, ...rest } = notraScript(options);
+  // Every other attribute as the SDK names it, so one it adds later shows up
+  // as a difference.
+  const attributes: HeadScript["attributes"] = {};
+  for (const [name, value] of Object.entries(rest)) {
+    if (value !== undefined) {
+      attributes[name] = value;
+    }
+  }
+  if (hash !== undefined) {
+    attributes["data-hash"] = true;
+  }
+  if (crossOrigin !== undefined) {
+    attributes.crossorigin = crossOrigin;
+  }
+  return attributes;
+};
+
+/** The `src` each `notra()` tag gets under `base`, in declared order. */
+const notraSrcs = (base: string) =>
+  analyticsHead(
+    [
+      notra({ src: "/notra.js", webKey: "nwk.abc" }),
+      // Written with the base already.
+      notra({ src: "/docs/notra.js", webKey: "nwk.abc" }),
+      notra({ src: "https://cdn.example.com/notra.js", webKey: "nwk.abc" }),
+    ],
+    base
+  ).map((node) => (node.type === "script" ? node.attributes.src : null));
+
+/** Every branch of the tag: build, pin, fragment counting, and each way to self-host. */
+const NOTRA_OPTION_CASES: NotraOptions[] = [
+  { webKey: "nwk.abc" },
+  { errors: true, webKey: "nwk.abc" },
+  { hash: true, webKey: "nwk.abc" },
+  { pinned: false, webKey: "nwk.abc" },
+  { errors: true, pinned: false, webKey: "nwk.abc" },
+  { integrity: "sha384-own", webKey: "nwk.abc" },
+  { integrity: "sha384-own", pinned: false, webKey: "nwk.abc" },
+  { api: "https://docs.example.com/collect", webKey: "nwk.abc" },
+  { endpoint: "https://docs.example.com", webKey: "nwk.abc" },
+  { endpoint: "https://docs.example.com//", errors: true, webKey: "nwk.abc" },
+  { endpoint: "https://docs.example.com", pinned: false, webKey: "nwk.abc" },
+  { api: "/collect", endpoint: "https://docs.example.com", webKey: "nwk.abc" },
+  { src: "/notra.js", webKey: "nwk.abc" },
+  { api: "/collect", src: "/notra.js", webKey: "nwk.abc" },
+  {
+    integrity: "sha384-own",
+    src: "https://cdn.example.com/notra.js",
+    webKey: "nwk.abc",
+  },
+  {
+    endpoint: "https://docs.example.com",
+    errors: true,
+    pinned: false,
+    src: "/notra.js",
+    webKey: "nwk.abc",
+  },
+];
 
 describe("provider adapter factories", () => {
   it("return serializable descriptors with public tokens and no runtime deps", () => {
@@ -494,34 +580,123 @@ describe("provider adapter heads", () => {
     ]);
   });
 
-  it("notra: the SDK's pinned deferred tag with its integrity hash, data-key, and beacon", () => {
+  it("notra: the pinned deferred tag with its integrity hash, data-key, and beacon", () => {
     expect(scripts(notra({ webKey: "nwk.abc" }))).toEqual([
       {
         attributes: {
           crossorigin: "anonymous",
-          "data-api": "https://ingest.usenotra.com/api/collect",
+          "data-api": NOTRA_COLLECT_URL,
           "data-key": "nwk.abc",
           defer: true,
           integrity: NOTRA_SCRIPT_RELEASE.integrity,
-          src: `https://static.usenotra.com/${NOTRA_SCRIPT_RELEASE.file}`,
+          src: `${NOTRA_SCRIPT_ORIGIN}/${NOTRA_SCRIPT_RELEASE.file}`,
         },
         content: null,
       },
     ]);
   });
 
-  it("notra: the errors build, hash routes, and a self-hosted script", () => {
+  it("notra: the errors build, fragment page views, and the unpinned file", () => {
     expect(
-      scripts(notra({ errors: true, hash: true, webKey: "nwk.abc" }))[0]
-        ?.attributes
+      notraAttributes({ errors: true, hash: true, webKey: "nwk.abc" })
     ).toMatchObject({
       "data-hash": true,
       integrity: NOTRA_SCRIPT_PLUS_RELEASE.integrity,
-      src: `https://static.usenotra.com/${NOTRA_SCRIPT_PLUS_RELEASE.file}`,
+      src: `${NOTRA_SCRIPT_ORIGIN}/${NOTRA_SCRIPT_PLUS_RELEASE.file}`,
+    });
+    // Unpinned, the tag has no hash to check, so it carries no `crossorigin`.
+    expect(notraAttributes({ pinned: false, webKey: "nwk.abc" })).toEqual({
+      "data-api": NOTRA_COLLECT_URL,
+      "data-key": "nwk.abc",
+      defer: true,
+      src: `${NOTRA_SCRIPT_ORIGIN}/notra.js`,
+    });
+  });
+
+  it("notra: an endpoint serves the pinned file under /api/ and takes the beacon", () => {
+    // No `data-api`: notra.js posts to /api/collect on the script's origin.
+    expect(
+      notraAttributes({
+        endpoint: "https://docs.example.com/",
+        webKey: "nwk.abc",
+      })
+    ).toEqual({
+      crossorigin: "anonymous",
+      "data-key": "nwk.abc",
+      defer: true,
+      integrity: NOTRA_SCRIPT_RELEASE.integrity,
+      src: `https://docs.example.com/api/${NOTRA_SCRIPT_RELEASE.file}`,
     });
     expect(
-      scripts(notra({ src: "/notra.js", webKey: "nwk.abc" }))[0]?.attributes
-    ).toEqual({ "data-key": "nwk.abc", defer: true, src: "/notra.js" });
+      notraAttributes({
+        endpoint: "https://docs.example.com",
+        errors: true,
+        pinned: false,
+        webKey: "nwk.abc",
+      }).src
+    ).toBe("https://docs.example.com/api/notra.plus.js");
+  });
+
+  it("notra: a self-hosted src sends no data-api unless api names one", () => {
+    expect(notraAttributes({ src: "/notra.js", webKey: "nwk.abc" })).toEqual({
+      "data-key": "nwk.abc",
+      defer: true,
+      src: "/notra.js",
+    });
+    expect(
+      notraAttributes({
+        api: NOTRA_COLLECT_URL,
+        integrity: "sha384-own",
+        src: "/notra.js",
+        webKey: "nwk.abc",
+      })
+    ).toEqual({
+      crossorigin: "anonymous",
+      "data-api": NOTRA_COLLECT_URL,
+      "data-key": "nwk.abc",
+      defer: true,
+      integrity: "sha384-own",
+      src: "/notra.js",
+    });
+  });
+
+  it("notra: a root-relative src is served under the deployment base", () => {
+    expect(notraSrcs("/docs/")).toEqual([
+      "/docs/notra.js",
+      "/docs/notra.js",
+      "https://cdn.example.com/notra.js",
+    ]);
+    expect(notraSrcs("/")[0]).toBe("/notra.js");
+  });
+
+  it("notra: pins the builds @usenotra/sdk pins and writes the tag it writes", () => {
+    // An SDK update that moves the pin fails here: copy the new file names
+    // and hashes into `src/analytics/notra.ts`.
+    expect(NOTRA_SCRIPT_RELEASE).toEqual(SDK_SCRIPT_RELEASE);
+    expect(NOTRA_SCRIPT_PLUS_RELEASE).toEqual(SDK_SCRIPT_PLUS_RELEASE);
+    for (const options of NOTRA_OPTION_CASES) {
+      expect(notraAttributes(options), JSON.stringify(options)).toEqual(
+        sdkNotraAttributes(options)
+      );
+    }
+  });
+
+  it("notra: takes exactly the options @usenotra/sdk takes", () => {
+    // Typed by the SDK's option names, so one it adds or renames fails
+    // typecheck here, and the schema has to take the same names to pass.
+    const names: Record<keyof NotraScriptOptions, true> = {
+      api: true,
+      endpoint: true,
+      errors: true,
+      hash: true,
+      integrity: true,
+      pinned: true,
+      src: true,
+      webKey: true,
+    };
+    expect(Object.keys(notraOptionsSchema.shape).toSorted()).toEqual(
+      Object.keys(names).toSorted()
+    );
   });
 
   it("notra: reject a key that isn't a public web key, and an unknown option", () => {

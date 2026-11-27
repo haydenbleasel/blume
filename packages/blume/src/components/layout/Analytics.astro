@@ -21,7 +21,8 @@ interface Props {
 }
 
 const { analytics } = Astro.props;
-// A `script()` src in `public/` is served under the deployment base.
+// A `script()` or `notra()` src in `public/` is served under the deployment
+// base.
 const nodes = analyticsHead(
   import.meta.env.PROD ? (analytics ?? []) : [],
   import.meta.env.BASE_URL
