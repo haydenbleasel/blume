@@ -88,6 +88,7 @@ import {
   getPagination,
   navGroupIds,
   sidebarForRoute,
+  withTabCrumb,
 } from "./nav-utils.ts";
 import NavTabMenu from "./NavTabMenu.astro";
 import NavTree from "./NavTree.astro";
@@ -498,9 +499,10 @@ const mcpMenu = mcp?.clients
   ? mcpMenuEntries(mcp.clients, locale, data.config.i18n?.defaultLocale)
   : undefined;
 
-// Scope the sidebar and pagination to the active tab's section so each tab
-// shows its own pages. Without tabs, or on a route under none, this is the
-// full sidebar.
+// Scope the sidebar (and the breadcrumbs/pagination derived from it) to the
+// active tab's section, so a multi-section site drills each tab into its own
+// pages. Without tabs this is the full sidebar; on a route under no tab, the
+// sidebar minus the sections the tabs own.
 // `navigation.root` keeps the root-tab check in the tabs' localized/based
 // path space (`/en`, `/docs`), so a locale or base prefix doesn't misread the
 // root tab as a section tab; in an archived version tree the root is
@@ -524,8 +526,13 @@ const activeTab = currentTabForRoute(
   page.route,
   navigation.root
 );
-// The full tree retains the tab's landing page as a breadcrumb ancestor.
-const crumbs = findBreadcrumbs(navigation.sidebar, page.route);
+// The scoped sidebar holds a tab's pages but not the tab itself, so the trail
+// is led by the tab's landing page.
+const crumbs = withTabCrumb(
+  findBreadcrumbs(sidebar, page.route),
+  activeTab,
+  navigation.root
+);
 // A group's own page lists the group's pages below its content when the
 // group asks for a directory. Looked up in the full tree: a tab's own page
 // is not in its scoped sidebar.

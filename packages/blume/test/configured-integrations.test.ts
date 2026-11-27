@@ -318,13 +318,27 @@ const waitForDevServer = async (
   );
 };
 
+/**
+ * The environment a fixture's CLI process starts with. `assistant.test.ts`
+ * and `hooks.test.ts` set `BASE_URL` for the modules they import directly,
+ * and in a full-suite run it is still set in this process. Astro inlines
+ * environment variables over `import.meta.env` in server code, so a
+ * `BASE_URL` passed down would replace the fixture's own `deployment.base`
+ * in every server-rendered link.
+ */
+const childEnv = (): NodeJS.ProcessEnv => {
+  const env: NodeJS.ProcessEnv = { ...process.env, NO_COLOR: "1" };
+  delete env.BASE_URL;
+  return env;
+};
+
 const startDev = async (root: string, requestedPort?: number) => {
   const port = requestedPort ?? (await availablePort());
   const proc = Bun.spawn(
     ["bun", CLI, "dev", "--host", "127.0.0.1", "--port", String(port)],
     {
       cwd: root,
-      env: { ...process.env, NO_COLOR: "1" },
+      env: childEnv(),
       stderr: "pipe",
       stdout: "pipe",
     }
@@ -403,13 +417,9 @@ const runCli = async (
   args: string[],
   timeout = 120_000
 ): Promise<{ exitCode: number; output: string }> => {
-  const env: NodeJS.ProcessEnv = { ...process.env, NO_COLOR: "1" };
-  // Component tests set BASE_URL for direct imports. Fixture builds use
-  // the deployment base in their own config.
-  delete env.BASE_URL;
   const proc = Bun.spawn(["bun", CLI, ...args], {
     cwd: root,
-    env,
+    env: childEnv(),
     stderr: "pipe",
     stdout: "pipe",
   });
@@ -557,6 +567,10 @@ it("passes invalid integration elements through to Astro validation", async () =
   // Budget for a killed-and-retried 90s build attempt.
 }, 240_000);
 
+/** The built-in breadcrumb landmark of a built page, or `""` without one. */
+const breadcrumbOf = (html: string): string =>
+  html.match(/<nav aria-label="Breadcrumb"[^>]*>[\s\S]*?<\/nav>/u)?.[0] ?? "";
+
 it("renders the tab landing page in built breadcrumbs", async () => {
   const root = await writeProject({
     "blume.config.ts": `
@@ -564,10 +578,17 @@ import { node } from "blume/deploy";
 
 export default {
   deployment: node({ base: "/docs", site: "https://docs.example.com" }),
-  navigation: { tabs: [{ label: "Guides", path: "/guides" }] },
+  navigation: {
+    tabs: [
+      { label: "Handbook", path: "/guides" },
+      { label: "Changelog", path: "/changelog" },
+    ],
+  },
   ${offlineFontsSource},
 };
 `,
+    "docs/changelog/v1-2-0.md":
+      '---\ntitle: "1.2.0"\ntype: changelog\ndate: 2026-01-02\n---\n\nNotes.\n',
     "docs/guides/index.md": "# Guides\n",
     "docs/guides/setup.md": "# Setup\n",
     "docs/index.md": "# Home\n",
@@ -575,19 +596,35 @@ export default {
 
   const built = await runIsolatedBuild(root);
   expect(built.exitCode, built.output).toBe(0);
-  const html = await readFile(
-    join(root, ".blume-verify/dist/client/guides/setup/index.html"),
-    "utf-8"
+  const page = (route: string): Promise<string> =>
+    readFile(
+      join(root, ".blume-verify/dist/client", route, "index.html"),
+      "utf-8"
+    );
+
+  // The crumb is the tab as the header names it: the section's folder is
+  // `guides`, and the sidebar under the tab never shows that name.
+  const setup = await page("guides/setup");
+  expect(breadcrumbOf(setup)).toContain('href="/docs/guides"');
+  expect(breadcrumbOf(setup)).toContain("Handbook");
+  expect(setup).toContain(
+    '"item":"https://docs.example.com/docs/guides","name":"Handbook","position":1'
   );
-  const breadcrumb =
-    html.match(/<nav aria-label="Breadcrumb"[^>]*>[\s\S]*?<\/nav>/u)?.[0] ?? "";
-  expect(breadcrumb).toContain('href="/docs/guides"');
-  expect(html).toContain('"@type":"BreadcrumbList"');
-  expect(html).toContain(
-    '"item":"https://docs.example.com/docs/guides","name":"Guides","position":1'
-  );
-  expect(html).toContain(
+  expect(setup).toContain(
     '"item":"https://docs.example.com/docs/guides/setup","name":"Setup","position":2'
+  );
+
+  // The landing page itself has no parent to show.
+  const landing = await page("guides");
+  expect(breadcrumbOf(landing)).toBe("");
+  expect(landing).not.toContain('"@type":"BreadcrumbList"');
+
+  // A tab can land on a route outside the content tree: the changelog's
+  // entries are content pages, its generated index is not.
+  const entry = await page("changelog/v1-2-0");
+  expect(breadcrumbOf(entry)).toContain('href="/docs/changelog"');
+  expect(entry).toContain(
+    '"item":"https://docs.example.com/docs/changelog","name":"Changelog","position":1'
   );
 }, 240_000);
 
