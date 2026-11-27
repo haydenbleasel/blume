@@ -79,7 +79,33 @@ const normalizePhrase = (value: string): string =>
     .replaceAll(/[^\p{L}\p{M}\p{N}]+/gu, " ")
     .trim();
 
-/** Check each candidate's title and individual aliases once per query. */
+/**
+ * Each page's title and keywords, normalized and led by a space so a phrase is
+ * only found starting at a word. Kept for the life of the index, which hands
+ * every query the same document objects: the dialog searches on each
+ * keystroke, and normalizing every matched page again would cost more than the
+ * search itself.
+ */
+const phraseFields = new WeakMap<OramaDoc, string[]>();
+
+const phraseFieldsOf = (doc: OramaDoc): string[] => {
+  let fields = phraseFields.get(doc);
+  if (!fields) {
+    fields = [doc.title, ...(doc.keywords ?? [])].map(
+      (value) => ` ${normalizePhrase(value)}`
+    );
+    phraseFields.set(doc, fields);
+  }
+  return fields;
+};
+
+/**
+ * Whether a page's title or one of its keywords holds a multiword query as a
+ * phrase. Every word but the last must be whole. The last matches as a prefix,
+ * the way Orama matches it, so a page keeps its place while a reader is still
+ * typing the word: `coding agen` finds "Memory for coding agents" as surely
+ * as `coding agents` does. A one-word query has no phrase to find.
+ */
 const phraseMatcher = (
   term: string
 ): ((doc: OramaDoc) => boolean) | undefined => {
@@ -87,23 +113,16 @@ const phraseMatcher = (
   if (!phrase.includes(" ")) {
     return;
   }
-  const needle = ` ${phrase} `;
-  const contains = (value: string): boolean =>
-    ` ${normalizePhrase(value)} `.includes(needle);
-  const matches = new WeakMap<OramaDoc, boolean>();
-  return (doc) => {
-    const cached = matches.get(doc);
-    if (cached !== undefined) {
-      return cached;
-    }
-    const match =
-      contains(doc.title) || (doc.keywords?.some(contains) ?? false);
-    matches.set(doc, match);
-    return match;
-  };
+  const needle = ` ${phrase}`;
+  return (doc) => phraseFieldsOf(doc).some((field) => field.includes(needle));
 };
 
-/** Use the same ranking before each locale's limit and when merging locales. */
+/**
+ * Use the same ranking before each locale's limit and when merging locales.
+ * Pages holding the query as a phrase come first, and relevance times the
+ * page's `search.boost` orders each group. The phrase is the stronger signal
+ * on purpose, so a boost never moves a page from one group to the other.
+ */
 const searchRanking = (term: string, hasBoosts: boolean) => {
   const matchesPhrase = phraseMatcher(term);
   const compareRank = (
@@ -548,8 +567,10 @@ export const queryOramaIndex = async (
   if (facetTerms.length > 0) {
     where.facetTerms = { containsAll: facetTerms };
   }
-  // Sort before Orama limits each result list. A whole phrase in the title
-  // or an alias ranks first, then relevance and the page's boost break ties.
+  // Sort before Orama limits each result list (it sorts the whole match set
+  // with a sort function), so a page can rise past matches outside the first
+  // page. A phrase in the title or a keyword ranks first, then relevance
+  // times the page's boost.
   const { compareRank, sortBy } = searchRanking(term, boostedDatabases.has(db));
   const unfiltered = {
     boost: BOOST,
