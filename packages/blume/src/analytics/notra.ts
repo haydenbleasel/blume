@@ -69,7 +69,10 @@ export interface NotraOptions {
    * accordion.
    */
   hash?: boolean;
-  /** Subresource Integrity value (`sha384-…`), overriding the pinned build's. */
+  /**
+   * Subresource Integrity value (`sha384-…`), overriding the pinned build's.
+   * With `src` or `pinned: false` the tag has no hash unless this sets one.
+   */
   integrity?: string;
   /** Load the pinned build with its integrity hash. Defaults to `true`. */
   pinned?: boolean;
