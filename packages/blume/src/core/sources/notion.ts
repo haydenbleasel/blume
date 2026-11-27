@@ -15,7 +15,7 @@ import {
   pollingWatch,
   snapshotCache,
 } from "./cache.ts";
-import type { InlineRun } from "./lower.ts";
+import type { InlinePart, InlineRun } from "./lower.ts";
 import {
   codeFence,
   guardBlockStart,
@@ -23,6 +23,8 @@ import {
   linkParts,
   renderInline,
   renderInlineMdx,
+  table,
+  tableCell,
 } from "./lower.ts";
 import { slugify, slugifyPath } from "./normalize.ts";
 import { missingSecretError } from "./remote.ts";
@@ -67,6 +69,8 @@ interface NotionBlockPayload {
   checked?: boolean;
   external?: { url: string };
   file?: { url: string };
+  /** Whether a `table`'s first row is its header row. */
+  has_column_header?: boolean;
   language?: string;
   rich_text?: NotionRichText[];
 }
@@ -180,15 +184,10 @@ interface LinkedRuns {
 }
 
 /**
- * Rich text as Markdown for an MDX body. The runs go through the shared
- * lowering, so a literal `{`, `<`, `*`, or `[` typed in Notion renders as
- * itself instead of opening a JSX expression, a tag, or emphasis, a code run
- * keeps its text verbatim inside a long-enough code span, neighbors share
- * their marks' delimiters, and neighbors that link to one `href` share one
- * link. With `mdx`, the text goes in as typed instead (see
- * `NotionSourceOptions.mdx`).
+ * Rich text as inline parts: runs carrying Notion's marks, where neighbors
+ * that link to one `href` share one link.
  */
-const richToMarkdown = (rich: NotionRichText[] = [], mdx = false): string => {
+const richParts = (rich: NotionRichText[] = []): InlinePart[] => {
   const linked: LinkedRuns[] = [];
   for (const { annotations = {}, href, plain_text: text } of rich) {
     const run: InlineRun = {
@@ -207,7 +206,19 @@ const richToMarkdown = (rich: NotionRichText[] = [], mdx = false): string => {
       linked.push({ href: href ?? undefined, runs: [run] });
     }
   }
-  const parts = linked.flatMap(({ href, runs }) => linkParts(runs, href, mdx));
+  return linked.flatMap(({ href, runs }) => linkParts(runs, href));
+};
+
+/**
+ * Rich text as Markdown for an MDX body. The runs go through the shared
+ * lowering, so a literal `{`, `<`, `*`, or `[` typed in Notion renders as
+ * itself instead of opening a JSX expression, a tag, or emphasis, a code run
+ * keeps its text verbatim inside a long-enough code span, and neighbors share
+ * their marks' delimiters. With `mdx`, the text goes in as typed instead (see
+ * `NotionSourceOptions.mdx`).
+ */
+const richToMarkdown = (rich?: NotionRichText[], mdx = false): string => {
+  const parts = richParts(rich);
   return mdx ? renderInlineMdx(parts) : renderInline(parts);
 };
 
@@ -327,34 +338,22 @@ const isYouTubeUrl = (url: string): boolean => {
   return YOUTUBE_HOST.test(host) && youtubeEmbedSrc(url) !== null;
 };
 
-// A line break would end the GFM row and a `|` would split the cell, the same
-// as in a Contentful table cell.
-const CELL_BREAK = /\n+/gu;
-const CELL_PIPE = /\|/gu;
-
-const tableRow = (cells: string[]): string => `| ${cells.join(" | ")} |`;
-
 /**
- * Render a Notion `table` from its `table_row` children as a GFM table. GFM
- * needs a header row, so the first row is the header, as for Contentful.
+ * Render a Notion `table` from its `table_row` children as a GFM table. The
+ * first row is the header unless the table's header row is off in Notion. A
+ * header column has no Markdown form, so it renders as any other column.
+ *
+ * A cell's text renders as written even with `NotionSourceOptions.mdx`: a row
+ * is one line that splits at every `|`, so a `|` in an expression or an
+ * attribute, or an expression that spans lines, can't be read as MDX there.
  */
-const renderTable = (rows: NotionBlock[], mdx: boolean): string => {
-  const [head, ...body] = rows.map((row) =>
-    (payloadOf(row)?.cells ?? []).map((cell) =>
-      blockText(cell, mdx)
-        .replaceAll(CELL_BREAK, " ")
-        .replaceAll(CELL_PIPE, String.raw`\|`)
-    )
+const renderTable = (block: NotionBlock, rows: NotionBlock[]): string =>
+  table(
+    rows.map((row) =>
+      (payloadOf(row)?.cells ?? []).map((cell) => tableCell([richParts(cell)]))
+    ),
+    payloadOf(block)?.has_column_header !== false
   );
-  if (!head) {
-    return "";
-  }
-  return [
-    tableRow(head),
-    tableRow(head.map(() => "---")),
-    ...body.map((cells) => tableRow(cells)),
-  ].join("\n");
-};
 
 /**
  * Render a Notion `video` block. Kept out of `renderLeaf`'s switch so that
@@ -551,7 +550,7 @@ export const notionSource = (
       return `<Columns>\n${rendered.join("\n")}\n</Columns>`;
     }
     if (block.type === "table") {
-      return renderTable(await childrenOf(client, block.id), textAsMdx);
+      return renderTable(block, await childrenOf(client, block.id));
     }
     return `{/* unsupported Notion block: ${block.type} */}`;
   };

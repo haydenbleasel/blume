@@ -30,7 +30,7 @@ const DIRECTIVE_COLON = /(?<!(?:[a-z][\w+.-]*:\/\/|www\.)\S*):(?=[a-z\d])/giu;
 // characters as written. That includes a trailing `*`, `_`, or `~`, which
 // GFM leaves out of the link: escaped, its backslash would still land inside.
 // A link label is the exception — GFM links nothing inside one, so there
-// every special is escaped (see `linkParts`).
+// every special is escaped (see `renderParts`).
 const BARE_URL = /\b(?:https?:\/\/|www\.)[\w-][^\s<]*/giu;
 
 // An entity or numeric character reference (`&copy;`, `&#38;`) is decoded
@@ -97,16 +97,25 @@ const escapeRest = (text: string): string =>
 export const escapeMarkdownText = (text: string): string =>
   escapeRest(escapeSpecials(text));
 
-/** CMS prose as {@link escapeMarkdownText}, except inside a bare URL. */
-const escapeProse = (text: string): string => {
-  let out = "";
-  let last = 0;
-  for (const match of text.matchAll(BARE_URL)) {
-    out += escapeSpecials(text.slice(last, match.index)) + match[0];
-    last = match.index + match[0].length;
-  }
-  return escapeRest(out + escapeSpecials(text.slice(last)));
-};
+const asTyped = (text: string): string => text;
+
+/**
+ * CMS prose as {@link escapeMarkdownText}, except inside a bare URL, which
+ * goes in as `bareUrl` writes it.
+ */
+const proseEscape =
+  (bareUrl: (url: string) => string) =>
+  (text: string): string => {
+    let out = "";
+    let last = 0;
+    for (const match of text.matchAll(BARE_URL)) {
+      out += escapeSpecials(text.slice(last, match.index)) + bareUrl(match[0]);
+      last = match.index + match[0].length;
+    }
+    return escapeRest(out + escapeSpecials(text.slice(last)));
+  };
+
+const escapeProse = proseEscape(asTyped);
 
 /** The marks a lowerer can put on an inline run. */
 export interface InlineMarks {
@@ -122,13 +131,23 @@ export interface InlineRun {
   text: string;
 }
 
-/** Inline Markdown a lowerer rendered itself: a link, an embed, a break. */
+/** Inline Markdown a lowerer rendered itself: an embed, a break. */
 export interface InlineMarkdown {
   markdown: string;
 }
 
+/**
+ * A link over inline parts. Its label is written by the block it lands in:
+ * MDX source takes it as typed (see {@link renderInlineMdx}), and a table
+ * cell has its own form for some code (see {@link tableCell}).
+ */
+export interface InlineLink {
+  href: string;
+  label: InlinePart[];
+}
+
 /** One piece of a block's inline content, in order. */
-export type InlinePart = InlineMarkdown | InlineRun;
+export type InlinePart = InlineLink | InlineMarkdown | InlineRun;
 
 const BACKTICK_RUN = /`+/gu;
 
@@ -250,14 +269,15 @@ const groupRuns = (
  */
 const renderRuns = (
   runs: InlineRun[],
-  escape: (text: string) => string
+  escape: (text: string) => string,
+  code: (text: string) => string
 ): string =>
   groupRuns(runs, ["bold", "italic", "strike"])
     .map(({ marks, runs: shared }) => {
       const inner = groupRuns(shared)
         .map((same) =>
           betweenEdges(same.runs.map((run) => run.text).join(""), (body) =>
-            same.marks.code ? codeSpan(body) : escape(body)
+            same.marks.code ? code(body) : escape(body)
           )
         )
         .join("");
@@ -276,39 +296,6 @@ const renderRuns = (
       });
     })
     .join("");
-
-/** Inline parts as Markdown, each stretch of runs through {@link renderRuns}. */
-const renderParts = (
-  parts: InlinePart[],
-  escape: (text: string) => string
-): string => {
-  let out = "";
-  let runs: InlineRun[] = [];
-  for (const part of parts) {
-    if ("markdown" in part) {
-      out += renderRuns(runs, escape) + part.markdown;
-      runs = [];
-    } else {
-      runs.push(part);
-    }
-  }
-  return out + renderRuns(runs, escape);
-};
-
-/** A block's inline content as Markdown. */
-export const renderInline = (parts: InlinePart[]): string =>
-  renderParts(parts, escapeProse);
-
-const asTyped = (text: string): string => text;
-
-/**
- * A block's inline content as MDX source, for a source whose site author
- * opted in to reading its text that way: marks still become delimiters and
- * code stays a code span, but the text goes in as typed, so a component, an
- * expression, or Markdown written in the CMS renders.
- */
-export const renderInlineMdx = (parts: InlinePart[]): string =>
-  renderParts(parts, asTyped);
 
 // A destination with whitespace, a control character, or parentheses ends
 // early in `[label](…)`; CommonMark's pointy-bracket form carries it intact.
@@ -335,28 +322,139 @@ export const destination = (url: string): string => {
   return UNSAFE_DESTINATION.test(escaped) ? `<${escaped}>` : escaped;
 };
 
+/** How a block writes its inline text: its prose, a link's label, and code. */
+interface InlineStyle {
+  code: (text: string) => string;
+  label: (text: string) => string;
+  prose: (text: string) => string;
+}
+
 /**
- * A Markdown link over inline parts, or the parts alone when the target is
- * missing — or unsafe: CMS content is the editor's, not the site author's, so
- * a destination that isn't a web, mail, or relative address (`javascript:`,
+ * Inline parts as Markdown, each stretch of runs through {@link renderRuns}.
+ * A link's label is inline parts too, written with the style's `label`
+ * escape rather than its `prose` one.
+ */
+const renderParts = (
+  parts: InlinePart[],
+  style: InlineStyle,
+  escape = style.prose
+): string => {
+  let out = "";
+  let runs: InlineRun[] = [];
+  for (const part of parts) {
+    if ("text" in part) {
+      runs.push(part);
+    } else {
+      out += renderRuns(runs, escape, style.code);
+      runs = [];
+      out +=
+        "markdown" in part
+          ? part.markdown
+          : `[${renderParts(part.label, style, style.label)}](${destination(part.href)})`;
+    }
+  }
+  return out + renderRuns(runs, escape, style.code);
+};
+
+// A label escapes a bare URL too: GFM autolinks nothing inside a link, so its
+// specials would read as syntax.
+const PROSE: InlineStyle = {
+  code: codeSpan,
+  label: escapeMarkdownText,
+  prose: escapeProse,
+};
+
+const MDX: InlineStyle = { code: codeSpan, label: asTyped, prose: asTyped };
+
+/** A block's inline content as Markdown. */
+export const renderInline = (parts: InlinePart[]): string =>
+  renderParts(parts, PROSE);
+
+/**
+ * A block's inline content as MDX source, for a source whose site author
+ * opted in to reading its text that way: marks still become delimiters and
+ * code stays a code span, but the text goes in as typed, a link's label
+ * included, so a component, an expression, or Markdown written in the CMS
+ * renders.
+ */
+export const renderInlineMdx = (parts: InlinePart[]): string =>
+  renderParts(parts, MDX);
+
+/**
+ * A link over inline parts, or the parts alone when the target is missing —
+ * or unsafe: CMS content is the editor's, not the site author's, so a
+ * destination that isn't a web, mail, or relative address (`javascript:`,
  * `data:`) never becomes a clickable link on the docs site (see
  * `safe-links.ts`). The parts stay parts then, so their runs merge with their
- * neighbors'. A label escapes a bare URL too: GFM autolinks nothing inside a
- * link, so its specials would read as syntax — unless `mdx` reads the label
- * as MDX source, like {@link renderInlineMdx}.
+ * neighbors'.
  */
-export const linkParts = (
-  parts: InlinePart[],
-  href?: string,
-  mdx = false
-): InlinePart[] =>
-  href && isSafeHref(href)
-    ? [
-        {
-          markdown: `[${renderParts(parts, mdx ? asTyped : escapeMarkdownText)}](${destination(href)})`,
-        },
-      ]
-    : parts;
+export const linkParts = (parts: InlinePart[], href?: string): InlinePart[] =>
+  href && isSafeHref(href) ? [{ href, label: parts }] : parts;
+
+const CELL_BREAK = /[\r\n]+/gu;
+const CELL_PIPE = /\|/gu;
+
+// An odd run of backslashes right before a pipe.
+const UNPAIRED_BACKSLASH_PIPE = /(?<!\\)(?:\\\\)*\\\|/u;
+
+// Every ASCII punctuation character but `|`, which a cell escapes last.
+const PUNCTUATION = /[!-/:-@[-`{}~]/gu;
+
+// GFM splits a row at every `|` a backslash doesn't escape, before it reads
+// the cells' inline syntax, so a cell escapes its pipes wherever they sit:
+// prose, a link's label and destination, and a code span, where `\|` reads
+// as the pipe alone. Two places can't take that backslash. A bare URL would
+// carry it into the href, so a pipe there is percent-encoded, as an
+// autolink's href has it anyway. And ahead of a pipe a code span renders one
+// backslash fewer than its source holds, while the row stays whole only when
+// that source run is odd — so code with an odd run of its own
+// (`grep 'a\|b'`) fits no code span, and is a `<code>` element instead. The
+// element's text is prose to the compiler, which would curl its quotes, join
+// its dashes, and read its Markdown, so every punctuation character in it is
+// escaped. A URL in it still autolinks.
+const CELL: InlineStyle = {
+  code: (text) =>
+    UNPAIRED_BACKSLASH_PIPE.test(text)
+      ? `<code>${text.replaceAll(PUNCTUATION, String.raw`\$&`)}</code>`
+      : codeSpan(text),
+  label: escapeMarkdownText,
+  prose: proseEscape((url) => url.replaceAll(CELL_PIPE, "%7C")),
+};
+
+/**
+ * A GFM table cell from the inline parts of each block in it. A cell is one
+ * line of a row, so its blocks join with a space and a line break inside one
+ * becomes a space; each is still a block, guarded like a paragraph (two
+ * struck runs in one meet as `~~~~` here too).
+ */
+export const tableCell = (blocks: InlinePart[][]): string =>
+  blocks
+    .map((parts) => guardBlockStart(renderParts(parts, CELL)))
+    .join(" ")
+    .replaceAll(CELL_BREAK, " ")
+    .replaceAll(CELL_PIPE, String.raw`\|`);
+
+const tableRow = (cells: string[]): string => `| ${cells.join(" | ")} |`;
+
+/**
+ * A GFM table from rows of {@link tableCell}s. GFM always has a header row:
+ * the first row, or an empty one for a table without a header, whose rows
+ * are then all body rows (Blume's renderer drops an empty header row, see
+ * `markdown/table-wrap.ts`). The header is as wide as the widest row, because
+ * GFM drops the cells a row has beyond it. A table with no cells is nothing.
+ */
+export const table = (rows: string[][], header = true): string => {
+  const width = Math.max(0, ...rows.map((cells) => cells.length));
+  if (width === 0) {
+    return "";
+  }
+  const [head = [], ...body] = header ? rows : [[], ...rows];
+  return [
+    tableRow(Array.from({ length: width }, (_, column) => head[column] ?? "")),
+    tableRow(Array.from({ length: width }, () => "---")),
+    ...body.map((cells) => tableRow(cells)),
+  ].join("\n");
+};
 
 /** The ATX prefix for a heading level, clamped to Markdown's six. */
 export const headingPrefix = (level: number): string =>
