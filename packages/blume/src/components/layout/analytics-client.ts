@@ -2,8 +2,8 @@
  * Send a custom analytics event to every analytics platform configured in
  * `blume.config.ts`. Mirrors the adapters `Analytics.astro` wires
  * (`src/analytics/*`): each one with a custom-event API is called through the
- * global its snippet defines (Cloudflare, Clearbit, and Clics have none to
- * forward to), and the `blume:track` CustomEvent fires unconditionally so a
+ * global its snippet defines (Cloudflare, Clearbit, Clics, and Notra have none
+ * to forward to), and the `blume:track` CustomEvent fires unconditionally so a
  * project can bridge the event to anything else — a `script()` adapter, say.
  * Every call no-ops cleanly when a provider isn't present — for example
  * during `blume dev`, where `Analytics.astro` injects nothing — and a provider
