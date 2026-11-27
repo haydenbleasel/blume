@@ -112,6 +112,7 @@ describe(toPackageCommands, () => {
       npm: "npm install react react-dom",
       nub: "nub add react react-dom",
       pnpm: "pnpm add react react-dom",
+      vlt: "vlt install react react-dom",
       yarn: "yarn add react react-dom",
     });
   });
@@ -123,6 +124,7 @@ describe(toPackageCommands, () => {
       npm: "npm install -D typescript",
       nub: "nub add -D typescript",
       pnpm: "pnpm add -D typescript",
+      vlt: "vlt install -D typescript",
       yarn: "yarn add -D typescript",
     });
   });
@@ -144,6 +146,7 @@ describe(toPackageCommands, () => {
       npm: "npm install -D -E @biomejs/biome",
       nub: "nub add -D -E @biomejs/biome",
       pnpm: "pnpm add -D -E @biomejs/biome",
+      vlt: "vlt install -D -E @biomejs/biome",
       yarn: "yarn add -D -E @biomejs/biome",
     });
     expect(toPackageCommands("yarn add --exact react").npm).toBe(
@@ -158,6 +161,7 @@ describe(toPackageCommands, () => {
       npm: "npm install",
       nub: "nub install",
       pnpm: "pnpm install",
+      vlt: "vlt install",
       yarn: "yarn install",
     });
   });
@@ -171,6 +175,7 @@ describe(toPackageCommands, () => {
       npm: "npm install -g typescript",
       nub: "nub add -g typescript",
       pnpm: "pnpm add -g typescript",
+      vlt: "vlt install -g typescript",
       yarn: "npm install -g typescript",
     });
     expect(toPackageCommands("yarn global remove typescript").yarn).toBe(
@@ -193,6 +198,7 @@ describe(toPackageCommands, () => {
       npm: "npx astro add react",
       nub: "nubx astro add react",
       pnpm: "pnpm dlx astro add react",
+      vlt: "vlx astro add react",
       yarn: "yarn dlx astro add react",
     });
   });
@@ -204,12 +210,13 @@ describe(toPackageCommands, () => {
       npm: "npm create astro@latest",
       nub: "nub create astro@latest",
       pnpm: "pnpm create astro@latest",
+      vlt: "vlt create astro@latest",
       yarn: "yarn create astro@latest",
     });
   });
 
-  it("puts a `--` before initializer flags on npm only", () => {
-    // npm reads flags after the initializer as its own config; the others
+  it("puts a `--` before initializer flags on npm and vlt only", () => {
+    // npm and vlt read flags after the initializer as their own; the others
     // forward them as written and would pass a `--` through to the
     // initializer, which then ignores the flags after it.
     const fromNpm = toPackageCommands(
@@ -221,11 +228,18 @@ describe(toPackageCommands, () => {
       npm: "npm create vite@latest my-app -- --template react-ts",
       nub: "nub create vite@latest my-app --template react-ts",
       pnpm: "pnpm create vite@latest my-app --template react-ts",
+      vlt: "vlt create vite@latest my-app -- --template react-ts",
       yarn: "yarn create vite@latest my-app --template react-ts",
     });
     expect(
       toPackageCommands("pnpm create vite@latest my-app --template react-ts")
     ).toStrictEqual(fromNpm);
+  });
+
+  it("maps a create without an initializer to vlt init", () => {
+    // `vlt create` requires an initializer; `vlt init` writes a package.json.
+    expect(toPackageCommands("npm init").vlt).toBe("vlt init");
+    expect(toPackageCommands("npm init -y").vlt).toBe("vlt init -y");
   });
 
   it("leaves create flags before the initializer to the manager", () => {
@@ -240,6 +254,27 @@ describe(toPackageCommands, () => {
     ).toBe("pnpm create foo@latest --save-dev --exact");
   });
 
+  it("puts a `--` before a binary's flags on vlx only", () => {
+    // vlt reads a flag anywhere in the command as its own option; the other
+    // runners would pass a `--` through to the binary.
+    const fromNpx = toPackageCommands("npx prettier . --write");
+    expect(fromNpx).toStrictEqual({
+      aube: "aube dlx prettier . --write",
+      bun: "bunx prettier . --write",
+      npm: "npx prettier . --write",
+      nub: "nubx prettier . --write",
+      pnpm: "pnpm dlx prettier . --write",
+      vlt: "vlx prettier . -- --write",
+      yarn: "yarn dlx prettier . --write",
+    });
+    expect(toPackageCommands("vlx prettier . -- --write")).toStrictEqual(
+      fromNpx
+    );
+    expect(toPackageCommands("vlt exec prettier . -- --write")).toStrictEqual(
+      fromNpx
+    );
+  });
+
   it("routes global installs through each manager's global command", () => {
     expect(toPackageCommands("npm i -g vercel")).toStrictEqual({
       aube: "aube add -g vercel",
@@ -247,6 +282,7 @@ describe(toPackageCommands, () => {
       npm: "npm install -g vercel",
       nub: "nub add -g vercel",
       pnpm: "pnpm add -g vercel",
+      vlt: "vlt install -g vercel",
       yarn: "npm install -g vercel",
     });
   });
@@ -258,6 +294,7 @@ describe(toPackageCommands, () => {
       npm: "npm uninstall lodash",
       nub: "nub remove lodash",
       pnpm: "pnpm remove lodash",
+      vlt: "vlt uninstall lodash",
       yarn: "yarn remove lodash",
     });
   });
@@ -266,7 +303,7 @@ describe(toPackageCommands, () => {
     expect(toPackageCommands("npm run build").yarn).toBe("yarn run build");
   });
 
-  it("forwards script arguments with a single `--` on npm only", () => {
+  it("forwards script arguments with a single `--` on npm and vlt only", () => {
     // pnpm passes a literal `--` through to the script, and npm would pass
     // the second of two.
     const fromNpm = toPackageCommands("npm run dev -- --port 3000");
@@ -276,6 +313,7 @@ describe(toPackageCommands, () => {
       npm: "npm run dev -- --port 3000",
       nub: "nub run dev --port 3000",
       pnpm: "pnpm run dev --port 3000",
+      vlt: "vlt run dev -- --port 3000",
       yarn: "yarn run dev --port 3000",
     });
     expect(toPackageCommands("pnpm run dev --port 3000")).toStrictEqual(
@@ -293,6 +331,7 @@ describe(toPackageCommands, () => {
       npm: "npm uninstall -g eslint",
       nub: "nub remove -g eslint",
       pnpm: "pnpm remove --global eslint",
+      vlt: "vlt uninstall -g eslint",
       yarn: "npm uninstall -g eslint",
     });
   });
@@ -306,6 +345,7 @@ describe(toPackageCommands, () => {
       npm: "npm ci",
       nub: "nub install --frozen-lockfile",
       pnpm: "pnpm install --frozen-lockfile",
+      vlt: "vlt ci",
       yarn: "yarn install --immutable",
     });
   });
@@ -1748,6 +1788,8 @@ describe("toPackageCommands (verb and flag normalization)", () => {
     expect(toPackageCommands("nubx astro").pnpm).toBe("pnpm dlx astro");
     expect(toPackageCommands("nub exec astro").nub).toBe("nubx astro");
     expect(toPackageCommands("aube dlx astro").bun).toBe("bunx astro");
+    expect(toPackageCommands("vlx astro").pnpm).toBe("pnpm dlx astro");
+    expect(toPackageCommands("vlt exec astro").vlt).toBe("vlx astro");
   });
 
   it("accepts nub and aube as explicit input managers", () => {
@@ -1755,6 +1797,15 @@ describe("toPackageCommands (verb and flag normalization)", () => {
       "npm install -D typescript"
     );
     expect(toPackageCommands("aube remove lodash").yarn).toBe(
+      "yarn remove lodash"
+    );
+  });
+
+  it("accepts vlt as an explicit input manager", () => {
+    expect(toPackageCommands("vlt install -D typescript").pnpm).toBe(
+      "pnpm add -D typescript"
+    );
+    expect(toPackageCommands("vlt uninstall lodash").yarn).toBe(
       "yarn remove lodash"
     );
   });
