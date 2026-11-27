@@ -28,6 +28,8 @@ import {
   linkParts,
   markdownDocument,
   renderInline,
+  table,
+  tableCell,
   unsupported,
   writesMdx,
 } from "../src/core/sources/lower.ts";
@@ -188,6 +190,27 @@ describe("lowering primitives", () => {
     expect(unsupported("thing", true)).toBe("{/* unsupported thing */}");
     expect(joinBlocks(["a", "", "b"])).toBe("a\n\nb");
     expect(markdownDocument(["a"])).toBe("a\n");
+  });
+
+  it("writes a table cell on one line and a header as wide as the table", () => {
+    // A cell's blocks join with a space, each guarded like a paragraph: two
+    // struck runs still share one strikethrough.
+    expect(
+      tableCell([
+        [
+          { marks: { strike: true }, text: "a" },
+          { marks: { italic: true, strike: true }, text: "b" },
+        ],
+        [{ marks: {}, text: "c|d\ne" }],
+      ])
+    ).toBe(String.raw`~~a*b*~~ c\|d e`);
+    expect(tableCell([])).toBe("");
+    expect(table([["a", "b"], ["c"]])).toBe("| a | b |\n| --- | --- |\n| c |");
+    expect(table([["a"], ["b", "c"]], false)).toBe(
+      "|  |  |\n| --- | --- |\n| a |\n| b | c |"
+    );
+    expect(table([])).toBe("");
+    expect(table([[]], false)).toBe("");
   });
 
   it("makes media URLs absolute", () => {

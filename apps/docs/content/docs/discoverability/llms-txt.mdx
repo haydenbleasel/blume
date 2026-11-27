@@ -13,8 +13,8 @@ agents: {
 
 While enabled, `blume build` writes two files to the root of your site:
 
-- **`/llms.txt`** — a compact index: your site title and description, then a linked list of every page with its summary (its meta description: `seo.description` when the page sets one, else `description`), organized into sections that mirror your sidebar — folders and groups become headings, so an agent sees the docs' structure, not one flat blob.
-- **`/llms-full.txt`** — the entire corpus: each page's full Markdown body, with its source URL, in one file.
+- **`/llms.txt`** — a compact index: your site title and description, then a linked list of every page with its summary (its meta description: `seo.description` when the page sets one, else `description`), organized into sections that mirror your sidebar — folders and groups become headings, so an agent sees the docs' structure, not one flat blob. The sections follow the order of your header's [tabs](/docs/content/navigation), so the docs come before a long changelog when the tabs put them first, and [custom pages](/docs/advanced/custom-pages#custom-pages-for-agents) are listed under the tab whose section they sit in (or under **Pages**).
+- **`/llms-full.txt`** — the entire corpus: each page's full Markdown body, with its source URL, in one file, in the order `llms.txt` lists them.
 
 Drafts, pages hidden from the sidebar (`sidebar.hidden`, or the top-level `hidden` shorthand), and `noindex` pages are excluded — except generated API reference pages, whose place in both files is set by `openapi` below rather than by `noindex`. Set [`deployment.site`](/docs/deployment) so the links and source URLs resolve to absolute addresses.
 

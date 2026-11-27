@@ -106,10 +106,35 @@ const PRIMITIVES = new Set([
 ]);
 
 /**
+ * A value written as text, as the JSON `type` it stands for: a page writes
+ * `placeholder="42"` and `default="true"` as strings whatever the field's
+ * type, and an integer field's sample should send `42`. Text that isn't
+ * such a value stays as written.
+ */
+const isText = (value: FieldValue): value is string =>
+  typeof value === "string";
+
+const typedValue = (value: FieldValue, type: string): FieldValue => {
+  if (!isText(value)) {
+    return value;
+  }
+  if (type === "boolean" && (value === "true" || value === "false")) {
+    return value === "true";
+  }
+  const number = Number(value);
+  const numeric = value.trim() !== "" && Number.isFinite(number);
+  return (type === "number" && numeric) ||
+    (type === "integer" && numeric && Number.isInteger(number))
+    ? number
+    : value;
+};
+
+/**
  * A field's JSON schema from its `type`: `string[]` an array of strings, a
  * field with nested fields an object with those properties, and anything
  * that isn't a JSON type (`enum<string>`, `Date`) a string, which is what it
- * goes over the wire as. A default and placeholder carry over, the
+ * goes over the wire as. A default and placeholder carry over, typed when
+ * they spell a value of the field's type (see {@link typedValue}), the
  * placeholder as the example the samples show.
  */
 export const fieldSchema = (field: EndpointField): SchemaLike => {
@@ -141,10 +166,10 @@ export const fieldSchema = (field: EndpointField): SchemaLike => {
     schema.required = required;
   }
   if (field.default !== undefined) {
-    schema.default = field.default;
+    schema.default = typedValue(field.default, type);
   }
   if (field.placeholder) {
-    schema.example = field.placeholder;
+    schema.example = typedValue(field.placeholder, type);
   }
   if (field.deprecated) {
     schema.deprecated = true;

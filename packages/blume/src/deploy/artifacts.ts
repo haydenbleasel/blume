@@ -5,6 +5,8 @@ import { dirname, join, resolve } from "pathe";
 
 import { buildAgentReadability } from "../ai/agent-readability.ts";
 import { advertisedConfig, servesMcp } from "../ai/agent-surface.ts";
+import { agentPages, readBuiltPages } from "../ai/built-pages.ts";
+import type { BuiltAgentPage } from "../ai/built-pages.ts";
 import { buildHomeLinkHeader } from "../ai/link-headers.ts";
 import { buildLlmsFiles } from "../ai/llms.ts";
 import { markdownRoutePaths } from "../ai/markdown.ts";
@@ -22,6 +24,7 @@ import {
 import type { SkillArtifact } from "../ai/skills.ts";
 import { normalizeBasePath } from "../core/base-path.ts";
 import { discoverPagesSync } from "../core/custom-pages.ts";
+import { MIRROR_EXTENSIONS } from "../core/markdown-mirrors.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
 import type { ResolvedConfig } from "../core/schema.ts";
 import { buildNarration } from "../narration/build.ts";
@@ -366,7 +369,10 @@ const emitWellKnownFiles = async (
 const publishLlmsFiles = async (
   project: BlumeProject,
   distDir: string,
-  skills: readonly SkillArtifact[],
+  {
+    pages,
+    skills,
+  }: { pages: readonly BuiltAgentPage[]; skills: readonly SkillArtifact[] },
   logger: ArtifactLogger
 ): Promise<void> => {
   const indexPath = join(distDir, "llms.txt");
@@ -376,7 +382,7 @@ const publishLlmsFiles = async (
   if (!(writeIndex || writeFull)) {
     return;
   }
-  const { index, full } = await buildLlmsFiles(project, { skills });
+  const { index, full } = await buildLlmsFiles(project, { pages, skills });
   const writes: Promise<void>[] = [];
   if (writeIndex) {
     writes.push(writeFile(indexPath, index, "utf-8"));
@@ -392,6 +398,40 @@ const publishLlmsFiles = async (
     ]
       .filter(Boolean)
       .join(" and ")}`
+  );
+};
+
+/**
+ * Write the Markdown copies of the custom pages that join the agent surfaces
+ * (see `ai/built-pages.ts`) beside their HTML — `/<route>.md` and `.mdx`, the
+ * names a content page's copies are served under — so the `.md` URL an agent
+ * appends works on every page, and the negotiation surfaces can serve it for
+ * `Accept: text/markdown`. A file already there (one the user ships in
+ * `public/`) wins.
+ */
+const emitBuiltPageMirrors = async (
+  distDir: string,
+  pages: readonly BuiltAgentPage[],
+  logger: ArtifactLogger
+): Promise<void> => {
+  const targets = pages.flatMap((page) =>
+    MIRROR_EXTENSIONS.map((extension) => ({
+      file: join(distDir, `${page.route.slice(1)}${extension}`),
+      text: `${page.document.markdown}\n`,
+    }))
+  );
+  const missing = targets.filter((target) => !existsSync(target.file));
+  if (missing.length === 0) {
+    return;
+  }
+  await Promise.all(
+    missing.map(async (target) => {
+      await mkdir(dirname(target.file), { recursive: true });
+      await writeFile(target.file, target.text, "utf-8");
+    })
+  );
+  logger.info(
+    `Wrote Markdown copies of ${pages.length} custom page(s) for agents`
   );
 };
 
@@ -452,11 +492,16 @@ export const publishBuildArtifacts = async (
       skills: skills.length > 0 || userSkillsIndex,
     }),
   };
+  // The custom pages, read back from the HTML Astro just wrote: their
+  // Markdown joins the mirrors and llms files, and their dates the sitemap.
+  const builtPages = await readBuiltPages(project, distDir);
+  const pages = agentPages(builtPages);
+  await emitBuiltPageMirrors(distDir, pages, logger);
   if (project.config.agents.llmsTxt.enabled) {
-    await publishLlmsFiles(advertised, distDir, skills, logger);
+    await publishLlmsFiles(advertised, distDir, { pages, skills }, logger);
   }
 
-  const sitemapFiles = buildSitemapFiles(project);
+  const sitemapFiles = buildSitemapFiles(project, builtPages);
   if (sitemapFiles && !existsSync(join(distDir, "sitemap.xml"))) {
     await Promise.all(
       sitemapFiles.map((file) =>

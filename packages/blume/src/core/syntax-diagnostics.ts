@@ -127,6 +127,14 @@ const MDX_COMMENT = /\{\s*\/\*[\s\S]*?\*\/\s*\}/gu;
 const ANGLE_DESTINATION =
   /(?<=\]\([\t ]*|^ {0,3}\[[^\]\n]+\]:[\t ]*)<[^<>\n]*>/gmu;
 
+// Inline code, or `.mdx` inline math: an unescaped run of two or more `$` (one
+// is plain text) up to the next run of the same length. Whichever opens first
+// holds the other as text, and neither reads `{…}` as an expression.
+const INLINE_CODE_OR_MATH = new RegExp(
+  String.raw`${INLINE_CODE.source}|${UNESCAPED}(?<!\$)(?<run>\${2,})(?!\$).*?(?<!\$)\k<run>(?!\$)`,
+  "gu"
+);
+
 /** `text` with every character but line breaks turned into a space. */
 const blank = (text: string): string => text.replaceAll(/[^\n]/gu, " ");
 
@@ -166,20 +174,22 @@ const maskMarkdown = (text: string): string => {
 };
 
 /**
- * An `.mdx` body with fenced code, inline code, comments, and angle-bracket
- * link destinations blanked, line by line rather than parsed: the problems
- * this looks for are what keeps MDX from parsing a page. MDX has no indented
- * code blocks.
+ * An `.mdx` body with code and math (fenced and inline), comments, and
+ * angle-bracket link destinations blanked, line by line rather than parsed:
+ * the problems this looks for are what keeps MDX from parsing a page. MDX has
+ * no indented code blocks.
  */
 const maskMdx = (text: string): string => {
   let fence: FenceState = null;
   return text
     .split("\n")
     .map((line) => {
-      const next = nextFenceState(line, fence);
+      const next = nextFenceState(line, fence, true);
       const inFence = fence !== null || next !== null;
       fence = next;
-      return inFence ? blank(line) : line.replaceAll(INLINE_CODE, blank);
+      return inFence
+        ? blank(line)
+        : line.replaceAll(INLINE_CODE_OR_MATH, blank);
     })
     .join("\n")
     .replaceAll(MDX_COMMENT, blank)

@@ -9,6 +9,7 @@ import {
   API_CATALOG_TYPE,
   hasApiCatalog,
 } from "../../ai/api-catalog.ts";
+import { builtMirrorRoutes } from "../../ai/built-pages.ts";
 import { buildHomeLinkHeader } from "../../ai/link-headers.ts";
 import {
   agentMarkdown,
@@ -139,7 +140,13 @@ export const emitVercelNegotiation = async (
     return;
   }
   const base = deploymentBase(project);
-  const routePaths = markdownRoutePaths(project);
+  const builtDir = staticDir(context, base);
+  // The content routes, plus the custom pages the build wrote a Markdown
+  // copy of (see `ai/built-pages.ts`).
+  const routePaths = [
+    ...markdownRoutePaths(project),
+    ...builtMirrorRoutes(project, builtDir),
+  ];
   // Keyed by the file's path in `static/`, under the base's directory.
   const overrides: Record<string, string> = {};
   if (hasApiCatalog(config)) {
@@ -158,7 +165,6 @@ export const emitVercelNegotiation = async (
   // The Markdown and JSON 404 routes point at the prerendered twins; only
   // wire each when the build actually emitted it (a project that owns `/404`
   // gets none).
-  const builtDir = staticDir(context, base);
   const injected = injectNegotiationRoutes(
     await readFile(configPath, "utf-8"),
     routePaths,

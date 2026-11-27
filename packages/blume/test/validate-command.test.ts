@@ -104,6 +104,67 @@ describe("blume validate --strict", () => {
   });
 });
 
+/** The fragments a validate report says no anchor matches, sorted. */
+const broken = (stderr: string): string[] =>
+  [...stderr.matchAll(/matches #(?<fragment>[\w-]+)/gu)]
+    .map((match) => match.groups?.fragment ?? "")
+    .toSorted();
+
+describe("blume validate — component anchors", () => {
+  const page = [
+    "---",
+    "title: Home",
+    "---",
+    "",
+    "[a](#slow-installs) [b](#more-details) [c](#windows) [d](#nope)",
+    "",
+    '<AccordionItem title="Slow installs">x</AccordionItem>',
+    "",
+    '<Expandable title="More details">y</Expandable>',
+    "",
+    '<Tabs><Tab title="Windows">z</Tab></Tabs>',
+    "",
+  ].join("\n");
+
+  it("accepts links to what built-ins render, and not to the project's own", async () => {
+    const [plain, own, unplannable] = await Promise.all([
+      fixture({ "docs/index.mdx": page }).then((root) => validate(root)),
+      fixture({
+        "components.ts": [
+          'import { defineComponents } from "blume";',
+          'import Item from "./components/Item.astro";',
+          "",
+          "export default defineComponents({ mdx: { AccordionItem: Item } });",
+          "",
+        ].join("\n"),
+        "components/Item.astro": "<details><slot /></details>\n",
+        "docs/index.mdx": page,
+        "islands/Tab.tsx":
+          "export default function Tab() {\n  return null;\n}\n",
+      }).then((root) => validate(root)),
+      // Which built-ins a components.ts that can't be planned replaces isn't
+      // known, so no component anchor counts.
+      fixture({
+        "components.ts": "export default 42;\n",
+        "docs/index.mdx": page,
+      }).then((root) => validate(root)),
+    ]);
+    expect(broken(plain.stderr)).toStrictEqual(["nope"]);
+    // The overridden accordion item and the island tab render what they like.
+    expect(broken(own.stderr)).toStrictEqual([
+      "nope",
+      "slow-installs",
+      "windows",
+    ]);
+    expect(broken(unplannable.stderr)).toStrictEqual([
+      "more-details",
+      "nope",
+      "slow-installs",
+      "windows",
+    ]);
+  });
+});
+
 describe("blume validate — routes beyond the content graph", () => {
   it("accepts links to custom .astro pages", async () => {
     // `pages/index.astro` serves `/`; a docs link to it must not fail CI as

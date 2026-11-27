@@ -9,8 +9,12 @@
  * block — or inside a ````-delimited block (the wrapper `codeBlockLines`
  * emits around code that contains its own ``` fence) — is content, not a
  * toggle.
+ *
+ * MDX scanners can also ask for block math, which MDX parses by the same
+ * rules: two or more `$` open it, and its content is never Markdown or MDX.
  */
 const CODE_FENCE = /^(?<run>`{3,}|~{3,})/u;
+const CODE_OR_MATH_FENCE = /^(?<run>`{3,}|~{3,}|\${2,})/u;
 
 // One block-quote marker. A fence inside a quote (`> ```ts`) is written after
 // one marker per level of nesting, and so is every line of its code.
@@ -21,10 +25,18 @@ const QUOTE_MARKER = /^[ \t]*>/u;
  * it opened at, or null outside one.
  */
 export type FenceState = {
-  delimiter: "`" | "~";
+  delimiter: "`" | "~" | "$";
   length: number;
   quotes: number;
 } | null;
+
+/** The character a fence's run is made of. */
+const delimiterOf = (run: string): NonNullable<FenceState>["delimiter"] => {
+  if (run.startsWith("`")) {
+    return "`";
+  }
+  return run.startsWith("$") ? "$" : "~";
+};
 
 /** Strip up to `max` leading block-quote markers from `line`. */
 const stripQuotes = (line: string, max: number) => {
@@ -47,29 +59,36 @@ const stripQuotes = (line: string, max: number) => {
  * long closes it (CommonMark), and any other line leaves the state untouched.
  * A fence inside block quotes is read past the quote markers it opened under,
  * and a line without them ends the quote, and the fence with it: code takes
- * no lazy continuation lines (CommonMark).
+ * no lazy continuation lines (CommonMark). With `math`, a `$$` block math
+ * fence counts too.
  */
-export const nextFenceState = (line: string, fence: FenceState): FenceState => {
+export const nextFenceState = (
+  line: string,
+  fence: FenceState,
+  math = false
+): FenceState => {
   const { depth, rest } = stripQuotes(
     line,
     fence === null ? Number.POSITIVE_INFINITY : fence.quotes
   );
   if (fence !== null && depth < fence.quotes) {
-    return nextFenceState(line, null);
+    return nextFenceState(line, null, math);
   }
   const trimmed = rest.trimStart();
-  const run = trimmed.match(CODE_FENCE)?.groups?.run;
+  const run = trimmed.match(math ? CODE_OR_MATH_FENCE : CODE_FENCE)?.groups
+    ?.run;
   if (run === undefined) {
     return fence;
   }
   const info = trimmed.slice(run.length);
-  const delimiter = run.startsWith("`") ? ("`" as const) : ("~" as const);
+  const delimiter = delimiterOf(run);
   if (fence === null) {
     // A backtick fence's info string cannot itself contain a backtick
-    // (CommonMark) — a line-leading ```inline``` span is a paragraph, and
-    // opening a phantom fence on it would swallow every heading and link
-    // after it. Tilde fences carry no such rule.
-    if (delimiter === "`" && info.includes("`")) {
+    // (CommonMark), nor a math fence's a `$` — a line-leading ```inline```
+    // span or `$$x$$` is a paragraph, and opening a phantom fence on it would
+    // swallow every heading and link after it. Tilde fences carry no such
+    // rule.
+    if (delimiter !== "~" && info.includes(delimiter)) {
       return fence;
     }
     return { delimiter, length: run.length, quotes: depth };

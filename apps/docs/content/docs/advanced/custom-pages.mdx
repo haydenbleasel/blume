@@ -234,7 +234,26 @@ The header a custom page gets is the same one the docs pages get, so the chrome 
 
 The language switcher is the exception. A custom page is served only at its own route, so Blume can't know which other locales have a version of it, and the header shows no switcher unless you pass one: `localeSwitch` takes an entry per locale — `{ code, label, dir, href, current, untranslated }` — pointing at the page you built for each language.
 
-The [agent-discovery head links](/docs/discoverability/agent-discovery#discovery-link-header) come along too: the layout reads the resolved config, so a custom page carries the same `describedby`, `ai-catalog`, and `ard` links the docs pages do without passing a prop. The homepage also advertises its `/index.md` Markdown mirror as a `text/markdown` alternate, since that mirror always exists; other custom pages have none, so none is advertised. Pass `discovery={null}` to drop the links from one page.
+The [agent-discovery head links](/docs/discoverability/agent-discovery#discovery-link-header) come along too: the layout reads the resolved config, so a custom page carries the same `describedby`, `ai-catalog`, and `ard` links the docs pages do without passing a prop. Pass `discovery={null}` to drop the links from one page.
+
+### Custom pages for agents
+
+A custom page reaches agents the way a content page does. After Astro writes the HTML, the build reads each static custom page back and converts what it renders inside `<main>` — the slot you fill — to Markdown: headings, prose, links, lists, tables, images with alt text, and code blocks with their language. That Markdown is served at the page's `.md` and `.mdx` URLs and answers `Accept: text/markdown` [like a content page's](/docs/discoverability/markdown#content-negotiation), the page is listed in [`llms.txt`](/docs/discoverability/llms-txt) under the header tab whose section it sits in, its Markdown is in `llms-full.txt`, and the sitemap dates it from the `dateModified` in its JSON-LD (see `lastModified` below). The layout advertises the `.md` copy as a `text/markdown` alternate in the head. The homepage keeps its own mirror, the `llms.txt` index.
+
+Elements that only CSS spaces apart, a row of spans or a card's title and description inside one link, are separated by a space, since the built HTML has no whitespace between tags; text next to an element, and anything inside `pre` or `code`, keeps its spacing exactly. What a reader can't use as text stays out: scripts, styles, inline SVG, form controls and buttons, navigation, decorative images (`alt=""`), and anything hidden from readers (`hidden`, `aria-hidden="true"`, `inert`). Mark any other element web-only to leave it out too, a call to action or an interactive demo, with the attribute [`<Visibility for="web">`](/docs/content/components#visibility) renders. The same attribute set to `agents` keeps an element even when it is hidden on the page:
+
+```astro pages/pricing.astro lineNumbers
+<section data-blume-visibility="web">
+  <SignUpForm />
+</section>
+<p data-blume-visibility="agents" hidden>
+  Prices are in US dollars and exclude tax.
+</p>
+```
+
+Pass `ai={{ exclude: true }}` to keep a whole page off the agent surfaces, as front matter `ai.exclude` does for a content page. A `noindex` page and a dynamic `[param]` route are left out on their own. A file you ship in `public/` at a page's `.md` path wins over the generated one.
+
+The page's line in `llms.txt` takes its `<title>` without a trailing segment that names the site: "Pricing — Acme" is listed as "Pricing" on a site titled Acme, and "Acme for Teams — Plans and pricing" stays whole.
 
 Pass `transparentHeader` to start the header see-through with its chrome in white, so it can sit over a dark hero at the top of the page; it becomes the usual frosted bar as soon as the page scrolls, and the search dialog keeps the page's own colors throughout. The hero has to run under the header for this to show — pull it up by the header's height (`-mt-16`) and pad its top to compensate.
 
@@ -255,7 +274,24 @@ Passing `siteUrl` (and `ogEnabled`) derives the page's `canonical` and a generat
 
 Only this page changes — every other route keeps its generated card — so it's how you give the home page alone a bespoke share image. The generated card declares its size and alt text to crawlers on its own; for your own `ogImage`, pass `ogImageAlt` and `ogImageSize` alongside so the share card gets the same treatment.
 
-The page also emits schema.org JSON-LD — the same graph the docs pages carry, with a `WebPage` node on the home page — so the home page (usually a custom page) isn't the one URL without structured data. A custom page has no content file to date, so pass `lastModified` (a date string or `Date`) to emit its `dateModified`; without a machine-readable date, search engines can take any other date the page shows as the page's own. Pass `structuredDataEnabled={config.structuredData}` to keep it in sync with the [`structuredData`](/docs/discoverability/structured-data) config, or `structuredDataEnabled={false}` to turn it off for one page.
+The page also emits schema.org JSON-LD — the same graph the docs pages carry, with a `WebPage` node on the home page — so the home page (usually a custom page) isn't the one URL without structured data. A custom page has no content file to date, so pass `lastModified` (a date string or `Date`) to emit its `dateModified`, which the sitemap reads too; without a machine-readable date, search engines can take any other date the page shows as the page's own. Pass `published` for its `datePublished`. Pass `structuredDataEnabled={config.structuredData}` to keep it in sync with the [`structuredData`](/docs/discoverability/structured-data) config, or `structuredDataEnabled={false}` to turn it off for one page.
+
+Other pages are articles in that graph (`TechArticle`). Pass `structuredDataType` for another schema.org type, `"WebPage"` for a landing page or `"CollectionPage"` for an index. Pass `pageType="blog"` for a post you render yourself: it becomes a `BlogPosting`, with `og:type: article` and `article:published_time` and `article:modified_time` from `published` and `lastModified`, as a blog post in the content folder gets.
+
+Anything else the page needs in its `<head>` — a feed's `alternate` link, its own JSON-LD, a preload — goes in the `head` slot:
+
+```astro pages/blog/index.astro lineNumbers
+<PageLayout {...props}>
+  <link
+    href="/blog/rss.xml"
+    rel="alternate"
+    slot="head"
+    title="Acme blog"
+    type="application/rss+xml"
+  />
+  <!-- page content -->
+</PageLayout>
+```
 
 `page.title` is used verbatim as the document title (no `- siteTitle` suffix), since marketing pages usually set their own. To give a custom page the full docs chrome instead — sidebar, TOC, and all — wrap it in `RootLayout`, the layout the generated pages use. Pull the required props straight from `blume:data`:
 

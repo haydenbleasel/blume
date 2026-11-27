@@ -5,8 +5,11 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "pathe";
 
 import { buildAskData } from "../src/ai/ask-data.ts";
+import { changelogIndexModified } from "../src/ai/changelog-markdown.ts";
 import { buildLlmsFiles } from "../src/ai/llms.ts";
 import { buildRawMarkdown, markdownRoutePaths } from "../src/ai/markdown.ts";
+import { buildRuntimeData } from "../src/astro/generate.ts";
+import { changelogIndexTemplate } from "../src/astro/templates.ts";
 import { scanProject } from "../src/core/project-graph.ts";
 import type { BlumeProject } from "../src/core/project-graph.ts";
 
@@ -202,5 +205,40 @@ describe("the generated changelog index mirror", () => {
     const raw = await buildRawMarkdown(project);
     expect(raw["/changelog"]).toBeUndefined();
     expect(markdownRoutePaths(project)).toStrictEqual(["/"]);
+  });
+});
+
+describe("the generated changelog index's date", () => {
+  it("is the newest listed entry search engines may index", async () => {
+    const project = await scanFixture({
+      ...RELEASES,
+      // Newer than v2.1, but noindexed: it doesn't date the page.
+      "docs/changelog/v2-2.md": entry(
+        "title: v2.2\ndate: 2026-10-06\nseo:\n  noindex: true"
+      ),
+    });
+    // The draft (10-01) and the hidden entry (10-02) aren't listed either.
+    expect(changelogIndexModified(project)).toBe("2026-10-05T00:00:00.000Z");
+    expect(JSON.parse(buildRuntimeData(project)).changelogModified).toBe(
+      "2026-10-05T00:00:00.000Z"
+    );
+  });
+
+  it("is null when no listed entry has a date", async () => {
+    const project = await scanFixture({
+      "docs/changelog/undated.md": entry("title: Someday"),
+      "docs/index.md": "# Home\n",
+    });
+    expect(changelogIndexModified(project)).toBeNull();
+  });
+
+  it("reaches the index page's layout", () => {
+    expect(
+      changelogIndexTemplate({
+        exportEpub: false,
+        exportPdf: false,
+        needsReact: false,
+      })
+    ).toContain("lastModified={data.changelogModified}");
   });
 });

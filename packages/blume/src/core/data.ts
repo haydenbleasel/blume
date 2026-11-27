@@ -320,6 +320,12 @@ export interface BlumeClientData {
 
 /** The `blume:data` module a Blume site's custom pages import. */
 export interface BlumeData {
+  /**
+   * When the generated changelog index last changed (ISO 8601): its newest
+   * indexable entry's date (see `ai/changelog-markdown.ts`). Null with no
+   * dated entry.
+   */
+  changelogModified: string | null;
   config: BlumeDataConfig;
   feeds: BlumeFeed[];
   /** Configured fonts for the head: CSS variable + preload weights per family. */

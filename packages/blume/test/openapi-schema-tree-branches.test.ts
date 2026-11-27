@@ -34,11 +34,10 @@ describe("schemaTree unions with shared properties", () => {
     if (node.kind !== "branches") {
       throw new Error(`expected a branches node, got ${node.kind}`);
     }
-    expect(node.label).toBe("One of");
-    expect(node.branches.map((branch) => branch.label)).toStrictEqual([
-      "Card",
-      "Bank",
-    ]);
+    expect(node.groups.map((group) => group.label)).toStrictEqual(["One of"]);
+    expect(
+      node.groups[0]?.branches.map((branch) => branch.label)
+    ).toStrictEqual(["Card", "Bank"]);
     expect(
       node.rows?.map((row) => [row.name, row.required, row.children])
     ).toStrictEqual([
@@ -55,7 +54,9 @@ describe("schemaTree unions with shared properties", () => {
       },
       SCHEMAS
     );
-    expect(node.kind === "branches" && node.label).toBe("Any of");
+    expect(
+      node.kind === "branches" && node.groups.map((group) => group.label)
+    ).toStrictEqual(["Any of"]);
     expect(
       node.kind === "branches" && node.rows?.map((row) => row.name)
     ).toStrictEqual(["id"]);
@@ -64,11 +65,25 @@ describe("schemaTree unions with shared properties", () => {
   it("leaves rows out of a plain union", () => {
     const node = schemaTree({ oneOf: [{ type: "string" }] }, SCHEMAS);
     expect(node).toStrictEqual({
-      branches: [
-        { label: "string", slot: { node: { kind: "type", label: "string" } } },
+      groups: [
+        {
+          branches: [
+            {
+              label: "string",
+              slot: {
+                node: {
+                  kind: "type",
+                  label: "string",
+                  schema: { type: "string" },
+                },
+              },
+            },
+          ],
+          label: "One of",
+        },
       ],
       kind: "branches",
-      label: "One of",
+      schema: { oneOf: [{ type: "string" }] },
     });
   });
 });

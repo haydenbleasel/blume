@@ -29,10 +29,9 @@ const renderedRows = (node: SchemaNode): number => {
       return node.items ? renderedRows(node.items.node) : 0;
     }
     case "branches": {
-      return node.branches.reduce(
-        (total, branch) => total + renderedRows(branch.slot.node),
-        0
-      );
+      return node.groups
+        .flatMap((group) => group.branches)
+        .reduce((total, branch) => total + renderedRows(branch.slot.node), 0);
     }
     case "properties": {
       return node.rows.reduce(
@@ -196,31 +195,40 @@ describe("schemaTree", () => {
       { oneOf: [ref("Cat"), { type: "string" }] },
       schemas
     );
-    expect(union.kind === "branches" && union.label).toBe("One of");
+    const [oneOf] = union.kind === "branches" ? union.groups : [];
+    expect(oneOf?.label).toBe("One of");
     expect(
-      union.kind === "branches" &&
-        union.branches.map((branch) => [branch.label, branch.slot.node.kind])
+      oneOf?.branches.map((branch) => [branch.label, branch.slot.node.kind])
     ).toStrictEqual([
       ["Cat", "properties"],
       ["string", "type"],
     ]);
+    // A variant that declares no type is unlabeled: it renders as "Option 1".
     const anyOf = schemaTree({ anyOf: [{}, { type: "string" }] }, schemas);
-    expect(anyOf.kind === "branches" && anyOf.label).toBe("Any of");
-    expect(
-      anyOf.kind === "branches" && anyOf.branches.map((branch) => branch.label)
-    ).toStrictEqual(["any", "string"]);
+    const [group] = anyOf.kind === "branches" ? anyOf.groups : [];
+    expect(group?.label).toBe("Any of");
+    expect(group?.branches.map((branch) => branch.label)).toStrictEqual([
+      "",
+      "string",
+    ]);
 
     expect(schemaTree({ type: "array" }, schemas)).toStrictEqual({
       itemsLabel: "any",
       kind: "array",
+      schema: { type: "array" },
     });
     expect(schemaTree(ref("Missing"), schemas)).toStrictEqual({
       kind: "type",
       label: "Missing",
+      schema: ref("Missing"),
     });
     expect(
       schemaTree({ format: "uuid", type: "string" }, schemas)
-    ).toStrictEqual({ kind: "type", label: "string<uuid>" });
+    ).toStrictEqual({
+      kind: "type",
+      label: "string<uuid>",
+      schema: { format: "uuid", type: "string" },
+    });
   });
 
   it("gives an inline object row a disclosure and a scalar row none", () => {

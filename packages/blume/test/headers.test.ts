@@ -60,6 +60,11 @@ describe("buildNetlifyHeaders", () => {
         "  Content-Type: text/markdown; charset=utf-8",
         "/*.txt",
         "  Content-Type: text/plain; charset=utf-8",
+        // The Markdown copies stay out of search indexes.
+        "/*.md",
+        "  X-Robots-Tag: noindex",
+        "/*.mdx",
+        "  X-Robots-Tag: noindex",
         "/*",
         "  X-Powered-By: Blume",
         "/blume-assets/*.svg",
@@ -201,12 +206,17 @@ describe("buildVercelHeaders", () => {
       configWith({ base: "/docs", basePath: "/guide" }),
       '</llms.txt>; rel="describedby"'
     );
-    const bySource = new Map(
-      sources.map((entry) => [entry.source, entry.headers])
-    );
+    const bySource = new Map<string, { key: string; value: string }[]>();
+    for (const entry of sources) {
+      bySource.set(entry.source, [
+        ...(bySource.get(entry.source) ?? []),
+        ...entry.headers,
+      ]);
+    }
     // A `*` glob becomes the segment-spanning `(.*)` group.
     expect(bySource.get("/docs/(.*).md")).toStrictEqual([
       { key: "Content-Type", value: "text/markdown; charset=utf-8" },
+      { key: "X-Robots-Tag", value: "noindex" },
     ]);
     expect(bySource.get("/docs/(.*).txt")).toStrictEqual([
       { key: "Content-Type", value: "text/plain; charset=utf-8" },

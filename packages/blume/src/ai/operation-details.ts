@@ -117,7 +117,7 @@ const bodyMarkdown = (
           )
         )
       : [
-          single === null || single === undefined
+          single === undefined
             ? ""
             : exampleBlock(`${heading} example`, single),
         ];
@@ -154,7 +154,6 @@ const responsesMarkdown = (
   const examples = responsePanels(responses, schemas, "", components).flatMap(
     (panel) =>
       (recorded.has(panel.name) || panel.name === sampled) &&
-      panel.value !== null &&
       panel.value !== undefined
         ? [
             exampleBlock(

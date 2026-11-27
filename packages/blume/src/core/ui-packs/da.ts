@@ -188,6 +188,8 @@ export const da: UIStringsOverride = {
       "Slutpunktet er ændret. Opret forbindelse igen for at bruge det.",
     example: "Eksempel",
     examples: "Eksempler",
+    exclusiveMax: "mindre end {n}",
+    exclusiveMin: "større end {n}",
     fields: "Felter",
     fillParameters:
       "Udfyld alle kanalparametre, før du opretter forbindelse: {names}.",
@@ -231,6 +233,7 @@ export const da: UIStringsOverride = {
     noAuthorizationOn: "Ingen autorisation nødvendig på {servers}.",
     noExamplePayload: "Ingen eksempelpayload.",
     noExampleResponse: "Intet eksempelsvar.",
+    not: "ikke {value}",
     notAllowed: "{path} skal være en af: {values}",
     notConnected: "Ikke forbundet.",
     notConnectedStream:
@@ -245,6 +248,7 @@ export const da: UIStringsOverride = {
     operations: "Operationer",
     option: "Mulighed {n}",
     or: "eller",
+    outOfRange: "{path} er uden for det tilladte område ({limits})",
     overview: "Oversigt",
     parameters: "Parametre",
     pathParameters: "Stiparametre",
@@ -261,6 +265,7 @@ export const da: UIStringsOverride = {
     response: "Svar",
     responses: "Svar",
     returns: "Returnerer",
+    schemaMismatch: "{path} matcher ikke sit skema",
     scopes: "Scopes:",
     send: "Send",
     sending: "Sender…",
