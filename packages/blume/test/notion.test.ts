@@ -1031,6 +1031,104 @@ describe("notionSource (video blocks)", () => {
   });
 });
 
+// A `table` block holds its rows as `table_row` children, each cell its own
+// rich text.
+const row = (id: string, cells: RichTextFixture[][]) => ({
+  id,
+  table_row: { cells },
+  type: "table_row",
+});
+
+describe("notionSource (table blocks)", () => {
+  const tablePage = {
+    id: "tbl",
+    last_edited_time: "2024-08-01T00:00:00Z",
+    properties: {
+      Name: { title: [rich("Table Page")], type: "title" },
+    },
+  };
+
+  const loadTable = async (rows: BlockList, mdx?: boolean) => {
+    const lists = new Map<string, BlockList>([
+      [
+        "tbl",
+        [
+          {
+            id: "intro",
+            paragraph: { rich_text: [rich("Plans")] },
+            type: "paragraph",
+          },
+          { has_children: true, id: "plans", table: {}, type: "table" },
+          {
+            id: "outro",
+            paragraph: { rich_text: [rich("Done")] },
+            type: "paragraph",
+          },
+        ],
+      ],
+      ["plans", rows],
+    ]);
+    const source = notionSource(
+      {
+        client: clientFor(lists, [tablePage]),
+        database: "db1",
+        fetchImpl,
+        mdx,
+        name: "handbook",
+      },
+      await ctxFor()
+    );
+    const { entries } = await source.load();
+    return entries[0]?.body.text ?? "";
+  };
+
+  it("renders a table as a GFM table whose first row is the header", async () => {
+    const body = await loadTable([
+      row("head", [[rich("Plan")], [rich("Limit")]]),
+      row("free", [[rich("Free", { bold: true })], [rich("3 {seats}")]]),
+      // A `|` would split the cell, in a code span too, and a line break
+      // would end the row.
+      row("pipe", [
+        [rich("Pipe")],
+        [rich("a|b", { code: true }), rich(" or c|d")],
+      ]),
+      row("break", [[rich("Break")], [rich("one\ntwo")]]),
+      row("blank", [[rich("Blank")], []]),
+    ]);
+    expect(body).toBe(
+      [
+        "Plans",
+        "",
+        "| Plan | Limit |",
+        "| --- | --- |",
+        "| **Free** | 3 \\{seats\\} |",
+        "| Pipe | `a\\|b` or c\\|d |",
+        "| Break | one two |",
+        "| Blank |  |",
+        "",
+        "Done",
+      ].join("\n")
+    );
+  });
+
+  it("reads table cells as MDX source when mdx is set", async () => {
+    const body = await loadTable(
+      [
+        row("head", [[rich("Name")], [rich("Status")]]),
+        row("beta", [[rich("{version}")], [rich("<Badge>new</Badge> a|b")]]),
+      ],
+      true
+    );
+    expect(body).toContain("| {version} | <Badge>new</Badge> a\\|b |");
+  });
+
+  it("renders a table without rows as nothing", async () => {
+    const body = await loadTable([]);
+    expect(body).toBe("Plans\n\nDone");
+    expect(body).not.toContain("unsupported Notion block: table");
+  });
+});
+
 /**
  * A client whose block fetches report how many are in flight at once. Each
  * call parks for a tick so overlapping requests are actually observed

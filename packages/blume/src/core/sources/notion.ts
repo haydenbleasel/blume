@@ -62,6 +62,8 @@ interface NotionPage {
 /** The per-type payload a block carries under the key matching its `type`. */
 interface NotionBlockPayload {
   caption?: NotionRichText[];
+  /** A `table_row`'s cells, each its own rich text. */
+  cells?: NotionRichText[][];
   checked?: boolean;
   external?: { url: string };
   file?: { url: string };
@@ -325,6 +327,35 @@ const isYouTubeUrl = (url: string): boolean => {
   return YOUTUBE_HOST.test(host) && youtubeEmbedSrc(url) !== null;
 };
 
+// A line break would end the GFM row and a `|` would split the cell, the same
+// as in a Contentful table cell.
+const CELL_BREAK = /\n+/gu;
+const CELL_PIPE = /\|/gu;
+
+const tableRow = (cells: string[]): string => `| ${cells.join(" | ")} |`;
+
+/**
+ * Render a Notion `table` from its `table_row` children as a GFM table. GFM
+ * needs a header row, so the first row is the header, as for Contentful.
+ */
+const renderTable = (rows: NotionBlock[], mdx: boolean): string => {
+  const [head, ...body] = rows.map((row) =>
+    (payloadOf(row)?.cells ?? []).map((cell) =>
+      blockText(cell, mdx)
+        .replaceAll(CELL_BREAK, " ")
+        .replaceAll(CELL_PIPE, String.raw`\|`)
+    )
+  );
+  if (!head) {
+    return "";
+  }
+  return [
+    tableRow(head),
+    tableRow(head.map(() => "---")),
+    ...body.map((cells) => tableRow(cells)),
+  ].join("\n");
+};
+
 /**
  * Render a Notion `video` block. Kept out of `renderLeaf`'s switch so that
  * function stays under the complexity limit.
@@ -518,6 +549,9 @@ export const notionSource = (
         cols.map(async (col) => `<Column>\n${await children(col)}\n</Column>`)
       );
       return `<Columns>\n${rendered.join("\n")}\n</Columns>`;
+    }
+    if (block.type === "table") {
+      return renderTable(await childrenOf(client, block.id), textAsMdx);
     }
     return `{/* unsupported Notion block: ${block.type} */}`;
   };
