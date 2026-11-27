@@ -1,3 +1,4 @@
+import { isExternalUrl } from "../../core/base-path.ts";
 import { isRootTab, isUnderPath } from "../../core/navigation.ts";
 import type { NavNode, NavTab, Navigation } from "../../core/types.ts";
 
@@ -129,6 +130,47 @@ export const currentTabForRoute = (
     return null;
   }
   return tab;
+};
+
+/**
+ * Lead a breadcrumb trail with the landing page of the tab it sits under. The
+ * trail is looked up in the tab's scoped sidebar ({@link sidebarForRoute}),
+ * which holds the section's children but not the section itself, so a page at
+ * the top of a tab has no parent in it.
+ *
+ * The crumb is the tab as the header shows it — its label and its target —
+ * not the section's sidebar group. That group's label never renders while its
+ * tab is active, so a site names the section in the tab alone (per locale,
+ * where the folder-derived name is not translated), and only a content index
+ * page gives the group a route, while a tab can also land on a route outside
+ * the content tree (the generated changelog index, a custom page).
+ *
+ * The trail is returned as it came when there is nothing to lead or no page
+ * to lead with: an empty trail (a page outside the sidebar), the root tab
+ * (it spans the whole tree), a trail that already holds the landing page (its
+ * own), an external `href`, and a tab whose target sits inside its own
+ * section. A section with no index page links its tab to its first page,
+ * which is one of the section's pages rather than their parent.
+ */
+export const withTabCrumb = (
+  trail: Crumb[],
+  tab: NavTab | null,
+  root = "/"
+): Crumb[] => {
+  if (trail.length === 0 || !tab || isRootTab(tab, root)) {
+    return trail;
+  }
+  const landing = tab.href ?? tab.path;
+  if (isExternalUrl(landing)) {
+    return trail;
+  }
+  if (landing !== tab.path && isUnderPath(landing, tab.path)) {
+    return trail;
+  }
+  if (trail.some((crumb) => crumb.route === landing)) {
+    return trail;
+  }
+  return [{ label: tab.label, route: landing }, ...trail];
 };
 
 /**
