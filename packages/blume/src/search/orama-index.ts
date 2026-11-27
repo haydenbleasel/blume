@@ -79,22 +79,24 @@ const normalizePhrase = (value: string): string =>
     .replaceAll(/[^\p{L}\p{M}\p{N}]+/gu, " ")
     .trim();
 
-/**
- * Each page's title and keywords, normalized and led by a space so a phrase is
- * only found starting at a word. Kept for the life of the index, which hands
- * every query the same document objects: the dialog searches on each
- * keystroke, and normalizing every matched page again would cost more than the
- * search itself.
- */
-const phraseFields = new WeakMap<OramaDoc, string[]>();
+/** A page's title and keywords, normalized for {@link phraseMatcher}. */
+type PhraseFields = WeakMap<OramaDoc, string[]>;
 
-const phraseFieldsOf = (doc: OramaDoc): string[] => {
-  let fields = phraseFields.get(doc);
+/**
+ * Each index's pages' titles and keywords, normalized and led by a space so a
+ * phrase is only found starting at a word. Kept for the life of the index,
+ * which hands every query the same document objects: the dialog searches on
+ * each keystroke, and normalizing every matched page again would cost more
+ * than the search itself. Kept per index, so one built again from edited pages
+ * reads their new titles.
+ */
+const phraseFields = new WeakMap<AnyOrama, PhraseFields>();
+
+const phraseFieldsOf = (db: AnyOrama): PhraseFields => {
+  let fields = phraseFields.get(db);
   if (!fields) {
-    fields = [doc.title, ...(doc.keywords ?? [])].map(
-      (value) => ` ${normalizePhrase(value)}`
-    );
-    phraseFields.set(doc, fields);
+    fields = new WeakMap();
+    phraseFields.set(db, fields);
   }
   return fields;
 };
@@ -107,6 +109,7 @@ const phraseFieldsOf = (doc: OramaDoc): string[] => {
  * as `coding agents` does. A one-word query has no phrase to find.
  */
 const phraseMatcher = (
+  db: AnyOrama,
   term: string
 ): ((doc: OramaDoc) => boolean) | undefined => {
   const phrase = normalizePhrase(term);
@@ -114,7 +117,17 @@ const phraseMatcher = (
     return;
   }
   const needle = ` ${phrase}`;
-  return (doc) => phraseFieldsOf(doc).some((field) => field.includes(needle));
+  const normalized = phraseFieldsOf(db);
+  return (doc) => {
+    let fields = normalized.get(doc);
+    if (!fields) {
+      fields = [doc.title, ...(doc.keywords ?? [])].map(
+        (value) => ` ${normalizePhrase(value)}`
+      );
+      normalized.set(doc, fields);
+    }
+    return fields.some((field) => field.includes(needle));
+  };
 };
 
 /**
@@ -123,8 +136,9 @@ const phraseMatcher = (
  * page's `search.boost` orders each group. The phrase is the stronger signal
  * on purpose, so a boost never moves a page from one group to the other.
  */
-const searchRanking = (term: string, hasBoosts: boolean) => {
-  const matchesPhrase = phraseMatcher(term);
+const searchRanking = (db: AnyOrama, term: string) => {
+  const hasBoosts = boostedDatabases.has(db);
+  const matchesPhrase = phraseMatcher(db, term);
   const compareRank = (
     a: OramaDoc,
     aScore: number,
@@ -571,7 +585,7 @@ export const queryOramaIndex = async (
   // with a sort function), so a page can rise past matches outside the first
   // page. A phrase in the title or a keyword ranks first, then relevance
   // times the page's boost.
-  const { compareRank, sortBy } = searchRanking(term, boostedDatabases.has(db));
+  const { compareRank, sortBy } = searchRanking(db, term);
   const unfiltered = {
     boost: BOOST,
     limit,

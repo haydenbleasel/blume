@@ -157,6 +157,20 @@ describe("ranking in the Orama index", () => {
     ).toStrictEqual(["/reference", "/reference"]);
   });
 
+  it("reads the new titles of an index built again from edited pages", async () => {
+    const query = ["memory for coding agents"];
+    const pages = MEMORY_DOCS.map((doc) => ({ ...doc }));
+    expect(await topRoutes(pages, query)).toStrictEqual(["/guide"]);
+    // Move the phrase to the other page in place, then index the same objects.
+    for (const page of pages) {
+      page.title =
+        page.route === "/guide"
+          ? "Memory operations for admins"
+          : "Memory for coding agents across sessions";
+    }
+    expect(await topRoutes(pages, query)).toStrictEqual(["/reference"]);
+  });
+
   it("orders pages holding the phrase by boost, without letting a boost cross it", async () => {
     // The boosted page only uses the words apart, so its boost leaves it last.
     expect(await routes(authDocs(1), "authentication guide")).toStrictEqual([
