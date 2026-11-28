@@ -1,17 +1,25 @@
 import { afterEach, describe, expect, it } from "bun:test";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
+import {
+  LOCALE_STORAGE_KEY,
+  rememberLocaleChoice,
+} from "../src/components/layout/locale-choice.ts";
 import {
   browserLanguageTargets,
   LOCALE_REDIRECT_SCRIPT,
-  LOCALE_STORAGE_KEY,
-  rememberLocaleChoice,
+  LOCALE_STORAGE_KEY as REDIRECT_STORAGE_KEY,
+  rememberLocaleChoice as redirectRememberLocaleChoice,
 } from "../src/components/layout/locale-redirect.ts";
+import type { ChoiceTarget } from "../src/components/layout/locale-redirect.ts";
 import type { BlumeDataI18n } from "../src/core/data.ts";
 
 /**
  * Routing by browser language: which home pages a visitor on the default
- * home can be sent to, the inline script that sends them, and the switcher
- * pick that stops it.
+ * home can be sent to, the inline script that sends them, the switcher pick
+ * that stops it, and what the switcher ships to the browser to record it.
  */
 
 const i18n = (over: Partial<BlumeDataI18n> = {}): BlumeDataI18n => ({
@@ -70,11 +78,15 @@ describe(browserLanguageTargets, () => {
 });
 
 interface Visit {
+  /** The path the site is served from, as the layout stamps it. */
+  base?: string;
   languages?: string[];
   referrer?: string;
   script?: boolean;
   stored?: string | null;
   storageThrows?: boolean;
+  /** The client router swapped the page in; the browser didn't load it. */
+  swapped?: boolean;
   targets?: string;
 }
 
@@ -87,20 +99,23 @@ const visit = (options: Visit): string | null => {
         ? null
         : {
             dataset: {
+              base: options.base,
               default: "en",
               targets:
                 options.targets ?? '{"fr":"/docs/fr","pt-br":"/docs/pt-br"}',
             },
           },
+    readyState: options.swapped ? "complete" : "loading",
     referrer: options.referrer ?? "",
   };
-  // Keyed, so the script's inline literal can't drift from the constant.
+  // The key is spelled out: the script reads it from the constant, and a
+  // changed constant would forget every reader's pick.
   const localStorage = {
     getItem: (key: string) => {
       if (options.storageThrows) {
         throw new Error("blocked");
       }
-      return key === LOCALE_STORAGE_KEY ? (options.stored ?? null) : null;
+      return key === "blume-locale" ? (options.stored ?? null) : null;
     },
   };
   const location = {
@@ -149,6 +164,42 @@ describe("the browser-language script", () => {
     expect(visit({ languages: ["fr"], targets: "not json" })).toBeNull();
     expect(visit({ languages: ["fr"], script: false })).toBeNull();
   });
+
+  it("leaves a reader the client router brings to the home page", () => {
+    // The referrer still names wherever they first came from.
+    expect(
+      visit({
+        languages: ["fr"],
+        referrer: "https://www.google.com/",
+        swapped: true,
+      })
+    ).toBeNull();
+    expect(visit({ languages: ["fr"], swapped: true })).toBeNull();
+  });
+
+  it("counts the rest of the origin as outside a site served under a base", () => {
+    const from = (referrer: string): string | null =>
+      visit({ base: "/docs/", languages: ["fr"], referrer });
+    expect(from("https://docs.example.com/")).toBe("/docs/fr?a=1#start");
+    expect(from("https://docs.example.com/pricing?plan=pro")).toBe(
+      "/docs/fr?a=1#start"
+    );
+    // A sibling path that only starts like the base.
+    expect(from("https://docs.example.com/docs-archive/x")).toBe(
+      "/docs/fr?a=1#start"
+    );
+    expect(from("https://docs.example.com/docs")).toBeNull();
+    expect(from("https://docs.example.com/docs?from=nav")).toBeNull();
+    expect(from("https://docs.example.com/docs/guide")).toBeNull();
+    // At the root, another origin that only starts like this one is outside.
+    expect(
+      visit({
+        base: "/",
+        languages: ["fr"],
+        referrer: "https://docs.example.com.evil.test/",
+      })
+    ).toBe("/docs/fr?a=1#start");
+  });
 });
 
 /** A `localStorage` stand-in, as the browser's would be. */
@@ -181,26 +232,31 @@ afterEach(() => {
 });
 
 /** How `rememberLocaleChoice` listens on the document. */
-type AddListener = Parameters<
-  typeof rememberLocaleChoice
->[0]["addEventListener"];
+type AddListener = ChoiceTarget["addEventListener"];
+
+/** The events `rememberLocaleChoice` listens for. */
+type ClickType = Parameters<AddListener>[0];
 
 /** The listener `rememberLocaleChoice` adds. */
 type ClickListener = Parameters<AddListener>[1];
 
-/** A document stand-in at `location` that hands back the click listeners it was given. */
+/**
+ * A document stand-in at `location` that sends an event to the listener it
+ * was given for that type.
+ */
 const listen = (location?: { hash: string }) => {
-  const listeners: ClickListener[] = [];
+  const listeners = new Map<ClickType, ClickListener>();
   rememberLocaleChoice({
-    addEventListener: (_type, handler) => {
-      listeners.push(handler);
+    addEventListener: (type, handler) => {
+      listeners.set(type, handler);
     },
     location: location ?? { hash: "" },
   });
-  return (event: Parameters<ClickListener>[0]) => {
-    for (const listener of listeners) {
-      listener(event);
-    }
+  return (
+    event: Parameters<ClickListener>[0],
+    type: ClickType = "click"
+  ): void => {
+    listeners.get(type)?.(event);
   };
 };
 
@@ -219,8 +275,12 @@ const choice = (hreflang: string, href = "/fr/guide") => {
   };
 };
 
-/** A click on an element whose switcher link (if any) is `link`. */
-const click = (link: ReturnType<typeof choice> | null) => ({
+/**
+ * A click with a mouse button (the main one unless given) on an element
+ * whose switcher link (if any) is `link`.
+ */
+const click = (link: ReturnType<typeof choice> | null, button = 0) => ({
+  button,
   target: { closest: () => link },
 });
 
@@ -230,7 +290,21 @@ describe(rememberLocaleChoice, () => {
     globalThis.localStorage = local;
     const onClick = listen();
     onClick(click(choice("fr")));
-    expect(items.get(LOCALE_STORAGE_KEY)).toBe("fr");
+    expect(items.get("blume-locale")).toBe("fr");
+  });
+
+  it("remembers a language opened in a new tab with a middle click", () => {
+    const { items, local } = storage();
+    globalThis.localStorage = local;
+    const link = choice("fr");
+    const onClick = listen({ hash: "#install" });
+    // A right click fires `auxclick` too, and picks nothing.
+    onClick(click(link, 2), "auxclick");
+    expect(items.size).toBe(0);
+    expect(link.attributes.get("href")).toBe("/fr/guide");
+    onClick(click(link, 1), "auxclick");
+    expect(items.get("blume-locale")).toBe("fr");
+    expect(link.attributes.get("href")).toBe("/fr/guide#install");
   });
 
   it("ignores other clicks, and storage that's off", () => {
@@ -238,7 +312,7 @@ describe(rememberLocaleChoice, () => {
     globalThis.localStorage = local;
     const onClick = listen();
     onClick(click(null));
-    onClick({ target: null });
+    onClick({ button: 0, target: null });
     expect(() => onClick(click(choice("fr")))).not.toThrow();
     expect(items.size).toBe(0);
   });
@@ -258,14 +332,73 @@ describe(rememberLocaleChoice, () => {
   });
 
   it("listens before the client router reads the link", () => {
-    const options: Parameters<AddListener>[2][] = [];
+    const registered: [ClickType, Parameters<AddListener>[2]][] = [];
     rememberLocaleChoice({
-      addEventListener: (_type, _handler, given) => {
-        options.push(given);
+      addEventListener: (type, _handler, given) => {
+        registered.push([type, given]);
       },
       location: { hash: "" },
     });
     // The router's bubbling listener on the document is registered first.
-    expect(options).toStrictEqual([{ capture: true }]);
+    expect(registered).toStrictEqual([
+      ["click", { capture: true }],
+      ["auxclick", { capture: true }],
+    ]);
+  });
+
+  it("is still exported from locale-redirect.ts, where it lived", () => {
+    expect(redirectRememberLocaleChoice).toBe(rememberLocaleChoice);
+    expect(REDIRECT_STORAGE_KEY).toBe(LOCALE_STORAGE_KEY);
+  });
+});
+
+const SRC = fileURLToPath(new URL("../src/", import.meta.url));
+const LAYOUT = path.resolve(SRC, "components/layout");
+const SWITCHER_SCRIPT = /<script>(?<code>[\s\S]*?)<\/script>/u;
+const transpiler = new Bun.Transpiler({ loader: "ts" });
+
+/**
+ * Blume's modules in the import graph of `code`, a module in `dir`, as paths
+ * under `src/`. The transpiler drops type-only imports, as a bundler does.
+ */
+const modulesReachedFrom = (code: string, dir: string): string[] => {
+  const seen = new Set<string>();
+  const walk = (source: string, from: string): void => {
+    for (const { path: specifier } of transpiler.scanImports(source)) {
+      const file = path.resolve(from, specifier);
+      if (specifier.startsWith(".") && !seen.has(file)) {
+        seen.add(file);
+        if (file.endsWith(".ts")) {
+          walk(readFileSync(file, "utf-8"), path.dirname(file));
+        }
+      }
+    }
+  };
+  walk(code, dir);
+  return [...seen].map((file) =>
+    path.relative(SRC, file).replaceAll("\\", "/")
+  );
+};
+
+const isTranslationPack = (module: string): boolean =>
+  module.startsWith("core/ui-packs/");
+
+describe("the switcher's browser script", () => {
+  it("stays clear of the translation packs", () => {
+    const switcher = readFileSync(
+      path.resolve(LAYOUT, "LanguageSwitcher.astro"),
+      "utf-8"
+    );
+    const script = SWITCHER_SCRIPT.exec(switcher)?.groups?.code ?? "";
+    const modules = modulesReachedFrom(script, LAYOUT);
+    expect(modules).toContain("components/layout/locale-choice.ts");
+    expect(modules.filter(isTranslationPack)).toStrictEqual([]);
+    // The walk does find the packs from the module the pick used to live in,
+    // which is what put them in the script.
+    const redirect = modulesReachedFrom(
+      readFileSync(path.resolve(LAYOUT, "locale-redirect.ts"), "utf-8"),
+      LAYOUT
+    );
+    expect(redirect.some(isTranslationPack)).toBe(true);
   });
 });

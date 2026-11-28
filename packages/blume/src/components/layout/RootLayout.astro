@@ -51,6 +51,7 @@ import {
   deployBase,
   withBase,
   withMountedBase,
+  withTrailingSlash,
 } from "../islands/base-path.ts";
 import { routeSetFor } from "../../core/locale-links.ts";
 import {
@@ -615,6 +616,7 @@ const localeRedirect = localeTargets
     {
       localeRedirect && (
         <script
+          data-base={withTrailingSlash(withMountedBase("/"))}
           data-default={data.config.i18n?.defaultLocale}
           data-targets={localeRedirect}
           is:inline
