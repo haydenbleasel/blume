@@ -238,12 +238,79 @@ const defaultLocaleFolderDiagnostic = (
 });
 
 /**
+ * A page's own logical route: its version-agnostic key under its version
+ * prefix. The same rule as `versionizeRoute` (versions.ts), which can't be
+ * imported here because versions.ts imports this module.
+ */
+const ownRoute = (page: PageRecord): string => {
+  if (!page.version) {
+    return page.versionKey;
+  }
+  return page.versionKey === "/"
+    ? `/${page.version}`
+    : `/${page.version}${page.versionKey}`;
+};
+
+/** Where a page came from, for a diagnostic: its file, or its source entry. */
+const pageOrigin = (page: PageRecord): string =>
+  page.sourcePath ?? `${page.source.name}:${page.source.ref}`;
+
+/**
+ * Checks on `translationOf`. One that names no default-locale page pairs the
+ * translation with nothing, losing its hreflang alternates and switcher entry
+ * silently. Two pages in one locale naming the same page both claim to be its
+ * translation, so hreflang lists that locale twice and the switcher picks one.
+ * Default-locale pages count by their own route (versionized, so pages pair
+ * within their version), never by a `translationOf` of their own.
+ */
+const translationOfDiagnostics = (
+  pages: PageRecord[],
+  i18n: ResolvedI18nConfig
+): Diagnostic[] => {
+  const defaultRoutes = new Set(
+    pages.filter((page) => page.locale === i18n.defaultLocale).map(ownRoute)
+  );
+  const claimed = new Set<string>();
+  const diagnostics: Diagnostic[] = [];
+  for (const page of pages) {
+    const named = page.meta.translationOf;
+    if (named === undefined) {
+      continue;
+    }
+    if (!defaultRoutes.has(page.translationKey)) {
+      diagnostics.push({
+        code: "BLUME_I18N_UNKNOWN_TRANSLATION",
+        file: pageOrigin(page),
+        message: `translationOf "${named}" names no "${i18n.defaultLocale}" page, so this translation pairs with nothing.`,
+        severity: "warning",
+        suggestion: `Set translationOf to the "${i18n.defaultLocale}" page's route without the locale prefix, like "guides/setup".`,
+      });
+      continue;
+    }
+    const claim = `${page.locale}\u0000${page.translationKey}`;
+    if (claimed.has(claim)) {
+      diagnostics.push({
+        code: "BLUME_I18N_DUPLICATE_TRANSLATION",
+        file: pageOrigin(page),
+        message: `Another "${page.locale}" page already translates "${named}", so hreflang lists "${page.locale}" twice and the language switcher picks one.`,
+        severity: "warning",
+        suggestion: `Keep one "${page.locale}" translation of "${named}", or point this page's translationOf at another page.`,
+      });
+    }
+    claimed.add(claim);
+  }
+  return diagnostics;
+};
+
+/**
  * Warn about top-level content folders that look like a locale (a code Blume
  * recognizes) but aren't declared in `i18n.locales`. Without this they're
  * silently treated as default-locale content under a `/<code>/…` route, which
  * is almost never intended — usually a translation that wasn't registered.
  * A folder named after the default locale gets the same treatment (see
  * {@link defaultLocaleFolderDiagnostic}).
+ * So does a `translationOf` that names no default-locale page (see
+ * {@link translationOfDiagnostics}).
  */
 export const i18nDiagnostics = (
   pages: PageRecord[],
@@ -288,5 +355,5 @@ export const i18nDiagnostics = (
       });
     }
   }
-  return diagnostics;
+  return [...diagnostics, ...translationOfDiagnostics(pages, i18n)];
 };

@@ -30,6 +30,11 @@ Frontmatter is YAML, so quote a value that holds a colon followed by a space, li
       description:
         "Set the page's full route from the content root (guides/setup). It replaces the whole path the file's location gives the page, not just the last segment. A . or .. segment is an error: browsers resolve it away, so no link could reach the page.",
     },
+    translationOf: {
+      type: "string",
+      description:
+        "On a translation with its own localized URL, the default-locale route of the page it translates (guides/setup), so the two pair up for hreflang, the language switcher, and fallbacks. See Localized URLs in Internationalization.",
+    },
     draft: {
       type: "boolean",
       default: "false",
