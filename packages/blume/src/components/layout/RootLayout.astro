@@ -48,6 +48,7 @@ import type { FaqEntry } from "../../markdown/faq.ts";
 import type { AuthorInput } from "../../seo/jsonld.ts";
 import { normalizeXHandle } from "../../seo/x-handle.ts";
 import {
+  deployBase,
   withBase,
   withMountedBase,
   withTrailingSlash,
@@ -92,6 +93,7 @@ import {
   getPagination,
   navGroupIds,
   sidebarForRoute,
+  withTabCrumb,
 } from "./nav-utils.ts";
 import NavTabMenu from "./NavTabMenu.astro";
 import NavTree from "./NavTree.astro";
@@ -504,7 +506,8 @@ const mcpMenu = mcp?.clients
 
 // Scope the sidebar (and the breadcrumbs/pagination derived from it) to the
 // active tab's section, so a multi-section site drills each tab into its own
-// pages. Without tabs — or on a route under none — this is the full sidebar.
+// pages. Without tabs this is the full sidebar; on a route under no tab, the
+// sidebar minus the sections the tabs own.
 // `navigation.root` keeps the root-tab check in the tabs' localized/based
 // path space (`/en`, `/docs`), so a locale or base prefix doesn't misread the
 // root tab as a section tab; in an archived version tree the root is
@@ -528,7 +531,13 @@ const activeTab = currentTabForRoute(
   page.route,
   navigation.root
 );
-const crumbs = findBreadcrumbs(sidebar, page.route);
+// The scoped sidebar holds a tab's pages but not the tab itself, so the trail
+// is led by the tab's landing page.
+const crumbs = withTabCrumb(
+  findBreadcrumbs(sidebar, page.route),
+  activeTab,
+  navigation.root
+);
 // A group's own page lists the group's pages below its content when the
 // group asks for a directory. Looked up in the full tree: a tab's own page
 // is not in its scoped sidebar.
@@ -550,7 +559,7 @@ const structuredData =
     ? null
     : buildStructuredData({
       authors,
-      base: import.meta.env.BASE_URL,
+      base: deployBase(),
       breadcrumbs: crumbs,
       description,
       faq,
@@ -1053,10 +1062,10 @@ const localeRedirect = localeTargets
       import { copyText, createCopyFlash } from "../copy-feedback.ts";
       import { syncDrawerInert } from "./drawer-inert.ts";
       import { chromeIcons as icons } from "../../theme/chrome-icons.ts";
-      // Registers the <blume-mermaid> custom element (emitted by ```mermaid
-      // fences) when some page has one; Mermaid itself is lazy-loaded only on
-      // pages that use a diagram. The loader is null — and the element and
-      // library absent from the bundle — for a site with no diagrams.
+      // Registers the diagram custom element (emitted by ```mermaid fences)
+      // when some page has one; Pele itself is lazy-loaded only on pages that
+      // use a diagram. The loader is null — and the element and library absent
+      // from the bundle — for a site with no diagrams.
       import { loadMermaid } from "blume:features";
       // Registers the <blume-toc> custom element: scrollspy for the table of
       // contents, highlighting the section currently in view as you scroll.

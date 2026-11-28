@@ -111,7 +111,8 @@ Beschränke Boosts auf ein paar Seiten, die Leser am häufigsten brauchen, etwa 
 
 Wie stark ein Boost eine Seite verschiebt, hängt vom Adapter ab:
 
-- **Orama** (der Standard) und **FlexSearch** multiplizieren jeden Treffer vor dem Sortieren mit dem Boost seiner Seite, sodass ein Boost von 3 genau dreifach zählt. Der [MCP-Server](/docs/discoverability/mcp) und die Suche des [Assistenten](/docs/configuration/assistant) ranken auf dieselbe Weise.
+- **Orama** (der Standard) multipliziert jeden Treffer vor dem Sortieren mit dem Boost seiner Seite, sodass ein Boost von 3 genau dreifach zählt. Eine Suchanfrage aus zwei oder mehr Wörtern rankt zuerst die Seiten, die [sie als Phrase enthalten](#phrase-matches). Die [JSON-Doku-API](/docs/discoverability/json-api), der [MCP-Server](/docs/discoverability/mcp) und der [Assistent](/docs/configuration/assistant) ranken auf dieselbe Weise.
+- **FlexSearch** multipliziert jeden Treffer vor dem Sortieren mit dem Boost seiner Seite, sodass ein Boost von 3 genau dreifach zählt.
 - **Pagefind** gewichtet den Text einer geboosteten Seite stärker. Es dämpft wiederholte Treffer, daher fällt der Anstieg kleiner aus als der Multiplikator: Ein Boost von 5 rankt die Seite höher, allerdings eher nur etwa doppelt so hoch. Pagefind wertet einen Boost über 10 als 10.
 - **Algolia** sortiert unter Ergebnissen, die etwa gleich gut passen, nach Boost, sodass ein Boost knappe Entscheidungen klärt, ohne einen schwächeren Treffer über einen starken zu heben. Die Synchronisierung fügt `desc(boost)` zum Custom Ranking des Index hinzu, hinter jedem Ranking, das du selbst festgelegt hast.
 - **Typesense** sortiert nach Relevanz und dann unter Ergebnissen mit gleichem Relevanzwert nach Boost, sodass ein Boost Gleichstände auflöst, ohne einen schwächeren Treffer über einen starken zu heben.
@@ -119,6 +120,12 @@ Wie stark ein Boost eine Seite verschiebt, hängt vom Adapter ab:
 - **Mixedbread** durchsucht deinen eigenen Store, in den Blume nichts hochlädt, daher kommen Boosts und Keywords dort nicht an.
 
 Keywords sind bei jedem Adapter außer Mixedbread durchsuchbar.
+
+### Phrasentreffer [#phrase-matches]
+
+Bei Orama rankt eine Suchanfrage aus zwei oder mehr Wörtern eine Seite zuerst, wenn ihr Titel oder eines ihrer Keywords die Suchanfrage als Phrase enthält. Eine Suche nach `coding agents` setzt eine Seite mit dem Titel „Memory for coding agents“ vor eine, die beide Wörter getrennt verwendet. Groß- und Kleinschreibung, Akzente und Satzzeichen spielen keine Rolle, und das letzte Wort zählt schon ab seinen ersten Buchstaben, sodass die Reihenfolge auch dann hält, wenn ein Leser noch tippt. Eine Suchanfrage aus einem einzigen Wort wird allein nach Relevanz und Boost gerankt.
+
+Ein Boost ordnet die Seiten innerhalb jeder Gruppe und verschiebt nie eine Seite von einer Gruppe in die andere. Eine veraltete Anleitung, deren Titel die Suchanfrage enthält, rankt über einer geboosteten Seite, die die Wörter der Suchanfrage nur getrennt verwendet. Um eine andere Seite nach vorn zu bringen, füge die Phrase zu den `search.keywords` dieser Seite hinzu, dann entscheiden die beiden Boosts zwischen ihnen.
 
 ## Suchanalysen [#search-analytics]
 

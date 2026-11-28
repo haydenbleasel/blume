@@ -14,8 +14,8 @@ agents: {
 
 Solange es aktiviert ist, schreibt `blume build` zwei Dateien in das Stammverzeichnis deiner Website:
 
-- **`/llms.txt`** — ein kompakter Index: Titel und Beschreibung deiner Website, danach eine verlinkte Liste aller Seiten mit ihrer Zusammenfassung (ihrer Meta-Beschreibung: `seo.description`, wenn die Seite eine festlegt, sonst `description`), gegliedert in Abschnitte, die deine Seitenleiste widerspiegeln — Ordner und Gruppen werden zu Überschriften, sodass ein Agent die Struktur der Dokumentation sieht und nicht einen einzigen flachen Klumpen.
-- **`/llms-full.txt`** — der gesamte Korpus: der vollständige Markdown-Text jeder Seite samt Quell-URL, in einer Datei.
+- **`/llms.txt`** — ein kompakter Index: Titel und Beschreibung deiner Website, danach eine verlinkte Liste aller Seiten mit ihrer Zusammenfassung (ihrer Meta-Beschreibung: `seo.description`, wenn die Seite eine festlegt, sonst `description`), gegliedert in Abschnitte, die deine Seitenleiste widerspiegeln — Ordner und Gruppen werden zu Überschriften, sodass ein Agent die Struktur der Dokumentation sieht und nicht einen einzigen flachen Klumpen. Die Abschnitte folgen der Reihenfolge der [Tabs](/docs/content/navigation) in deinem Header, sodass die Dokumentation vor einem langen Changelog steht, wenn die Tabs sie zuerst anordnen, und [eigene Seiten](/docs/advanced/custom-pages#custom-pages-for-agents) werden unter dem Tab aufgeführt, in dessen Abschnitt sie liegen (oder unter **Pages**).
+- **`/llms-full.txt`** — der gesamte Korpus: der vollständige Markdown-Text jeder Seite samt Quell-URL, in einer Datei, in der Reihenfolge, in der `llms.txt` sie auflistet.
 
 Entwurfsseiten, in der Seitenleiste ausgeblendete Seiten (`sidebar.hidden` oder die Kurzform `hidden` auf oberster Ebene) und `noindex`-Seiten werden ausgeschlossen — mit Ausnahme generierter API-Referenzseiten, deren Platz in beiden Dateien nicht über `noindex`, sondern über das unten beschriebene `openapi` festgelegt wird. Setze [`deployment.site`](/docs/deployment), damit die Links und Quell-URLs zu absoluten Adressen aufgelöst werden.
 

@@ -8,7 +8,7 @@ description: >-
 
 ## サイトマップ [#sitemap]
 
-Blume はビルド時に、インデックス対象となるすべてのページを含む `sitemap.xml` を書き出します。絶対 URL の [`deployment.site`](/docs/deployment) が必要で、下書き・[非表示](/docs/content/navigation#hidden-pages)・[`noindex`](/docs/discoverability/metadata#per-page-overrides) のページ、および `seo.canonical` で別の URL を指定しているページを除くすべてのページを列挙します。[バージョン管理された](/docs/content/versioning)サイトでは、canonical が現行版を指しているアーカイブページも除外されます — インデックスすべきなのは現行のページだからです。デフォルトで有効です:
+Blume はビルド時に、インデックス対象となるすべてのページを含む `sitemap.xml` を書き出します。絶対 URL の [`deployment.site`](/docs/deployment) が必要で、下書き・[非表示](/docs/content/navigation#hidden-pages)・[`noindex`](/docs/discoverability/metadata#per-page-overrides) のページ、および `seo.canonical` で別の URL を指定しているページを除くすべてのページを列挙します。[バージョン管理された](/docs/content/versioning)サイトでは、canonical が現行版を指しているアーカイブページも除外されます — インデックスすべきなのは現行のページだからです。[カスタムページ](/docs/advanced/custom-pages)も列挙され、その JSON-LD の `dateModified` (`PageLayout` の `lastModified`) が日付として使われます。`noindex` のカスタムページは除外されます。デフォルトで有効です:
 
 ```ts blume.config.ts lineNumbers
 seo: {

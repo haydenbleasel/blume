@@ -17,6 +17,7 @@ import type { SourceContext, SourceEntry } from "../src/core/sources/types.ts";
 import type { ProjectContext } from "../src/core/types.ts";
 import { notion } from "../src/sources/notion.ts";
 import { withEnv } from "./cms-fixtures.ts";
+import { renderMdx } from "./mdx-render.ts";
 
 const dirs: string[] = [];
 const tempDir = async (): Promise<string> => {
@@ -1028,6 +1029,207 @@ describe("notionSource (video blocks)", () => {
     // The unsupported-block comment is the pre-fix behavior; a video block
     // must never fall through to it.
     expect(body).not.toContain("unsupported Notion block: video");
+  });
+});
+
+// A `table` block holds its rows as `table_row` children, each cell its own
+// rich text.
+const row = (id: string, cells: (RichTextFixture & { href?: string })[][]) => ({
+  id,
+  table_row: { cells },
+  type: "table_row",
+});
+
+/** A table's own lines, between the paragraphs around it. */
+const tableLines = (body: string): string[] =>
+  body.split("\n\n")[1]?.split("\n") ?? [];
+
+describe("notionSource (table blocks)", () => {
+  const tablePage = {
+    id: "tbl",
+    last_edited_time: "2024-08-01T00:00:00Z",
+    properties: {
+      Name: { title: [rich("Table Page")], type: "title" },
+    },
+  };
+
+  const loadTable = async (
+    rows: BlockList,
+    {
+      mdx,
+      table = {},
+    }: { mdx?: boolean; table?: { has_column_header?: boolean } } = {}
+  ) => {
+    const lists = new Map<string, BlockList>([
+      [
+        "tbl",
+        [
+          {
+            id: "intro",
+            paragraph: { rich_text: [rich("Plans")] },
+            type: "paragraph",
+          },
+          { has_children: true, id: "plans", table, type: "table" },
+          {
+            id: "outro",
+            paragraph: { rich_text: [rich("Done")] },
+            type: "paragraph",
+          },
+        ],
+      ],
+      ["plans", rows],
+    ]);
+    const source = notionSource(
+      {
+        client: clientFor(lists, [tablePage]),
+        database: "db1",
+        fetchImpl,
+        mdx,
+        name: "handbook",
+      },
+      await ctxFor()
+    );
+    const { entries } = await source.load();
+    return entries[0]?.body.text ?? "";
+  };
+
+  it("renders a table as a GFM table whose first row is the header", async () => {
+    const body = await loadTable(
+      [
+        row("head", [[rich("Plan")], [rich("Limit")]]),
+        row("free", [[rich("Free", { bold: true })], [rich("3 {seats}")]]),
+        // A `|` would split the cell, in a code span too, and a line break
+        // would end the row, whichever line ending it is.
+        row("pipe", [
+          [rich("Pipe")],
+          [rich("a|b", { code: true }), rich(" or c|d")],
+        ]),
+        row("break", [[rich("Break")], [rich("one\ntwo\r\nthree\rfour")]]),
+        row("blank", [[rich("Blank")], []]),
+      ],
+      { table: { has_column_header: true } }
+    );
+    expect(body).toBe(
+      [
+        "Plans",
+        "",
+        "| Plan | Limit |",
+        "| --- | --- |",
+        "| **Free** | 3 \\{seats\\} |",
+        "| Pipe | `a\\|b` or c\\|d |",
+        "| Break | one two three four |",
+        "| Blank |  |",
+        "",
+        "Done",
+      ].join("\n")
+    );
+  });
+
+  it("keeps a backslash typed before a pipe, in code and in prose", async () => {
+    const body = await loadTable([
+      row("head", [[rich("Command")], [rich("Note")]]),
+      // A code span can't hold an odd run of backslashes before a pipe: `\\|`
+      // would split the row, so the code is a `<code>` element instead, its
+      // punctuation escaped so the compiler leaves the text alone.
+      row("odd", [[rich("grep 'a\\|b' *", { code: true })], [rich("x")]]),
+      // An even run fits a code span, which keeps both backslashes.
+      row("even", [[rich("a\\\\|b", { code: true })], [rich("x")]]),
+      // In a link's label too, under the marks around it.
+      row("link", [
+        [
+          {
+            ...rich("a\\|b", { bold: true, code: true }),
+            href: "https://x.dev/p|q",
+          },
+        ],
+        [rich("x")],
+      ]),
+      row("prose", [[rich("a \\| b")], [rich("x")]]),
+    ]);
+    expect(tableLines(body)).toEqual([
+      "| Command | Note |",
+      "| --- | --- |",
+      String.raw`| <code>grep \'a\\\|b\' \*</code> | x |`,
+      "| `a\\\\\\|b` | x |",
+      String.raw`| [**<code>a\\\|b</code>**](https://x.dev/p\|q) | x |`,
+      String.raw`| a \\\| b | x |`,
+    ]);
+    // The page compiles to the code as typed: straight quotes, one backslash.
+    const { code } = await renderMdx(body);
+    expect(code).toContain(String.raw`children: "grep 'a\\|b' *"`);
+    expect(code).toContain(String.raw`children: "a\\\\|b"`);
+  });
+
+  it("percent-encodes a pipe in a bare URL, where a backslash would reach the href", async () => {
+    const body = await loadTable([
+      row("head", [[rich("Link")], [rich("Note")]]),
+      row("bare", [
+        [rich("see https://x.dev/a|b or www.x.dev/c|d")],
+        [rich("x")],
+      ]),
+      // A link's label isn't autolinked, so its pipe is escaped as prose.
+      row("label", [
+        [{ ...rich("https://x.dev/a|b"), href: "https://x.dev/a|b" }],
+        [rich("x")],
+      ]),
+    ]);
+    expect(tableLines(body)).toEqual([
+      "| Link | Note |",
+      "| --- | --- |",
+      "| see https://x.dev/a%7Cb or www.x.dev/c%7Cd | x |",
+      String.raw`| [https://x.dev/a\|b](https://x.dev/a\|b) | x |`,
+    ]);
+  });
+
+  it("leaves the header empty when the table's header row is off", async () => {
+    const body = await loadTable(
+      [
+        row("name", [[rich("Name")], [rich("Alice")]]),
+        row("role", [[rich("Role")], [rich("Dev")]]),
+      ],
+      { table: { has_column_header: false } }
+    );
+    expect(tableLines(body)).toEqual([
+      "|  |  |",
+      "| --- | --- |",
+      "| Name | Alice |",
+      "| Role | Dev |",
+    ]);
+  });
+
+  it("widens the header to the widest row", async () => {
+    const body = await loadTable([
+      { id: "bare", table_row: {}, type: "table_row" },
+      row("wide", [[rich("a")], [rich("b")]]),
+    ]);
+    expect(tableLines(body)).toEqual(["|  |  |", "| --- | --- |", "| a | b |"]);
+  });
+
+  it("renders a cell's text as written when mdx is set", async () => {
+    // A row is one line that splits at every `|`, so MDX typed in a cell
+    // can't be read as MDX: it stays text, like the rest of what Notion holds.
+    const body = await loadTable(
+      [
+        row("head", [[rich("Field")], [rich("Value")]]),
+        row("mdx", [
+          [rich('<Card title="a|b" />')],
+          [rich("{1 || 2}\n**bold**")],
+        ]),
+      ],
+      { mdx: true }
+    );
+    expect(tableLines(body)).toEqual([
+      "| Field | Value |",
+      "| --- | --- |",
+      String.raw`| \<Card title="a\|b" /> | \{1 \|\| 2\} \*\*bold\*\* |`,
+    ]);
+  });
+
+  it("renders a table without cells as nothing", async () => {
+    expect(await loadTable([])).toBe("Plans\n\nDone");
+    expect(
+      await loadTable([{ id: "bare", table_row: {}, type: "table_row" }])
+    ).toBe("Plans\n\nDone");
   });
 });
 

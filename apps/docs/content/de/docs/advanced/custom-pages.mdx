@@ -235,7 +235,26 @@ Die Kopfzeile, die eine benutzerdefinierte Seite erhält, ist dieselbe wie bei d
 
 Der Sprachwechsler ist die Ausnahme. Eine benutzerdefinierte Seite wird nur unter ihrer eigenen Route ausgeliefert, daher kann Blume nicht wissen, welche anderen Locales eine Version von ihr haben, und die Kopfzeile zeigt keinen Wechsler an, sofern du keinen übergibst: `localeSwitch` erwartet einen Eintrag pro Locale — `{ code, label, dir, href, current, untranslated }` —, der auf die Seite verweist, die du für die jeweilige Sprache gebaut hast.
 
-Auch die [Agent-Discovery-Links im Head](/docs/discoverability/agent-discovery#discovery-link-header) kommen mit: Das Layout liest die aufgelöste Konfiguration, sodass eine benutzerdefinierte Seite dieselben `describedby`-, `ai-catalog`- und `ard`-Links wie die Dokumentationsseiten trägt, ohne dass du ein Prop übergeben musst. Die Startseite weist außerdem ihren Markdown-Spiegel `/index.md` als `text/markdown`-Alternative aus, da dieser Spiegel immer existiert; andere benutzerdefinierte Seiten haben keinen, daher wird auch keiner ausgewiesen. Übergib `discovery={null}`, um die Links auf einer Seite wegzulassen.
+Auch die [Agent-Discovery-Links im Head](/docs/discoverability/agent-discovery#discovery-link-header) kommen mit: Das Layout liest die aufgelöste Konfiguration, sodass eine benutzerdefinierte Seite dieselben `describedby`-, `ai-catalog`- und `ard`-Links wie die Dokumentationsseiten trägt, ohne dass du ein Prop übergeben musst. Übergib `discovery={null}`, um die Links auf einer Seite wegzulassen.
+
+### Benutzerdefinierte Seiten für Agenten [#custom-pages-for-agents]
+
+Eine benutzerdefinierte Seite erreicht Agenten auf dieselbe Weise wie eine Inhaltsseite. Nachdem Astro das HTML geschrieben hat, liest der Build jede statische benutzerdefinierte Seite wieder ein und wandelt das, was sie innerhalb von `<main>` rendert — den Slot, den du befüllst —, in Markdown um: Überschriften, Fließtext, Links, Listen, Tabellen, Bilder mit Alternativtext und Codeblöcke mitsamt ihrer Sprache. Dieses Markdown wird unter den `.md`- und `.mdx`-URLs der Seite ausgeliefert und beantwortet `Accept: text/markdown` [wie das einer Inhaltsseite](/docs/discoverability/markdown#content-negotiation), die Seite wird in [`llms.txt`](/docs/discoverability/llms-txt) unter dem Kopfzeilen-Tab aufgeführt, in dessen Abschnitt sie liegt, ihr Markdown steht in `llms-full.txt`, und die Sitemap datiert sie anhand des `dateModified` in ihrem JSON-LD (siehe `lastModified` weiter unten). Das Layout weist die `.md`-Kopie im Head als `text/markdown`-Alternative aus. Die Startseite behält ihren eigenen Spiegel, den `llms.txt`-Index.
+
+Elemente, die nur per CSS voneinander abgesetzt sind — etwa eine Reihe von Spans oder Titel und Beschreibung einer Karte innerhalb eines Links —, werden durch ein Leerzeichen getrennt, da das gebaute HTML zwischen den Tags keine Leerzeichen enthält; Text neben einem Element sowie alles innerhalb von `pre` oder `code` behält seine Abstände exakt bei. Was eine lesende Person nicht als Text nutzen kann, bleibt außen vor: Skripte, Styles, Inline-SVG, Formularelemente und Buttons, Navigation, dekorative Bilder (`alt=""`) und alles, was vor Lesenden verborgen ist (`hidden`, `aria-hidden="true"`, `inert`). Markiere jedes andere Element als reines Web-Element, um es ebenfalls wegzulassen — etwa einen Call-to-Action oder eine interaktive Demo —, und zwar mit dem Attribut, das [`<Visibility for="web">`](/docs/content/components#visibility) rendert. Dasselbe Attribut, auf `agents` gesetzt, behält ein Element bei, selbst wenn es auf der Seite verborgen ist:
+
+```astro pages/pricing.astro lineNumbers
+<section data-blume-visibility="web">
+  <SignUpForm />
+</section>
+<p data-blume-visibility="agents" hidden>
+  Prices are in US dollars and exclude tax.
+</p>
+```
+
+Übergib `ai={{ exclude: true }}`, um eine ganze Seite von den Agenten-Oberflächen fernzuhalten, so wie es das Frontmatter-Feld `ai.exclude` bei einer Inhaltsseite tut. Eine `noindex`-Seite und eine dynamische `[param]`-Route werden von sich aus weggelassen. Eine Datei, die du in `public/` unter dem `.md`-Pfad einer Seite mitlieferst, gewinnt gegenüber der generierten.
+
+Die Zeile der Seite in `llms.txt` übernimmt ihren `<title>` ohne ein abschließendes Segment, das die Website benennt: „Pricing — Acme“ wird auf einer Website namens Acme als „Pricing“ aufgeführt, während „Acme for Teams — Plans and pricing“ vollständig erhalten bleibt.
 
 Übergib `transparentHeader`, damit die Kopfzeile zunächst durchsichtig ist und ihr Chrome in Weiß erscheint — so kann sie oben auf der Seite über einem dunklen Hero-Bereich liegen. Sobald die Seite scrollt, wird sie zur üblichen Milchglas-Leiste, und der Suchdialog behält durchgehend die eigenen Farben der Seite. Damit das sichtbar wird, muss der Hero-Bereich unter der Kopfzeile verlaufen — zieh ihn um die Höhe der Kopfzeile nach oben (`-mt-16`) und gleiche das mit einem Innenabstand oben aus.
 
@@ -256,7 +275,24 @@ Die Übergabe von `siteUrl` (und `ogEnabled`) leitet automatisch das `canonical`
 
 Nur diese eine Seite ändert sich — jede andere Route behält ihre generierte Karte —, und so gibst du allein der Startseite ein maßgeschneidertes Teilen-Bild. Die generierte Karte gibt ihre Größe und ihren Alternativtext von sich aus an Crawler weiter; übergib bei deinem eigenen `ogImage` zusätzlich `ogImageAlt` und `ogImageSize`, damit die Teilen-Karte dieselbe Behandlung erhält.
 
-Die Seite gibt außerdem schema.org-JSON-LD aus — denselben Graphen, den auch die Dokumentationsseiten mitführen, mit einem `WebPage`-Knoten auf der Startseite —, damit die Startseite (üblicherweise eine benutzerdefinierte Seite) nicht die eine URL ohne strukturierte Daten ist. Eine benutzerdefinierte Seite hat keine Inhaltsdatei, aus der sich ein Datum ableiten ließe, übergib daher `lastModified` (eine Datumszeichenkette oder ein `Date`), um ihr `dateModified` auszugeben; ohne maschinenlesbares Datum können Suchmaschinen irgendein anderes Datum, das die Seite anzeigt, als Datum der Seite selbst übernehmen. Übergib `structuredDataEnabled={config.structuredData}`, um sie mit der [`structuredData`](/docs/discoverability/structured-data)-Konfiguration synchron zu halten, oder `structuredDataEnabled={false}`, um sie für eine Seite abzuschalten.
+Die Seite gibt außerdem schema.org-JSON-LD aus — denselben Graphen, den auch die Dokumentationsseiten mitführen, mit einem `WebPage`-Knoten auf der Startseite —, damit die Startseite (üblicherweise eine benutzerdefinierte Seite) nicht die eine URL ohne strukturierte Daten ist. Eine benutzerdefinierte Seite hat keine Inhaltsdatei, aus der sich ein Datum ableiten ließe, übergib daher `lastModified` (eine Datumszeichenkette oder ein `Date`), um ihr `dateModified` auszugeben, das auch die Sitemap ausliest; ohne maschinenlesbares Datum können Suchmaschinen irgendein anderes Datum, das die Seite anzeigt, als Datum der Seite selbst übernehmen. Übergib `published` für ihr `datePublished`. Übergib `structuredDataEnabled={config.structuredData}`, um sie mit der [`structuredData`](/docs/discoverability/structured-data)-Konfiguration synchron zu halten, oder `structuredDataEnabled={false}`, um sie für eine Seite abzuschalten.
+
+Andere Seiten sind in diesem Graphen Artikel (`TechArticle`). Übergib `structuredDataType` für einen anderen schema.org-Typ, etwa `"WebPage"` für eine Landingpage oder `"CollectionPage"` für einen Index. Übergib `pageType="blog"` für einen Beitrag, den du selbst renderst: Er wird zu einem `BlogPosting` mit `og:type: article` sowie `article:published_time` und `article:modified_time` aus `published` und `lastModified` — genau wie ein Blogbeitrag im Inhaltsordner.
+
+Alles Weitere, was die Seite in ihrem `<head>` braucht — der `alternate`-Link eines Feeds, eigenes JSON-LD, ein Preload —, gehört in den `head`-Slot:
+
+```astro pages/blog/index.astro lineNumbers
+<PageLayout {...props}>
+  <link
+    href="/blog/rss.xml"
+    rel="alternate"
+    slot="head"
+    title="Acme blog"
+    type="application/rss+xml"
+  />
+  <!-- page content -->
+</PageLayout>
+```
 
 `page.title` wird wortwörtlich als Dokumenttitel verwendet (ohne `- siteTitle`-Suffix), da Marketingseiten üblicherweise ihren eigenen festlegen. Um einer benutzerdefinierten Seite stattdessen das komplette Dokumentations-Chrome zu geben — Seitenleiste, Inhaltsverzeichnis und alles Weitere —, bette sie in `RootLayout` ein, das Layout, das auch die generierten Seiten verwenden. Beziehe die erforderlichen Props direkt aus `blume:data`:
 

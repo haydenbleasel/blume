@@ -51,6 +51,7 @@ export default defineConfig({
 | `hotjar()` | [Hotjar](#hotjar) | `id` |
 | `logrocket()` | [LogRocket](#logrocket) | `id` |
 | `mixpanel()` | [Mixpanel](#mixpanel) | `token` |
+| `notra()` | [Notra](#notra) | `webKey` |
 | `oneDollarStats()` | [OneDollarStats](#onedollarstats) | — |
 | `pirsch()` | [Pirsch](#pirsch) | `code` |
 | `plausible()` | [Plausible](#plausible) | `domain` |
@@ -209,6 +210,23 @@ analytics: [
 ```
 
 `clientId` は `data-client-id` になります。その他のオプションはそれぞれタグ上の個別の `data-` 属性になるため、属性名と同じケバブケースで指定してください（`track-web-vitals`、`track-errors`、`track-outgoing-links`、`api-url` など）。`trackWebVitals` のようなキャメルケースの名前は Databuddy に無視されます。値は文字列です。オン／オフの切り替えには `"true"` または `"false"` を、`skip-patterns` と `mask-patterns` には JSON 配列を指定してください。それ以外の形式のリスト値は、Databuddy では空として扱われます。
+
+## Notra
+
+プロジェクトの**公開ウェブキー**（`nwk.…`。[Notra](https://usenotra.com) の **Settings → Tracking** で確認できます）をコピーして、`notra()` に渡します。
+
+```ts blume.config.ts lineNumbers
+analytics: [notra({ webKey: "nwk.xxxxxxxxxxxxxxxx" })],
+```
+
+Blume は、[`@usenotra/sdk`](https://www.npmjs.com/package/@usenotra/sdk) が固定している notra.js のビルドを、そのサブリソース完全性（Subresource Integrity）ハッシュ付きで読み込みます。スクリプトが 1 バイトでも変わるとブラウザは実行を拒否します。ハッシュをご自身で設定する必要はありません。固定されるビルドは Blume のリリースに合わせて更新されます。notra.js は Cookie を使わずに訪問者をカウントし、クライアントサイドのナビゲーションも自身で追跡します。
+
+- `errors: true` を指定すると `notra.plus.js` を読み込みます。こちらは JavaScript のエラーもレポートします。
+- `hash: true` を指定すると、`#fragment` が変わるたびにページビューをカウントします。Blume にはハッシュによるルートがないため、目次のクリック、タブの切り替え、アコーディオンの展開のたびにカウントされることになります。ご自身のページでハッシュによるルーティングを行っている場合を除き、オフのままにしてください。
+- `endpoint` は、`/api/` 配下でスクリプトを配信し、`/api/collect` でページビューを受け付ける、セルフホストの取り込みサーバーまたはプロキシのオリジンです。タグはそこに固定されたビルド `/api/notra.<build>.js` を要求します。このファイル名は、固定されるビルドが更新されるたびに変わります。`/api/notra.js` しか配信していない場合や、固定されたものとは別のビルドを配信している場合は、`pinned: false` を設定してください。
+- `src` を指定すると、Notra のビルドの代わりにご自身のスクリプト URL を読み込みます。そのため、`endpoint`、`errors`、`pinned` によってファイルが選ばれることはなくなります。そのハッシュは `integrity` で設定します。ルート相対の `src` は `public/` 内のファイルを指すため、[カスタムスクリプト](#custom-scripts)と同様に [`deployment.base`](/docs/deployment#subpath-deploys) が付加されます。
+- `api` はページビューの送信先です。`endpoint` または `src` を指定して `api` を指定しない場合、notra.js は Notra ではなく、スクリプトの配信元オリジンの `/api/collect` に送信します。`public/` に置いた notra.js のコピーは、`api: "https://ingest.usenotra.com/api/collect"` を設定するまで、静的サイトでは何も記録しません。
+- `src` を指定しない場合、`pinned: false` は固定されていない `notra.js`（または `notra.plus.js`）を読み込みます。ご自身の `src` と同様に、`integrity` を設定しない限り完全性ハッシュは付きません。
 
 ## OneDollarStats
 
@@ -431,6 +449,14 @@ analytics: [
 | `mixpanel()` | `token` | — | Mixpanel のプロジェクトトークン。必須です。 |
 | `mixpanel()` | `region` | `us` | データレジデンシーのリージョン：`us`、`eu`、`in` のいずれか。 |
 | `mixpanel()` | その他すべて | `track_pageview: "url-with-path-and-query-string"` | そのまま `mixpanel.init` のオプションにマージされます。 |
+| `notra()` | `webKey` | — | Notra の公開ウェブキー（`nwk.…`）。必須です。 |
+| `notra()` | `errors` | `false` | JavaScript のエラーもレポートする `notra.plus.js` を読み込みます。 |
+| `notra()` | `hash` | `false` | `#fragment` の変更をすべてページビューとしてカウントします（`data-hash`）。 |
+| `notra()` | `endpoint` | — | `/api/` 配下でスクリプトを配信し、`/api/collect` でページビューを受け付ける、セルフホストの取り込みサーバーまたはプロキシのオリジン。`endpoint` と `src` のどちらも指定しない場合、スクリプトは `https://static.usenotra.com` から読み込まれます。 |
+| `notra()` | `api` | `https://ingest.usenotra.com/api/collect`。`endpoint` または `src` を指定した場合はスクリプトのオリジンの `/api/collect` | ビーコンのエンドポイント（`data-api`）。 |
+| `notra()` | `src` | — | セルフホスト用の完全なスクリプト URL。`endpoint`、`errors`、`pinned` より優先されます。ルート相対の場合はデプロイのベースが付加されます。 |
+| `notra()` | `integrity` | 固定されたビルドのハッシュ。`src` または `pinned: false` の場合はなし | サブリソース完全性の値（`sha384-…`）。 |
+| `notra()` | `pinned` | `true` | 固定されたビルドを完全性ハッシュ付きで読み込みます。 |
 | `oneDollarStats()` | `hostname` | — | すべてのホストで、すべてのイベントのレポートに使われるホスト名（スキームやパスなし）。 |
 | `oneDollarStats()` | その他すべて | — | タグ上の `data-` 属性としてレンダリングされます（`"hash-routing": "false"` は出力されません）。 |
 | `pirsch()` | `code` | — | Pirsch の識別コード。必須です。 |
@@ -452,4 +478,4 @@ analytics: [
 
 ## カスタムイベント [#custom-events]
 
-Blume のページフィードバック（`feedback`、および[記述式フィードバック](/docs/configuration#written-feedback)が有効な場合は `feedback_comment`）、[検索](/docs/configuration/search#search-analytics)（`search`、`search_select`）、[アシスタント](/docs/configuration/assistant#analytics)（`ask`、`ask_answer`、`ask_error`）、[ナレーション](/docs/configuration/narration#analytics)プレーヤー（`narration_play`、`narration_complete`）は、クライアント API を持つ設定済みのすべてのアダプター — PostHog、Mixpanel、Heap、Segment、Hightouch、Amplitude、LogRocket、Adobe、Google Analytics、Google Tag Manager（`window.dataLayer` への `{ event }` の push として）、Plausible、Databuddy、Fathom、OneDollarStats（各プロパティの値は文字列として）、Pirsch、Clarity、Hotjar、Vercel — を通じてカスタムイベントを送信します。Fathom、Clarity、Hotjar はイベント名しか受け取らないため、各イベントはプロパティなしでカウントされます。Cloudflare と Clearbit にはイベント API がなく、Clics には Blume が呼び出せるグローバルなイベント API がありません。また、すべてのイベントは `detail` に `{ event, props }` を持つ `blume:track` CustomEvent として `window` 上でも発火するため、`script()` アダプターを使えば他の任意の送信先に転送できます。アシスタントが質問のテキストをプロバイダーに送信することはありません。検索はクエリを入力されたとおりに送信しますが、[`search.analytics.queries`](/docs/configuration/search#search-analytics) を `false` に設定すると、代わりに各クエリの長さを送信します。いずれの場合もテキスト自体は `blume:track` イベントに含まれるため、ご自身で作成したリスナーから転送できます。ビルドしたサイトのデプロイについては、[デプロイ](/docs/deployment)を参照してください。
+Blume のページフィードバック（`feedback`、および[記述式フィードバック](/docs/configuration#written-feedback)が有効な場合は `feedback_comment`）、[検索](/docs/configuration/search#search-analytics)（`search`、`search_select`）、[アシスタント](/docs/configuration/assistant#analytics)（`ask`、`ask_answer`、`ask_error`）、[ナレーション](/docs/configuration/narration#analytics)プレーヤー（`narration_play`、`narration_complete`）は、クライアント API を持つ設定済みのすべてのアダプター — PostHog、Mixpanel、Heap、Segment、Hightouch、Amplitude、LogRocket、Adobe、Google Analytics、Google Tag Manager（`window.dataLayer` への `{ event }` の push として）、Plausible、Databuddy、Fathom、OneDollarStats（各プロパティの値は文字列として）、Pirsch、Clarity、Hotjar、Vercel — を通じてカスタムイベントを送信します。Fathom、Clarity、Hotjar はイベント名しか受け取らないため、各イベントはプロパティなしでカウントされます。Cloudflare、Clearbit、Notra にはイベント API がなく、Clics には Blume が呼び出せるグローバルなイベント API がありません。また、すべてのイベントは `detail` に `{ event, props }` を持つ `blume:track` CustomEvent として `window` 上でも発火するため、`script()` アダプターを使えば他の任意の送信先に転送できます。アシスタントが質問のテキストをプロバイダーに送信することはありません。検索はクエリを入力されたとおりに送信しますが、[`search.analytics.queries`](/docs/configuration/search#search-analytics) を `false` に設定すると、代わりに各クエリの長さを送信します。いずれの場合もテキスト自体は `blume:track` イベントに含まれるため、ご自身で作成したリスナーから転送できます。ビルドしたサイトのデプロイについては、[デプロイ](/docs/deployment)を参照してください。

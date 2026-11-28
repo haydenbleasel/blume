@@ -137,4 +137,18 @@ describe("Mermaid element module", () => {
     );
     expect(source).toMatch(/^export /mu);
   });
+
+  it("imports Pele dynamically, so a page without a diagram never loads it", async () => {
+    // `blume:features` imports this module on every page of a site that has a
+    // diagram. A static value import of `pele` here would put the renderer in
+    // every page's module graph; only the type import and the dynamic import
+    // are allowed.
+    const source = await readFile(
+      new URL("../src/components/content/mermaid-element.ts", import.meta.url),
+      "utf-8"
+    );
+    expect(source).toContain('import type { Mounted } from "pele";');
+    expect(source).not.toMatch(/^import (?!type\b)/mu);
+    expect(source).toContain('import("pele")');
+  });
 });

@@ -9,10 +9,20 @@
  *
  * These helpers run server-side (config, route construction, the link checker,
  * redirects, the markdown link plugin). The client-side counterpart lives in
- * `components/islands/base-path.ts` and serves `deployment.base` via `BASE_URL`.
+ * `components/islands/base-path.ts` and serves `deployment.base` via
+ * `deployBase()`.
  */
 
 import { trimEnd } from "./trim.ts";
+
+/**
+ * The build constant that carries the base Astro resolved to the site's own
+ * code: the integration defines it, and `deployBase()` in
+ * `components/islands/base-path.ts` reads it. Blume's own name, because the
+ * environment can shadow Astro's own `BASE_URL` field in a build (see
+ * `deployBase`).
+ */
+export const DEPLOY_BASE_DEFINE = "import.meta.env.BLUME_BASE_URL";
 
 /**
  * Canonicalize a configured base path to either `""` (none) or `/seg[/seg…]`

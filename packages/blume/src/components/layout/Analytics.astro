@@ -4,6 +4,7 @@ import data from "blume:data";
 
 import { analyticsHead } from "../../analytics/head.ts";
 import type { BlumeDataConfig } from "../../core/data.ts";
+import { deployBase } from "../islands/base-path.ts";
 
 // The analytics adapters' <head> output. Each adapter in `analytics` owns the
 // snippet it emits (src/analytics/*); `analyticsHead` collects them into one
@@ -21,10 +22,11 @@ interface Props {
 }
 
 const { analytics } = Astro.props;
-// A `script()` src in `public/` is served under the deployment base.
+// A `script()` or `notra()` src in `public/` is served under the deployment
+// base.
 const nodes = analyticsHead(
   import.meta.env.PROD ? (analytics ?? []) : [],
-  import.meta.env.BASE_URL
+  deployBase()
 );
 const held = data.config.consent
   ? { "data-blume-consent": "analytics", type: "text/plain" }

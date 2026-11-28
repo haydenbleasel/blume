@@ -14,6 +14,11 @@ export interface MeasuredHeading {
  * trigger line (the first heading before any has reached it), or the last
  * heading once the page is scrolled to the bottom.
  *
+ * A heading less than a pixel below the line counts as reached. A clicked
+ * anchor scrolls its heading to the line, but the browser snaps the scroll
+ * position to whole pixels while the heading's offset can be fractional, so it
+ * can settle at 72.05px for a 72px line and leave the previous entry lit.
+ *
  * Only rendered headings compete. A heading inside a hidden tab panel
  * (`display: none`) has no boxes and measures `top: 0`, so it would always
  * read as scrolled past and hold the highlight from the top of the page.
@@ -33,7 +38,7 @@ export const activeTocEntry = <Entry extends { heading: MeasuredHeading }>(
   // trigger line is the section currently being read; default to the first.
   let active = rendered[0] ?? null;
   for (const entry of rendered) {
-    if (entry.heading.getBoundingClientRect().top <= triggerOffset) {
+    if (entry.heading.getBoundingClientRect().top < triggerOffset + 1) {
       active = entry;
     }
   }

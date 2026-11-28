@@ -235,7 +235,26 @@ const { config } = data;
 
 言語スイッチャーは例外です。カスタムページは自身のルートでのみ配信されるため、Blume はそのページのバージョンが他のどのロケールにあるかを知ることができません。そのため、明示的に渡さない限り、ヘッダーにスイッチャーは表示されません: `localeSwitch` はロケールごとのエントリ — `{ code, label, dir, href, current, untranslated }` — を受け取り、それぞれが各言語向けに作成したページを指します。
 
-[エージェント検出用の head リンク](/docs/discoverability/agent-discovery#discovery-link-header)も一緒についてきます: レイアウトが解決済みの設定を読み取るため、カスタムページは props を渡さなくても、ドキュメントページと同じ `describedby`、`ai-catalog`、`ard` リンクを持ちます。ホームページはさらに、`/index.md` の Markdown ミラーを `text/markdown` の代替として告知します。このミラーは常に存在するためです。他のカスタムページにはミラーがないため、何も告知されません。あるページからこれらのリンクを取り除くには `discovery={null}` を渡します。
+[エージェント検出用の head リンク](/docs/discoverability/agent-discovery#discovery-link-header)も一緒についてきます: レイアウトが解決済みの設定を読み取るため、カスタムページは props を渡さなくても、ドキュメントページと同じ `describedby`、`ai-catalog`、`ard` リンクを持ちます。あるページからこれらのリンクを取り除くには `discovery={null}` を渡します。
+
+### エージェント向けのカスタムページ [#custom-pages-for-agents]
+
+カスタムページは、コンテンツページと同じ方法でエージェントに届きます。Astro が HTML を書き出した後、ビルドは各静的カスタムページを読み戻し、`<main>` 内にレンダリングされたもの — あなたが埋めるスロット — を Markdown に変換します: 見出し、文章、リンク、リスト、テーブル、代替テキスト付きの画像、そして言語指定付きのコードブロックです。その Markdown はページの `.md` と `.mdx` の URL で配信され、[コンテンツページと同様に](/docs/discoverability/markdown#content-negotiation) `Accept: text/markdown` に応答します。また、そのページは [`llms.txt`](/docs/discoverability/llms-txt) 内で、自身が属するセクションのヘッダータブの下に掲載され、その Markdown は `llms-full.txt` に含まれ、サイトマップは JSON-LD 内の `dateModified` からその日付を設定します（後述の `lastModified` を参照）。レイアウトは head 内で `.md` のコピーを `text/markdown` の代替として告知します。ホームページは独自のミラーである `llms.txt` インデックスを保持します。
+
+CSS だけで間隔が空けられている要素 — 並んだ span や、1 つのリンク内にあるカードのタイトルと説明など — は、ビルドされた HTML のタグ間に空白がないため、スペースで区切られます。要素の隣にあるテキストや、`pre` や `code` 内のものは、その間隔が正確に保たれます。読者がテキストとして利用できないものは除外されます: スクリプト、スタイル、インライン SVG、フォームコントロールとボタン、ナビゲーション、装飾的な画像（`alt=""`）、そして読者から隠されているもの（`hidden`、`aria-hidden="true"`、`inert`）です。それ以外の要素 — コールトゥアクションやインタラクティブなデモなど — も除外するには、[`<Visibility for="web">`](/docs/content/components#visibility) がレンダリングする属性でその要素を Web 専用としてマークします。同じ属性を `agents` に設定すると、ページ上で非表示になっている要素であっても保持されます:
+
+```astro pages/pricing.astro lineNumbers
+<section data-blume-visibility="web">
+  <SignUpForm />
+</section>
+<p data-blume-visibility="agents" hidden>
+  Prices are in US dollars and exclude tax.
+</p>
+```
+
+ページ全体をエージェント向けの出力から除外するには `ai={{ exclude: true }}` を渡します。これはコンテンツページにおけるフロントマターの `ai.exclude` と同じ働きをします。`noindex` のページと動的な `[param]` ルートは自動的に除外されます。ページの `.md` パスに相当するファイルを `public/` に置いた場合は、生成されたものよりそちらが優先されます。
+
+`llms.txt` 内のそのページの行には、`<title>` からサイト名を示す末尾のセグメントを除いたものが使われます: Acme というタイトルのサイトでは「Pricing — Acme」は「Pricing」として掲載され、「Acme for Teams — Plans and pricing」はそのまま残ります。
 
 `transparentHeader` を渡すと、ヘッダーは透過した状態で、クロームを白で表示して始まるため、ページ上部の暗いヒーローの上に重ねられます。ページがスクロールされるとすぐに通常のすりガラス風のバーになり、検索ダイアログは終始ページ本来の配色を保ちます。これを見せるにはヒーローがヘッダーの下まで伸びている必要があります — ヘッダーの高さ分（`-mt-16`）だけ引き上げ、その分を上部のパディングで補ってください。
 
@@ -256,7 +275,24 @@ const { config } = data;
 
 変わるのはこのページだけで、他のすべてのルートは生成されたカードのままです — つまりこれが、ホームページだけに独自の共有画像を与える方法です。生成されたカードは自身のサイズと代替テキストをクローラーに対して自動的に宣言します。独自の `ogImage` を使う場合は、共有カードが同じ扱いを受けられるよう `ogImageAlt` と `ogImageSize` を併せて渡してください。
 
-このページは schema.org の JSON-LD も出力します — ドキュメントページが持つのと同じグラフで、ホームページには `WebPage` ノードが加わります — そのため、（多くの場合カスタムページである）ホームページだけが構造化データのない URL になることはありません。カスタムページには日付の基準となるコンテンツファイルがないため、`dateModified` を出力するには `lastModified`（日付文字列または `Date`）を渡してください。機械可読な日付がないと、検索エンジンはページに表示されている他の日付をそのページ自身の日付とみなすことがあります。[`structuredData`](/docs/discoverability/structured-data) の設定と同期させるには `structuredDataEnabled={config.structuredData}` を、特定のページだけ無効にするには `structuredDataEnabled={false}` を渡します。
+このページは schema.org の JSON-LD も出力します — ドキュメントページが持つのと同じグラフで、ホームページには `WebPage` ノードが加わります — そのため、（多くの場合カスタムページである）ホームページだけが構造化データのない URL になることはありません。カスタムページには日付の基準となるコンテンツファイルがないため、`dateModified` を出力するには `lastModified`（日付文字列または `Date`）を渡してください。この値はサイトマップでも読み取られます。機械可読な日付がないと、検索エンジンはページに表示されている他の日付をそのページ自身の日付とみなすことがあります。`datePublished` を出力するには `published` を渡します。[`structuredData`](/docs/discoverability/structured-data) の設定と同期させるには `structuredDataEnabled={config.structuredData}` を、特定のページだけ無効にするには `structuredDataEnabled={false}` を渡します。
+
+その他のページは、このグラフ内で記事（`TechArticle`）として扱われます。別の schema.org タイプにするには `structuredDataType` を渡します。ランディングページなら `"WebPage"`、インデックスなら `"CollectionPage"` です。自分でレンダリングする記事には `pageType="blog"` を渡します: これにより `BlogPosting` となり、コンテンツフォルダ内のブログ記事と同様に、`og:type: article` に加えて、`published` と `lastModified` に基づく `article:published_time` と `article:modified_time` が付与されます。
+
+ページの `<head>` に必要なその他のもの — フィードの `alternate` リンク、独自の JSON-LD、プリロードなど — は `head` スロットに入れます:
+
+```astro pages/blog/index.astro lineNumbers
+<PageLayout {...props}>
+  <link
+    href="/blog/rss.xml"
+    rel="alternate"
+    slot="head"
+    title="Acme blog"
+    type="application/rss+xml"
+  />
+  <!-- page content -->
+</PageLayout>
+```
 
 `page.title` はドキュメントタイトルとしてそのまま使われます（`- siteTitle` のサフィックスは付きません）。マーケティングページは通常、自前のタイトルを設定するためです。代わりにカスタムページへ完全なドキュメントのクローム — サイドバー、目次、すべて — を与えるには、生成されたページが使うレイアウトである `RootLayout` でラップします。必要な props は `blume:data` から直接取得できます:
 

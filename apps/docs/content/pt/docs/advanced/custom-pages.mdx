@@ -235,7 +235,26 @@ O cabeçalho que uma página personalizada recebe é o mesmo das páginas de doc
 
 O seletor de idioma é a exceção. Uma página personalizada é servida apenas na sua própria rota, então o Blume não tem como saber quais outros idiomas têm uma versão dela, e o cabeçalho não mostra nenhum seletor a menos que você passe um: `localeSwitch` recebe uma entrada por idioma — `{ code, label, dir, href, current, untranslated }` — apontando para a página que você construiu para cada idioma.
 
-Os [links de descoberta para agentes no head](/docs/discoverability/agent-discovery#discovery-link-header) também vêm junto: o layout lê a configuração resolvida, então uma página personalizada carrega os mesmos links `describedby`, `ai-catalog` e `ard` que as páginas de documentação, sem que você precise passar nenhuma prop. A página inicial também anuncia seu espelho em Markdown `/index.md` como alternativa `text/markdown`, já que esse espelho sempre existe; as outras páginas personalizadas não têm um, então nenhum é anunciado. Passe `discovery={null}` para remover os links de uma página específica.
+Os [links de descoberta para agentes no head](/docs/discoverability/agent-discovery#discovery-link-header) também vêm junto: o layout lê a configuração resolvida, então uma página personalizada carrega os mesmos links `describedby`, `ai-catalog` e `ard` que as páginas de documentação, sem que você precise passar nenhuma prop. Passe `discovery={null}` para remover os links de uma página específica.
+
+### Páginas personalizadas para agentes [#custom-pages-for-agents]
+
+Uma página personalizada chega aos agentes da mesma forma que uma página de conteúdo. Depois que o Astro grava o HTML, o build lê de volta cada página personalizada estática e converte para Markdown o que ela renderiza dentro do `<main>` — o slot que você preenche: títulos, prosa, links, listas, tabelas, imagens com texto alternativo e blocos de código com a respectiva linguagem. Esse Markdown é servido nas URLs `.md` e `.mdx` da página e responde a `Accept: text/markdown` [como o de uma página de conteúdo](/docs/discoverability/markdown#content-negotiation), a página é listada no [`llms.txt`](/docs/discoverability/llms-txt) sob a aba do cabeçalho em cuja seção ela está, o Markdown dela entra no `llms-full.txt`, e o sitemap a data a partir do `dateModified` do JSON-LD dela (veja `lastModified` abaixo). O layout anuncia a cópia `.md` como alternativa `text/markdown` no head. A página inicial mantém o próprio espelho, o índice `llms.txt`.
+
+Elementos que só o CSS separa, como uma fileira de spans ou o título e a descrição de um card dentro de um único link, são separados por um espaço, já que o HTML gerado não tem espaços em branco entre as tags; texto ao lado de um elemento, e qualquer coisa dentro de `pre` ou `code`, mantém o espaçamento exatamente como está. O que um leitor não consegue usar como texto fica de fora: scripts, estilos, SVG inline, controles de formulário e botões, navegação, imagens decorativas (`alt=""`) e qualquer coisa oculta para leitores (`hidden`, `aria-hidden="true"`, `inert`). Para deixar de fora também qualquer outro elemento, como uma chamada para ação ou uma demo interativa, marque-o como exclusivo da web com o atributo que o [`<Visibility for="web">`](/docs/content/components#visibility) renderiza. O mesmo atributo definido como `agents` mantém um elemento mesmo quando ele está oculto na página:
+
+```astro pages/pricing.astro lineNumbers
+<section data-blume-visibility="web">
+  <SignUpForm />
+</section>
+<p data-blume-visibility="agents" hidden>
+  Prices are in US dollars and exclude tax.
+</p>
+```
+
+Passe `ai={{ exclude: true }}` para manter uma página inteira fora das superfícies para agentes, como o `ai.exclude` do frontmatter faz em uma página de conteúdo. Uma página `noindex` e uma rota dinâmica `[param]` já ficam de fora por conta própria. Um arquivo que você coloca em `public/` no caminho `.md` de uma página prevalece sobre o gerado.
+
+A linha da página no `llms.txt` usa o `<title>` dela sem um segmento final que nomeie o site: "Pricing — Acme" é listada como "Pricing" em um site chamado Acme, e "Acme for Teams — Plans and pricing" fica inteira.
 
 Passe `transparentHeader` para que o cabeçalho comece transparente, com seus elementos em branco, para que ele possa ficar sobre um hero escuro no topo da página; ele vira a barra fosca de sempre assim que a página rola, e o diálogo de busca mantém as cores da própria página o tempo todo. O hero precisa passar por baixo do cabeçalho para que isso apareça — puxe-o para cima pela altura do cabeçalho (`-mt-16`) e adicione um espaçamento no topo para compensar.
 
@@ -256,7 +275,24 @@ Passar `siteUrl` (e `ogEnabled`) deriva automaticamente o `canonical` da página
 
 Apenas esta página muda — todas as outras rotas mantêm seu card gerado — então é assim que você dá somente à página inicial uma imagem de compartilhamento sob medida. O card gerado declara seu tamanho e texto alternativo aos rastreadores por conta própria; para a sua própria `ogImage`, passe `ogImageAlt` e `ogImageSize` junto para que o card de compartilhamento receba o mesmo tratamento.
 
-A página também emite JSON-LD do schema.org — o mesmo grafo que as páginas de documentação carregam, com um nó `WebPage` na página inicial — para que a página inicial (geralmente uma página personalizada) não seja a única URL sem dados estruturados. Uma página personalizada não tem um arquivo de conteúdo de onde tirar uma data, então passe `lastModified` (uma string de data ou um `Date`) para emitir o `dateModified` dela; sem uma data legível por máquina, os mecanismos de busca podem tomar qualquer outra data exibida na página como a data da própria página. Passe `structuredDataEnabled={config.structuredData}` para mantê-lo em sincronia com a configuração [`structuredData`](/docs/discoverability/structured-data), ou `structuredDataEnabled={false}` para desativá-lo em uma página específica.
+A página também emite JSON-LD do schema.org — o mesmo grafo que as páginas de documentação carregam, com um nó `WebPage` na página inicial — para que a página inicial (geralmente uma página personalizada) não seja a única URL sem dados estruturados. Uma página personalizada não tem um arquivo de conteúdo de onde tirar uma data, então passe `lastModified` (uma string de data ou um `Date`) para emitir o `dateModified` dela, que o sitemap também lê; sem uma data legível por máquina, os mecanismos de busca podem tomar qualquer outra data exibida na página como a data da própria página. Passe `published` para emitir o `datePublished` dela. Passe `structuredDataEnabled={config.structuredData}` para mantê-lo em sincronia com a configuração [`structuredData`](/docs/discoverability/structured-data), ou `structuredDataEnabled={false}` para desativá-lo em uma página específica.
+
+As outras páginas são artigos nesse grafo (`TechArticle`). Passe `structuredDataType` para usar outro tipo do schema.org, `"WebPage"` para uma landing page ou `"CollectionPage"` para um índice. Passe `pageType="blog"` para um post que você mesmo renderiza: ele vira um `BlogPosting`, com `og:type: article` e `article:published_time` e `article:modified_time` a partir de `published` e `lastModified`, como acontece com um post de blog na pasta de conteúdo.
+
+Qualquer outra coisa de que a página precise no `<head>` — o link `alternate` de um feed, o próprio JSON-LD, um preload — vai no slot `head`:
+
+```astro pages/blog/index.astro lineNumbers
+<PageLayout {...props}>
+  <link
+    href="/blog/rss.xml"
+    rel="alternate"
+    slot="head"
+    title="Acme blog"
+    type="application/rss+xml"
+  />
+  <!-- page content -->
+</PageLayout>
+```
 
 `page.title` é usado literalmente como título do documento (sem o sufixo `- siteTitle`), já que páginas de marketing geralmente definem o seu próprio. Para dar a uma página personalizada toda a estrutura da documentação — barra lateral, índice e tudo mais — envolva-a no `RootLayout`, o layout que as páginas geradas usam. Puxe as props necessárias diretamente do `blume:data`:
 

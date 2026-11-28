@@ -119,7 +119,7 @@ describe("the client base helpers", () => {
     expect(mountBase("/guides", "#setup")).toBe("#setup");
   });
 
-  it("bind withMountedBase to BASE_URL (unset in tests -> pass-through)", () => {
+  it("bind withMountedBase to the deployment base (root in tests -> pass-through)", () => {
     expect(withMountedBase("/guides/setup")).toBe("/guides/setup");
   });
 });

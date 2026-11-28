@@ -21,6 +21,7 @@ export default defineConfig({
         // prereleases: false,  // include prereleases (default off)
         // drafts: false,       // include drafts (needs a write token)
         // limit: 100,          // cap releases, newest-first
+        // noindex: { minWords: 60 }, // keep short releases out of search
         // baseUrl: "https://github.acme.com/api/v3", // GitHub Enterprise Server
       }),
     ],
@@ -36,6 +37,10 @@ changelog: {
   description: "Every release of the Acme SDK, from GitHub.",
 },
 ```
+
+### छोटी रिलीज़ [#short-releases]
+
+जो रिपॉज़िटरी बार-बार रिलीज़ करती है, उसके कई रिलीज़ पेजों में बहुत कम जानकारी होती है, जैसे केवल वर्ज़न में बदलाव या एक पंक्ति का सुधार। यदि कोई सर्च इंजन इन सभी पेजों को इंडेक्स करता है, तो वह साइट को अधिकतर कम सामग्री वाले पेजों के रूप में देखता है। इन्हें इंडेक्स से बाहर रखने के लिए `noindex` सेट करें। `{ minWords: 60 }` किसी रिलीज़ को तब `noindex` चिह्नित करता है जब उसके नोट्स में 60 से कम शब्दों का गद्य हो (शीर्षक, कोड और changesets द्वारा आरंभ में जोड़े गए कमिट हैश गिने नहीं जाते), और `true` प्रत्येक रिलीज़ को चिह्नित करता है। noindex की गई रिलीज़ का पेज, `/changelog` टाइमलाइन पर उसका स्थान और उसका RSS आइटम बने रहते हैं। लेकिन किसी भी अन्य [`noindex`](/docs/discoverability/metadata#per-page-overrides) पेज की तरह, वह [साइटमैप](/docs/discoverability/sitemap-and-robots#sitemap), [`llms.txt`](/docs/discoverability/llms-txt) और [स्ट्रक्चर्ड डेटा](/docs/discoverability/structured-data) से हटा दी जाती है।
 
 निजी रिपॉज़िटरी `GITHUB_TOKEN` एनवायरनमेंट वेरिएबल के माध्यम से प्रमाणीकृत होती है। यह वही टोकन है जिसका उपयोग अन्य GitHub सुविधाएँ करती हैं, और इसे कभी भी आपके कॉन्फ़िग में सीधे नहीं लिखा जाता। एडैप्टर इस वेरिएबल को घोषित करता है, इसलिए इसके बिना बिल्ड करने पर चेतावनी दिखाई जाती है। GitHub Enterprise Server पर स्थित रिपॉज़िटरी के लिए, `baseUrl` को उसके REST API (`https://<host>/api/v3`) पर सेट करें। `GITHUB_TOKEN` वहीं भेजा जाता है, इसलिए यह उसी सर्वर का टोकन होना चाहिए। [हर रिमोट स्रोत](/docs/content/sources#caching-and-offline-builds) की तरह, इसे भी `.blume/cache/<source>/` के अंतर्गत कैश किया जाता है। API उपलब्ध न होने पर इसे ऑफ़लाइन कैश से परोसा जाता है। चेंजलॉग एक पूरक सामग्री है, इसलिए फ़ेच विफल होने पर बिल्ड विफल नहीं होता, भले ही कोई कैश मौजूद न हो (जैसे बिना टोकन वाला CI बिल्ड)। ऐसे में चेतावनी के साथ एक खाली चेंजलॉग बनता है। चेंजलॉग में सामग्री लाने के लिए अपने CI और डिप्लॉय एनवायरनमेंट में `GITHUB_TOKEN` सेट करें।
 

@@ -41,6 +41,7 @@ import { customMirrorName, ogTypeFor } from "../../seo/page-kind.ts";
 import { normalizeXHandle } from "../../seo/x-handle.ts";
 import Icon from "../Icon.astro";
 import {
+  deployBase,
   stripBase,
   withBase,
   withMountedBase,
@@ -267,7 +268,7 @@ const description = page?.description ?? site.description;
 // and `/index.md` mirror. `trailingSlash: "never"` keeps the pathname bare.
 const route =
   page?.route ??
-  stripBase(import.meta.env.BASE_URL ?? "/", Astro.url.pathname);
+  stripBase(deployBase(), Astro.url.pathname);
 const activeTab = currentTabForRoute(navigation.tabs, route, navigation.root);
 
 // The page's Markdown copy, advertised as a `text/markdown` alternate. The
@@ -353,7 +354,7 @@ const structuredData =
   structuredDataEnabled === false || noindex
     ? null
     : buildStructuredData({
-      base: import.meta.env.BASE_URL,
+      base: deployBase(),
       breadcrumbs: [],
       description,
       identity: data.config.identity,

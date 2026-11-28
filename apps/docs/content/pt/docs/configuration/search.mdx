@@ -110,7 +110,8 @@ Reserve os boosts para as poucas páginas de que os leitores mais precisam, como
 
 O quanto um boost move uma página depende do adaptador:
 
-- O **Orama** (o padrão) e o **FlexSearch** multiplicam cada correspondência pelo boost da página antes de ordenar, então um boost de 3 conta exatamente três vezes. A busca do [servidor MCP](/docs/discoverability/mcp) e a do [assistente](/docs/configuration/assistant) classificam da mesma forma.
+- O **Orama** (o padrão) multiplica cada correspondência pelo boost da página antes de ordenar, então um boost de 3 conta exatamente três vezes. Uma consulta de duas ou mais palavras classifica primeiro as páginas que [a contêm como frase](#phrase-matches). A [API JSON da documentação](/docs/discoverability/json-api), o [servidor MCP](/docs/discoverability/mcp) e o [assistente](/docs/configuration/assistant) classificam da mesma forma.
+- O **FlexSearch** multiplica cada correspondência pelo boost da página antes de ordenar, então um boost de 3 conta exatamente três vezes.
 - O **Pagefind** dá mais peso ao texto de uma página com boost. Ele atenua correspondências repetidas, então o ganho é menor que o multiplicador: um boost de 5 classifica a página mais acima, mas algo mais próximo do dobro. O Pagefind trata um boost acima de 10 como 10.
 - O **Algolia** ordena pelo boost entre resultados com correspondência mais ou menos equivalente, então um boost desempata casos próximos sem colocar uma correspondência mais fraca acima de uma forte. A sincronização adiciona `desc(boost)` ao ranking personalizado do índice, depois de qualquer ranking que você tenha definido.
 - O **Typesense** ordena pela relevância e, depois, pelo boost entre resultados com a mesma pontuação de relevância, então um boost resolve empates sem colocar uma correspondência mais fraca acima de uma forte.
@@ -118,6 +119,12 @@ O quanto um boost move uma página depende do adaptador:
 - O **Mixedbread** busca no seu próprio store, para o qual o Blume não envia nada, então boosts e palavras-chave não chegam até ele.
 
 As palavras-chave são pesquisadas em todos os adaptadores, exceto no Mixedbread.
+
+### Correspondências de frase [#phrase-matches]
+
+Com o Orama, uma consulta de duas ou mais palavras coloca uma página em primeiro lugar quando o título dela ou uma das palavras-chave dela contém a consulta como frase. Buscar `coding agents` coloca uma página com o título "Memory for coding agents" acima de outra que usa as duas palavras separadas. Maiúsculas e minúsculas, acentos e pontuação não importam, e a última palavra conta a partir das primeiras letras, então a ordem se mantém enquanto o leitor ainda está digitando. Uma consulta de uma só palavra é classificada apenas pela relevância e pelo boost.
+
+Um boost ordena as páginas dentro de cada grupo e nunca move uma página de um grupo para o outro. Um guia legado cujo título contém a consulta fica acima de uma página com boost que só usa as palavras dela separadas. Para colocar outra página em primeiro lugar, adicione a frase ao `search.keywords` dessa página, e os dois boosts decidem entre elas.
 
 ## Análise de buscas [#search-analytics]
 

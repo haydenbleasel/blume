@@ -51,6 +51,7 @@ export default defineConfig({
 | `hotjar()` | [Hotjar](#hotjar) | `id` |
 | `logrocket()` | [LogRocket](#logrocket) | `id` |
 | `mixpanel()` | [Mixpanel](#mixpanel) | `token` |
+| `notra()` | [Notra](#notra) | `webKey` |
 | `oneDollarStats()` | [OneDollarStats](#onedollarstats) | — |
 | `pirsch()` | [Pirsch](#pirsch) | `code` |
 | `plausible()` | [Plausible](#plausible) | `domain` |
@@ -209,6 +210,23 @@ analytics: [
 ```
 
 `clientId`, `data-client-id` बन जाता है। कोई भी अन्य विकल्प टैग पर अपना अलग `data-` एट्रिब्यूट बन जाता है, इसलिए उसका नाम ठीक वैसे ही रखें जैसा एट्रिब्यूट में लिखा जाता है, यानी kebab-case में (`track-web-vitals`, `track-errors`, `track-outgoing-links`, `api-url`, …)। Databuddy `trackWebVitals` जैसे camelCase नाम को अनदेखा करता है। मान स्ट्रिंग्स होते हैं: किसी स्विच के लिए `"true"` या `"false"`, और `skip-patterns` तथा `mask-patterns` के लिए एक JSON ऐरे। Databuddy किसी भी अन्य रूप में दिए गए सूची मान को खाली मानता है।
+
+## Notra
+
+अपने प्रोजेक्ट की **सार्वजनिक वेब की** (`nwk.…`, [Notra](https://usenotra.com) में **Settings → Tracking** से) कॉपी करें और उसे `notra()` को दें।
+
+```ts blume.config.ts lineNumbers
+analytics: [notra({ webKey: "nwk.xxxxxxxxxxxxxxxx" })],
+```
+
+Blume, notra.js का वह बिल्ड उसके Subresource Integrity हैश के साथ लोड करता है जिसे [`@usenotra/sdk`](https://www.npmjs.com/package/@usenotra/sdk) पिन करता है। यदि एक भी बाइट बदलती है तो ब्राउज़र स्क्रिप्ट चलाने से मना कर देता है, और आपको हैश कभी स्वयं सेट नहीं करना पड़ता: पिन Blume की रिलीज़ के साथ बदलता है। notra.js कुकीज़ के बिना विज़िटर्स गिनता है और क्लाइंट-साइड नेविगेशन को स्वयं ट्रैक करता है।
+
+- `errors: true` सेट करने पर `notra.plus.js` लोड होता है, जो JavaScript त्रुटियों की भी रिपोर्ट करता है।
+- `hash: true` हर बार `#fragment` बदलने पर एक पेज व्यू गिनता है। Blume में कोई हैश रूट नहीं होते, इसलिए इसका अर्थ है विषय-सूची का हर क्लिक, हर टैब स्विच, और हर खोला गया अकॉर्डियन। इसे तब तक बंद रखें जब तक आपका अपना कोई पेज हैश के आधार पर रूटिंग न करता हो।
+- `endpoint` किसी सेल्फ़-होस्टेड इंजेस्ट या प्रॉक्सी का ओरिजिन है, जो स्क्रिप्ट को `/api/` के अंतर्गत सर्व करता है और `/api/collect` पर पेज व्यू लेता है। टैग उससे पिन किया गया बिल्ड, `/api/notra.<build>.js`, माँगता है, जिसका फ़ाइलनाम पिन बदलने पर हर बार बदल जाता है। यदि वह केवल `/api/notra.js` सर्व करता है, या पिन किए गए बिल्ड के अलावा कोई अन्य बिल्ड, तो `pinned: false` सेट करें।
+- `src` Notra के बिल्ड्स के स्थान पर आपका अपना स्क्रिप्ट URL लोड करता है, इसलिए तब फ़ाइल का चयन `endpoint`, `errors`, और `pinned` से नहीं होता। `integrity` उसका हैश सेट करता है। रूट-रिलेटिव `src`, `public/` में मौजूद एक फ़ाइल होता है, इसलिए किसी [कस्टम स्क्रिप्ट](#custom-scripts) की तरह उसमें भी [`deployment.base`](/docs/deployment#subpath-deploys) जुड़ जाता है।
+- `api` वह स्थान है जहाँ पेज व्यू भेजे जाते हैं। `endpoint` या `src` होने पर और `api` न होने पर, notra.js, Notra के बजाय उस ओरिजिन के `/api/collect` पर पोस्ट करता है जहाँ से उसकी स्क्रिप्ट आई थी। `public/` में रखी notra.js की प्रति किसी स्टैटिक साइट पर तब तक कुछ भी रिकॉर्ड नहीं करती जब तक आप `api: "https://ingest.usenotra.com/api/collect"` सेट न करें।
+- `src` के बिना, `pinned: false` अनपिन किया गया `notra.js` (या `notra.plus.js`) लोड करता है। आपके अपने `src` की तरह, इसमें भी तब तक कोई इंटीग्रिटी हैश नहीं होता जब तक आप `integrity` सेट न करें।
 
 ## OneDollarStats
 
@@ -431,6 +449,14 @@ analytics: [
 | `mixpanel()` | `token` | — | Mixpanel प्रोजेक्ट टोकन। आवश्यक। |
 | `mixpanel()` | `region` | `us` | डेटा रेज़िडेंसी रीजन: `us`, `eu`, या `in`। |
 | `mixpanel()` | अन्य कुछ भी | `track_pageview: "url-with-path-and-query-string"` | `mixpanel.init` विकल्पों में ज्यों का त्यों मर्ज किया जाता है। |
+| `notra()` | `webKey` | — | Notra सार्वजनिक वेब की (`nwk.…`)। आवश्यक। |
+| `notra()` | `errors` | `false` | `notra.plus.js` लोड करता है, जो JavaScript त्रुटियों की भी रिपोर्ट करता है। |
+| `notra()` | `hash` | `false` | हर `#fragment` बदलाव को एक पेज व्यू के रूप में गिनता है (`data-hash`)। |
+| `notra()` | `endpoint` | — | किसी सेल्फ़-होस्टेड इंजेस्ट या प्रॉक्सी का ओरिजिन, जो स्क्रिप्ट को `/api/` के अंतर्गत सर्व करता है और `/api/collect` पर पेज व्यू लेता है। `endpoint` और `src` दोनों न होने पर, स्क्रिप्ट `https://static.usenotra.com` से लोड होती है। |
+| `notra()` | `api` | `https://ingest.usenotra.com/api/collect`, या `endpoint` अथवा `src` होने पर स्क्रिप्ट के ओरिजिन पर `/api/collect` | बीकन एंडपॉइंट (`data-api`)। |
+| `notra()` | `src` | — | पूरा स्क्रिप्ट URL, सेल्फ़-होस्टिंग के लिए। `endpoint`, `errors`, और `pinned` को ओवरराइड करता है। रूट-रिलेटिव URL में डिप्लॉयमेंट बेस जुड़ जाता है। |
+| `notra()` | `integrity` | पिन किए गए बिल्ड का हैश, या `src` अथवा `pinned: false` होने पर कोई नहीं | Subresource Integrity मान (`sha384-…`)। |
+| `notra()` | `pinned` | `true` | पिन किया गया बिल्ड उसके इंटीग्रिटी हैश के साथ लोड करता है। |
 | `oneDollarStats()` | `hostname` | — | वह सादा होस्ट नाम जिसके अंतर्गत हर होस्ट पर हर इवेंट रिपोर्ट किया जाता है। |
 | `oneDollarStats()` | अन्य कुछ भी | — | टैग पर `data-` एट्रिब्यूट के रूप में रेंडर किया जाता है (`"hash-routing": "false"` छोड़ दिया जाता है)। |
 | `pirsch()` | `code` | — | Pirsch आइडेंटिफ़िकेशन कोड। आवश्यक। |
@@ -452,4 +478,4 @@ analytics: [
 
 ## कस्टम इवेंट्स [#custom-events]
 
-Blume का पेज फ़ीडबैक (`feedback`, और [लिखित फ़ीडबैक](/docs/configuration#written-feedback) चालू होने पर `feedback_comment`), [सर्च](/docs/configuration/search#search-analytics) (`search`, `search_select`), [असिस्टेंट](/docs/configuration/assistant#analytics) (`ask`, `ask_answer`, `ask_error`), और [नैरेशन](/docs/configuration/narration#analytics) प्लेयर (`narration_play`, `narration_complete`) हर उस कॉन्फ़िगर किए गए एडैप्टर के ज़रिए कस्टम इवेंट्स भेजते हैं जिसके पास क्लाइंट API है — PostHog, Mixpanel, Heap, Segment, Hightouch, Amplitude, LogRocket, Adobe, Google Analytics, Google Tag Manager (`window.dataLayer` पर `{ event }` पुश के रूप में), Plausible, Databuddy, Fathom, OneDollarStats (हर प्रॉपर्टी मान को स्ट्रिंग के रूप में), Pirsch, Clarity, Hotjar, और Vercel। Fathom, Clarity, और Hotjar केवल इवेंट का नाम लेते हैं, इसलिए वे हर इवेंट को उसकी प्रॉपर्टीज़ के बिना गिनते हैं। Cloudflare और Clearbit के पास कोई इवेंट API नहीं है, और Clics के पास कोई ग्लोबल इवेंट API नहीं है जिसे Blume कॉल कर सके। हर इवेंट `window` पर `blume:track` CustomEvent के रूप में भी फ़ायर होता है, जिसके `detail` में `{ event, props }` होता है, इसलिए कोई `script()` एडैप्टर उसे कहीं और भी फ़ॉरवर्ड कर सकता है। असिस्टेंट कभी भी किसी प्रश्न का टेक्स्ट किसी प्रोवाइडर को नहीं भेजता, और सर्च अपनी क्वेरीज़ को ठीक वैसे ही भेजता है जैसे वे टाइप की गई हैं, जब तक कि आप [`search.analytics.queries`](/docs/configuration/search#search-analytics) को `false` पर सेट न करें, जिससे इसके बजाय हर क्वेरी की लंबाई भेजी जाती है; दोनों ही स्थितियों में टेक्स्ट फिर भी `blume:track` इवेंट तक पहुँचता है, ताकि आपके द्वारा लिखा गया कोई लिसनर उसे फ़ॉरवर्ड कर सके। अपनी बिल्ट साइट को डिप्लॉय करने के लिए, [Deployment](/docs/deployment) देखें।
+Blume का पेज फ़ीडबैक (`feedback`, और [लिखित फ़ीडबैक](/docs/configuration#written-feedback) चालू होने पर `feedback_comment`), [सर्च](/docs/configuration/search#search-analytics) (`search`, `search_select`), [असिस्टेंट](/docs/configuration/assistant#analytics) (`ask`, `ask_answer`, `ask_error`), और [नैरेशन](/docs/configuration/narration#analytics) प्लेयर (`narration_play`, `narration_complete`) हर उस कॉन्फ़िगर किए गए एडैप्टर के ज़रिए कस्टम इवेंट्स भेजते हैं जिसके पास क्लाइंट API है — PostHog, Mixpanel, Heap, Segment, Hightouch, Amplitude, LogRocket, Adobe, Google Analytics, Google Tag Manager (`window.dataLayer` पर `{ event }` पुश के रूप में), Plausible, Databuddy, Fathom, OneDollarStats (हर प्रॉपर्टी मान को स्ट्रिंग के रूप में), Pirsch, Clarity, Hotjar, और Vercel। Fathom, Clarity, और Hotjar केवल इवेंट का नाम लेते हैं, इसलिए वे हर इवेंट को उसकी प्रॉपर्टीज़ के बिना गिनते हैं। Cloudflare, Clearbit, और Notra के पास कोई इवेंट API नहीं है, और Clics के पास कोई ग्लोबल इवेंट API नहीं है जिसे Blume कॉल कर सके। हर इवेंट `window` पर `blume:track` CustomEvent के रूप में भी फ़ायर होता है, जिसके `detail` में `{ event, props }` होता है, इसलिए कोई `script()` एडैप्टर उसे कहीं और भी फ़ॉरवर्ड कर सकता है। असिस्टेंट कभी भी किसी प्रश्न का टेक्स्ट किसी प्रोवाइडर को नहीं भेजता, और सर्च अपनी क्वेरीज़ को ठीक वैसे ही भेजता है जैसे वे टाइप की गई हैं, जब तक कि आप [`search.analytics.queries`](/docs/configuration/search#search-analytics) को `false` पर सेट न करें, जिससे इसके बजाय हर क्वेरी की लंबाई भेजी जाती है; दोनों ही स्थितियों में टेक्स्ट फिर भी `blume:track` इवेंट तक पहुँचता है, ताकि आपके द्वारा लिखा गया कोई लिसनर उसे फ़ॉरवर्ड कर सके। अपनी बिल्ट साइट को डिप्लॉय करने के लिए, [Deployment](/docs/deployment) देखें।

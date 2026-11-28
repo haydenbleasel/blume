@@ -38,7 +38,10 @@ seo: {
   },
   software: {
     license: "MIT",
-    operatingSystem: "Node.js 22+",
+    softwareVersion: "2.4.0",
+    softwareRequirements: "Node.js 22+",
+    downloadUrl: "https://www.npmjs.com/package/acme",
+    installUrl: "https://docs.acme.com/quickstart",
     price: 0, // emitted as an Offer; 0 marks it free
     sameAs: ["https://www.npmjs.com/package/acme"],
   },
@@ -47,7 +50,7 @@ seo: {
 
 `organization` adiciona um nó **Organization** a todas as páginas — os nós WebSite e de página o citam como `publisher` — com o e-mail e o telefone como um `ContactPoint` (`contactType` tem como padrão `"customer support"`) e o endereço como um `PostalAddress`, os dois campos que as verificações de validação de negócio procuram. `name` e `url` assumem por padrão os do site; um `logo` relativo à raiz é absolutizado como qualquer URL de página.
 
-`software` adiciona um nó **SoftwareApplication** à página inicial: o nome e a descrição do produto (assumindo por padrão os do site), `applicationCategory` (padrão `"DeveloperApplication"`), sistema operacional, licença, um `Offer` quando `price` está definido, e as URLs do registro ou repositório em `sameAs`. Passe `software: true` para aceitar todos os padrões. A organização, quando configurada, é citada como seu `publisher`.
+`software` adiciona um nó **SoftwareApplication** à página inicial: o nome e a descrição do produto (assumindo por padrão os do site), `applicationCategory` (padrão `"DeveloperApplication"`), a `softwareVersion` atual, o `operatingSystem` em que ele roda e os `softwareRequirements` de que ele precisa (um runtime como o Node.js vai ali, não em `operatingSystem`), o `downloadUrl` e o `installUrl` de onde obtê-lo, licença, um `Offer` quando `price` está definido, e as URLs do registro ou repositório em `sameAs`. Passe `software: true` para aceitar todos os padrões. A organização, quando configurada, é citada como seu `publisher`.
 
 ## Identificadores de entidade compartilhados [#shared-entity-identifiers]
 
@@ -93,6 +96,20 @@ seo: {
 
 A [imagem Open Graph](/docs/discoverability/open-graph) resolvida também é incluída como `image` do nó da página, venha ela do frontmatter, de um padrão do site ou de um card gerado.
 
+## Perguntas e respostas [#questions-and-answers]
+
+Uma página escrita como perguntas e respostas, um FAQ ou uma página de solução de problemas, pode indicar isso no front matter:
+
+```yaml lineNumbers
+---
+title: FAQ
+seo:
+  faq: true
+---
+```
+
+A página então também carrega um nó **FAQPage**: cada título `##` que termina com ponto de interrogação é uma pergunta, e o texto até o próximo título `##` é a resposta aceita dela, como texto simples, deixando de fora os blocos de código. Uma pergunta sem texto abaixo dela é ignorada, assim como qualquer título `##` que não seja uma pergunta.
+
 ## Páginas personalizadas [#custom-pages]
 
-Uma [página `.astro`](/docs/advanced/custom-pages) personalizada renderizada através do `PageLayout` emite o mesmo grafo, então uma página inicial de marketing não fica sendo a única URL sem dados estruturados. Uma página personalizada não tem um arquivo de conteúdo de onde tirar a data, então passe `lastModified` para dar a ela um `dateModified`. Passe `structuredDataEnabled={config.structuredData}` para mantê-la em sincronia com essa configuração, ou `structuredDataEnabled={false}` para desativá-la apenas naquela página.
+Uma [página `.astro`](/docs/advanced/custom-pages) personalizada renderizada através do `PageLayout` emite o mesmo grafo, então uma página inicial de marketing não fica sendo a única URL sem dados estruturados. Uma página personalizada não tem um arquivo de conteúdo de onde tirar a data, então passe `lastModified` para dar a ela um `dateModified`, e `published` para o `datePublished` dela. Ela é um article, a menos que você diga o contrário: `structuredDataType` define o tipo do nó da página (`"WebPage"`, `"CollectionPage"`), e `pageType="blog"` a transforma em um `BlogPosting`. Passe `structuredDataEnabled={config.structuredData}` para mantê-la em sincronia com essa configuração, ou `structuredDataEnabled={false}` para desativá-la apenas naquela página.

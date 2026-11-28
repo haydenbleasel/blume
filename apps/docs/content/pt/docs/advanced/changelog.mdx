@@ -63,6 +63,8 @@ Assim que você tiver pelo menos uma entrada `type: changelog`, o Blume gera aut
 - A data segue o [`dateFormat`](/docs/configuration#date-format) configurado, sem o ano que o grupo da linha já mostra.
 - Os rascunhos e as entradas com `sidebar.hidden` são ignorados.
 
+A página leva a data da entrada mais recente que os mecanismos de busca podem indexar (uma versão com [`noindex`](/docs/discoverability/metadata#per-page-overrides) continua aparecendo na cronologia, mas não conta): em uma linha "Última atualização" no rodapé da página, no `dateModified` do JSON-LD dela e no `<lastmod>` dela no [sitemap](/docs/discoverability/sitemap-and-robots#sitemap).
+
 A página tem o título **Changelog** (em inglês), com uma descrição de uma linha logo abaixo. Defina os seus com `changelog` na sua configuração; eles também viram o `<title>` da página, a meta description e o card OG, além do topo do espelho em Markdown dela em `/changelog.md`:
 
 ```ts blume.config.ts

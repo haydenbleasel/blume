@@ -38,7 +38,10 @@ seo: {
   },
   software: {
     license: "MIT",
-    operatingSystem: "Node.js 22+",
+    softwareVersion: "2.4.0",
+    softwareRequirements: "Node.js 22+",
+    downloadUrl: "https://www.npmjs.com/package/acme",
+    installUrl: "https://docs.acme.com/quickstart",
     price: 0, // emitted as an Offer; 0 marks it free
     sameAs: ["https://www.npmjs.com/package/acme"],
   },
@@ -47,7 +50,7 @@ seo: {
 
 `organization` は、すべてのページに **Organization** ノードを追加します — WebSite ノードとページノードはこれを `publisher` として参照します — メールアドレスと電話番号は `ContactPoint` として (`contactType` のデフォルトは `"customer support"`)、住所は `PostalAddress` として出力され、この 2 つのフィールドはビジネス検証のチェックで参照されます。`name` と `url` はサイトの値がデフォルトになります。ルート相対の `logo` は、他のページ URL と同様に絶対 URL 化されます。
 
-`software` は、ホームページに **SoftwareApplication** ノードを追加します: 製品の名前と説明 (デフォルトはサイトの値)、`applicationCategory` (デフォルトは `"DeveloperApplication"`)、オペレーティングシステム、ライセンス、`price` が設定されている場合は `Offer`、そして `sameAs` にレジストリまたはリポジトリの URL が含まれます。すべてデフォルト値を使用するには `software: true` を指定してください。organization が設定されている場合は、その `publisher` として参照されます。
+`software` は、ホームページに **SoftwareApplication** ノードを追加します: 製品の名前と説明 (デフォルトはサイトの値)、`applicationCategory` (デフォルトは `"DeveloperApplication"`)、現在の `softwareVersion`、動作環境を示す `operatingSystem` と動作に必要な `softwareRequirements` (Node.js のようなランタイムは `operatingSystem` ではなくこちらに指定します)、入手先となる `downloadUrl` と `installUrl`、ライセンス、`price` が設定されている場合は `Offer`、そして `sameAs` にレジストリまたはリポジトリの URL が含まれます。すべてデフォルト値を使用するには `software: true` を指定してください。organization が設定されている場合は、その `publisher` として参照されます。
 
 ## 共有エンティティ識別子 [#shared-entity-identifiers]
 
@@ -93,6 +96,20 @@ seo: {
 
 解決された [Open Graph 画像](/docs/discoverability/open-graph) も、フロントマター、サイトのデフォルト、生成されたカードのいずれに由来するものであっても、ページノードの `image` として含まれます。
 
+## 質問と回答 [#questions-and-answers]
+
+FAQ やトラブルシューティングページのように、質問と回答の形式で書かれたページは、フロントマターでそのことを示せます:
+
+```yaml lineNumbers
+---
+title: FAQ
+seo:
+  faq: true
+---
+```
+
+これにより、そのページには **FAQPage** ノードも含まれるようになります: 疑問符で終わる各 `##` 見出しが質問となり、次の `##` 見出しまでのテキストがその承認済みの回答になります。回答はプレーンテキストとして出力され、コードブロックは除外されます。下にテキストがない質問はスキップされ、質問ではない `##` 見出しも同様にスキップされます。
+
 ## カスタムページ [#custom-pages]
 
-`PageLayout` を通してレンダリングされるカスタム [`.astro` ページ](/docs/advanced/custom-pages) も同じグラフを出力するため、マーケティング用のホームページだけが構造化データを持たない URL になることはありません。カスタムページには日付の基となるコンテンツファイルがないため、`dateModified` を付与するには `lastModified` を渡してください。この設定と同期させるには `structuredDataEnabled={config.structuredData}` を渡し、そのページだけ無効にするには `structuredDataEnabled={false}` を渡してください。
+`PageLayout` を通してレンダリングされるカスタム [`.astro` ページ](/docs/advanced/custom-pages) も同じグラフを出力するため、マーケティング用のホームページだけが構造化データを持たない URL になることはありません。カスタムページには日付の基となるコンテンツファイルがないため、`dateModified` を付与するには `lastModified` を、`datePublished` を付与するには `published` を渡してください。特に指定しない限り、カスタムページは記事として扱われます: `structuredDataType` はページノードの型 (`"WebPage"`、`"CollectionPage"`) を設定し、`pageType="blog"` を指定すると `BlogPosting` になります。この設定と同期させるには `structuredDataEnabled={config.structuredData}` を渡し、そのページだけ無効にするには `structuredDataEnabled={false}` を渡してください。

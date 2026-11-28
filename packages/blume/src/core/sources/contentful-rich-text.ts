@@ -22,6 +22,8 @@ import {
   listItem,
   markdownDocument,
   renderInline,
+  table,
+  tableCell,
   unsupported,
   writesMdx,
 } from "./lower.ts";
@@ -54,8 +56,6 @@ export interface ContentfulRichTextOptions {
 }
 
 const HEADING = /^heading-(?<level>[1-6])$/u;
-const CELL_PIPE = /\|/gu;
-const CELL_BREAK = /\n+/gu;
 
 /** The file behind an asset entry, or null when it carries none. */
 export const assetFromEntry = (asset: JsonObject): ContentfulAsset | null => {
@@ -219,37 +219,23 @@ const renderList = (
     )
     .join("\n");
 
-// Each of a cell's paragraphs is a block as much as a page's is, so it goes
-// through the same guard: two struck runs in one still meet as `~~~~`.
-const cellText = (
-  cell: JsonObject,
-  options: ContentfulRichTextOptions
-): string =>
-  children(cell)
-    .map((paragraph) => blockText(paragraph, options))
-    .join(" ")
-    .replaceAll(CELL_BREAK, " ")
-    .replaceAll(CELL_PIPE, String.raw`\|`);
-
-const tableRow = (cells: string[]): string => `| ${cells.join(" | ")} |`;
-
+// A cell holds paragraphs, each a block of the cell. The first row is the
+// header: GFM needs one.
 const renderTable = (
   node: JsonObject,
   options: ContentfulRichTextOptions
-): string => {
-  const rows = children(node).map((row) =>
-    children(row).map((cell) => cellText(cell, options))
+): string =>
+  table(
+    children(node).map((row) =>
+      children(row).map((cell) =>
+        tableCell(
+          children(cell).map((paragraph) =>
+            inlineParts(children(paragraph), options)
+          )
+        )
+      )
+    )
   );
-  const [head, ...body] = rows;
-  if (!head) {
-    return "";
-  }
-  return [
-    tableRow(head),
-    tableRow(head.map(() => "---")),
-    ...body.map((cells) => tableRow(cells)),
-  ].join("\n");
-};
 
 const renderBlock = (
   node: JsonObject,

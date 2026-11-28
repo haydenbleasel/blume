@@ -21,6 +21,7 @@ export default defineConfig({
         // prereleases: false,  // include prereleases (default off)
         // drafts: false,       // include drafts (needs a write token)
         // limit: 100,          // cap releases, newest-first
+        // noindex: { minWords: 60 }, // keep short releases out of search
         // baseUrl: "https://github.acme.com/api/v3", // GitHub Enterprise Server
       }),
     ],
@@ -36,6 +37,10 @@ changelog: {
   description: "Every release of the Acme SDK, from GitHub.",
 },
 ```
+
+### Releases curtas [#short-releases]
+
+Um repositório que publica releases com frequência acaba tendo muitas páginas de release com pouco conteúdo, como um bump de versão ou uma correção de uma linha, e um mecanismo de busca que indexa todas elas enxerga o site como composto principalmente de páginas rasas. Defina `noindex` para mantê-las fora do índice: `{ minWords: 60 }` marca uma release como `noindex` quando as notas dela têm menos de 60 palavras de texto corrido (títulos, código e os hashes de commit que o changesets coloca no início das entradas não contam), e `true` marca todas as releases. Uma release com noindex mantém a página, o lugar na timeline de `/changelog` e o item no feed RSS, mas sai do [sitemap](/docs/discoverability/sitemap-and-robots#sitemap), do [`llms.txt`](/docs/discoverability/llms-txt) e dos [dados estruturados](/docs/discoverability/structured-data), como acontece com qualquer página [`noindex`](/docs/discoverability/metadata#per-page-overrides).
 
 Um repositório privado se autentica com a variável de ambiente `GITHUB_TOKEN` — o mesmo token usado pelos outros recursos do GitHub, nunca colocado direto na sua config; o adapter declara essa variável, então um build sem ela gera um aviso. Para um repositório no GitHub Enterprise Server, defina `baseUrl` como a API REST dele (`https://<host>/api/v3`); o `GITHUB_TOKEN` é enviado para lá, então ele precisa ser um token desse servidor. Como [toda source remota](/docs/content/sources#caching-and-offline-builds), ela fica em cache em `.blume/cache/<source>/` e é servida offline se a API estiver inacessível. Como o changelog é um conteúdo complementar, uma falha na busca sem cache (por exemplo, um build de CI sem token) resulta em um changelog vazio com um aviso, em vez de quebrar o build — defina `GITHUB_TOKEN` nos seus ambientes de CI e de deploy para preenchê-lo.
 

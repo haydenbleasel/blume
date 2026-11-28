@@ -13,6 +13,7 @@ import { hightouchHead } from "./hightouch.ts";
 import { hotjarHead } from "./hotjar.ts";
 import { logrocketHead } from "./logrocket.ts";
 import { mixpanelHead } from "./mixpanel.ts";
+import { notraHead } from "./notra.ts";
 import { oneDollarStatsHead } from "./one-dollar-stats.ts";
 import { pirschHead } from "./pirsch.ts";
 import { plausibleHead } from "./plausible.ts";
@@ -99,6 +100,9 @@ const adapterScripts = (
     case "mixpanel": {
       return mixpanelHead(adapter.options);
     }
+    case "notra": {
+      return notraHead(adapter.options, base);
+    }
     case "one-dollar-stats": {
       return oneDollarStatsHead(adapter.options);
     }
@@ -124,8 +128,8 @@ const adapterScripts = (
  * Map the configured adapters to what `Analytics.astro` renders, in declared
  * order. A second `vercel()` is dropped — two copies of the component would
  * count every pageview twice — so the first one keeps its position. `base` is
- * the deployment base a `script()` adapter's root-relative `src` is served
- * under.
+ * the deployment base a `script()` or `notra()` adapter's root-relative `src`
+ * is served under.
  */
 export const analyticsHead = (
   adapters: AnalyticsAdapter[],

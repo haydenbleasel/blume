@@ -24,6 +24,7 @@ const { search, webmcp } = data.config;
 <script>
   import { navigate } from "astro:transitions/client";
 
+  import { deployBase } from "../islands/base-path.ts";
   import type { ModelContext } from "../islands/webmcp.ts";
   import { buildWebMcpTools, registerWebMcpTools } from "../islands/webmcp.ts";
 
@@ -39,7 +40,7 @@ const { search, webmcp } = data.config;
     if (context) {
       registerWebMcpTools(
         buildWebMcpTools({
-          base: import.meta.env.BASE_URL,
+          base: deployBase(),
           llms: marker.dataset.llms === "true",
           loadSearch: async () =>
             (await import("blume:search-client")).createSearch(),
